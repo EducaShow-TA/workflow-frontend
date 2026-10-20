@@ -1,10 +1,10 @@
 <script setup lang="ts">
 const ruta = useRoute()
 const enlacesPendientes = [
-  { nombre: 'Docentes', icono: '/icons/docentes.svg' },
-  { nombre: 'Clases', icono: '/icons/clases.svg' },
-  { nombre: 'Finanzas', icono: '/icons/finanzas.svg' },
-  { nombre: 'Reportes', icono: '/icons/reportes.svg' },
+  { nombre: 'Docentes', icono: '/icons/menu-docentes.svg' },
+  { nombre: 'Clases', icono: '/icons/menu-clases.svg' },
+  { nombre: 'Finanzas', icono: '/icons/menu-finanzas.svg' },
+  { nombre: 'Reportes', icono: '/icons/menu-reportes.svg' },
 ]
 </script>
 
@@ -29,23 +29,34 @@ const enlacesPendientes = [
         :aria-current="ruta.path === '/panel' ? 'page' : undefined"
       >
         <span class="contenedor-icono">
-          <img src="/icons/panel.svg" alt="" />
+          <img src="/icons/menu-panel.svg" alt="" />
         </span>
         <span>Panel</span>
       </NuxtLink>
 
       <NuxtLink
-      to="/estudiantes"
-      class="enlace-menu"
-      :class="{ activo: ruta.path.startsWith('/estudiantes') }"
-      :aria-current="ruta.path.startsWith('/estudiantes') ? 'page' : undefined"
-    >
-      <span class="contenedor-icono">
-        <img src="/icons/estudiantes.svg" alt="" />
-      </span>
+        to="/estudiantes"
+        class="enlace-menu"
+        :class="{ activo: ruta.path.startsWith('/estudiantes') }"
+        :aria-current="ruta.path.startsWith('/estudiantes') ? 'page' : undefined"
+      >
+        <span class="contenedor-icono">
+          <img src="/icons/menu-estudiantes.svg" alt="" />
+        </span>
 
-      <span>Estudiantes</span>
-    </NuxtLink>
+        <span>Estudiantes</span>
+      </NuxtLink>
+      <NuxtLink
+        to="/matriculas/nueva"
+        class="enlace-menu"
+        :class="{ activo: ruta.path.startsWith('/matriculas') }"
+        :aria-current="ruta.path.startsWith('/matriculas') ? 'page' : undefined"
+      >
+        <span class="contenedor-icono">
+          <img src="/icons/menu-matricula.svg" alt="" />
+        </span>
+        <span>Matrícula</span>
+      </NuxtLink>
 
       <span
         v-for="enlace in enlacesPendientes"
@@ -64,7 +75,7 @@ const enlacesPendientes = [
     <div class="parte-inferior">
       <span class="enlace-menu deshabilitado" aria-disabled="true" title="Configuración pendiente">
         <span class="contenedor-icono">
-          <img src="/icons/config.svg" alt="" />
+          <img src="/icons/menu-config.svg" alt="" />
         </span>
         <span>Configuración</span>
       </span>
@@ -196,4 +207,12 @@ const enlacesPendientes = [
     display: none;
   }
 }
+
+/* EDU: color unico para iconos del menu */
+.navegacion .contenedor-icono img,
+.parte-inferior .contenedor-icono img {
+  filter: none !important;
+  opacity: 1 !important;
+}
+
 </style>

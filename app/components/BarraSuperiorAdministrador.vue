@@ -5,7 +5,11 @@ import { useAutenticacionStore } from '~/stores/autenticacion'
 const autenticacion = useAutenticacionStore()
 const ruta = useRoute()
 
-const nombrePagina = computed(() => (ruta.path.startsWith('/estudiantes') ? 'Estudiantes' : 'Panel'))
+const nombrePagina = computed(() => {
+  if (ruta.path.startsWith('/estudiantes')) return 'Estudiantes'
+  if (ruta.path.startsWith('/matriculas')) return 'Matrícula'
+  return 'Panel'
+})
 
 const consulta = ref('')
 const avisoBusqueda = ref('')

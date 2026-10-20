@@ -10,7 +10,7 @@ const estudiantesDemostracion: EstudianteListado[] = [
     grado: '3ro Secundaria',
     seccion: 'A',
     estado: 'ACTIVO',
-    avatar: '/images/estudiantes/ana-garcia.png',
+    avatar: '/images/estudiantes/ana-garcia.svg',
   },
   {
     codigo: 'EST-2023-045',
@@ -31,7 +31,7 @@ const estudiantesDemostracion: EstudianteListado[] = [
     grado: '1ro Secundaria',
     seccion: 'A',
     estado: 'ACTIVO',
-    avatar: '/images/estudiantes/luis-silva.png',
+    avatar: '/images/estudiantes/luis-silva.svg',
   },
 ]
 
