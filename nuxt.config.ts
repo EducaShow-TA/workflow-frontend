@@ -21,4 +21,15 @@ export default defineNuxtConfig({
 
   // Modulos del proyecto
   modules: ['@pinia/nuxt', '@nuxt/eslint'],
+
+  // Solo en `nuxt dev`: reenvia /api al backend local para trabajar en el mismo origen, como en produccion
+  // (Nginx sirve la SPA y /api desde el mismo dominio), sin habilitar CORS en el backend.
+  nitro: {
+    devProxy: {
+      '/api': {
+        target: 'http://localhost:8080/api',
+        changeOrigin: true,
+      },
+    },
+  },
 })

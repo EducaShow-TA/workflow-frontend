@@ -1,5 +1,6 @@
 import type { MetodoHttp, RespuestaErrorApi } from '~/types/api'
 import { ErrorSolicitudApi } from '~/types/api'
+import { useAutenticacionStore } from '~/stores/autenticacion'
 
 interface OpcionesSolicitud {
   metodo?: MetodoHttp
@@ -30,26 +31,37 @@ function convertirErrorApi(error: unknown): ErrorSolicitudApi {
 
 export function useApi() {
   const configuracion = useRuntimeConfig()
+  const autenticacion = useAutenticacionStore()
 
   async function solicitar<T>(ruta: string, opciones: OpcionesSolicitud = {}): Promise<T> {
+    // Base vacía = mismo origen: en producción Nginx sirve la SPA y /api; en desarrollo lo hace el devProxy de Nuxt.
     const urlBase = String(configuracion.public.apiBase || '').replace(/\/+$/, '')
-
-    if (!urlBase) {
-      throw new ErrorSolicitudApi('La URL del backend todavía no está configurada.', 0, ruta)
-    }
 
     if (!ruta.startsWith('/api/v1/')) {
       throw new ErrorSolicitudApi('La ruta debe utilizar el prefijo /api/v1/.', 0, ruta)
+    }
+
+    const cabeceras: Record<string, string> = {}
+    if (opciones.cuerpo !== undefined) {
+      cabeceras['Content-Type'] = 'application/json'
+    }
+    if (autenticacion.token) {
+      cabeceras.Authorization = `Bearer ${autenticacion.token}`
     }
 
     try {
       return await $fetch<T>(`${urlBase}${ruta}`, {
         method: opciones.metodo ?? 'GET',
         body: opciones.cuerpo === undefined ? undefined : JSON.stringify(opciones.cuerpo),
-        headers: opciones.cuerpo === undefined ? undefined : { 'Content-Type': 'application/json' },
+        headers: cabeceras,
       })
     } catch (error: unknown) {
-      throw convertirErrorApi(error)
+      const errorApi = convertirErrorApi(error)
+      // Token vencido o inválido: se descarta la sesión para que el middleware lleve al login.
+      if (errorApi.estado === 401 && autenticacion.token) {
+        autenticacion.cerrarSesion()
+      }
+      throw errorApi
     }
   }
 

@@ -1,11 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-
-interface UsuarioAutenticado {
-  nombre: string
-  correoElectronico: string
-  rol: 'ADMINISTRADOR'
-}
+import type { RespuestaInicioSesion, SolicitudInicioSesion, UsuarioPerfil } from '~/types/autenticacion'
+import { ErrorSolicitudApi } from '~/types/api'
 
 interface ResultadoAutenticacion {
   exito: boolean
@@ -13,45 +9,35 @@ interface ResultadoAutenticacion {
 }
 
 export const useAutenticacionStore = defineStore('autenticacion', () => {
-  const usuario = ref<UsuarioAutenticado | null>(null)
+  // El token vive solo en memoria: al recargar la página se pide iniciar sesión otra vez.
+  // Persistirlo ("Recordar sesión") es una decisión de seguridad pendiente del equipo.
+  const token = ref<string | null>(null)
+  const usuario = ref<UsuarioPerfil | null>(null)
 
-  const autenticado = computed(() => usuario.value !== null)
+  const autenticado = computed(() => token.value !== null && usuario.value !== null)
 
-  function iniciarSesion(correoElectronico: string, contrasenia: string): ResultadoAutenticacion {
-    if (!import.meta.dev) {
-      return {
-        exito: false,
-        mensaje: 'La autenticación de prueba no está disponible.',
-      }
-    }
+  async function iniciarSesion(correoElectronico: string, contrasenia: string): Promise<ResultadoAutenticacion> {
+    const { solicitar } = useApi()
+    const cuerpo: SolicitudInicioSesion = { username: correoElectronico, password: contrasenia }
 
-    const correoValido = correoElectronico.toLowerCase() === 'admin@educashow.com'
-    const contraseniaValida = contrasenia === 'Admin12345'
-
-    if (!correoValido || !contraseniaValida) {
-      return {
-        exito: false,
-        mensaje: 'Correo electrónico o contraseña incorrectos.',
-      }
-    }
-
-    usuario.value = {
-      nombre: 'Administrador',
-      correoElectronico: 'admin@educashow.com',
-      rol: 'ADMINISTRADOR',
-    }
-
-    return {
-      exito: true,
-      mensaje: '',
+    try {
+      const respuesta = await solicitar<RespuestaInicioSesion>('/api/v1/auth/login', { metodo: 'POST', cuerpo })
+      token.value = respuesta.token
+      usuario.value = respuesta.usuario
+      return { exito: true, mensaje: '' }
+    } catch (error: unknown) {
+      const mensaje = error instanceof ErrorSolicitudApi ? error.message : 'No se pudo iniciar sesión.'
+      return { exito: false, mensaje }
     }
   }
 
   function cerrarSesion(): void {
+    token.value = null
     usuario.value = null
   }
 
   return {
+    token,
     usuario,
     autenticado,
     iniciarSesion,

@@ -43,7 +43,7 @@ async function procesarInicioSesion(): Promise<void> {
     return
   }
 
-  const resultado = autenticacion.iniciarSesion(correoElectronico.value.trim(), contrasenia.value)
+  const resultado = await autenticacion.iniciarSesion(correoElectronico.value.trim(), contrasenia.value)
 
   if (!resultado.exito) {
     mensajeInformativo.value = resultado.mensaje
