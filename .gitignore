@@ -9,23 +9,26 @@ dist
 # Node dependencies
 node_modules
 
+# Herramientas
+coverage/
+.eslintcache
+
 # Logs
 logs
 *.log
-
-# Misc
-.DS_Store
-.fleet
-.idea
 
 # Local env files
 .env
 .env.*
 !.env.example
-node_modules/
-.nuxt/
-.output/
-dist/
-coverage/
-*.bak
+
+# Editores
+.idea/
+.fleet/
+.vscode/
+!.vscode/extensions.json
+
+# Misc
+.DS_Store
 Thumbs.db
+*.bak

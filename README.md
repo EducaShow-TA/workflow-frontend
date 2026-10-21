@@ -1,75 +1,37 @@
-# Nuxt Minimal Starter
+# EducaShow — frontend
 
-Look at the [Nuxt documentation](https://nuxt.com/docs/getting-started/introduction) to learn more.
+SPA del Sistema de Información Web para la Gestión Integral de un Colegio de Educación Secundaria
+(Nuxt 4 + Vue 3 + TypeScript + Pinia, sin SSR). Consume el API REST de
+[`workflow-backend`](https://github.com/EducaShow-TA/workflow-backend).
 
-## Setup
+## Despliegue local
 
-Make sure to install dependencies:
+La guía completa (requisitos, MySQL en Docker, backend y frontend) está en el backend:
+[`docs/despliegue-local.md`](https://github.com/EducaShow-TA/workflow-backend/blob/Development/docs/despliegue-local.md).
 
-```bash
-# npm
-npm install
-
-# pnpm
-pnpm install
-
-# yarn
-yarn install
-
-# bun
-bun install
-```
-
-## Development Server
-
-Start the development server on `http://localhost:3000`:
+Resumen del frontend, con el backend ya corriendo en `http://localhost:8080`:
 
 ```bash
-# npm
-npm run dev
-
-# pnpm
-pnpm dev
-
-# yarn
-yarn dev
-
-# bun
-bun run dev
+npm ci         # instala dependencias (Node 22)
+npm run dev    # http://localhost:3000
 ```
 
-## Production
+En desarrollo, el `devProxy` de `nuxt.config.ts` reenvía `/api` al backend: no hace falta `.env` ni CORS.
 
-Build the application for production:
+## Verificaciones antes de un Pull Request
 
 ```bash
-# npm
-npm run build
-
-# pnpm
-pnpm build
-
-# yarn
-yarn build
-
-# bun
-bun run build
+npx eslint .
+npx prettier --check .
+npx nuxi typecheck
 ```
 
-Locally preview production build:
+## Build de producción
 
 ```bash
-# npm
-npm run preview
-
-# pnpm
-pnpm preview
-
-# yarn
-yarn preview
-
-# bun
-bun run preview
+npm run generate   # genera la SPA estática en .output/public (la sirve Nginx)
 ```
 
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
+Flujo de ramas y Pull Requests:
+[`docs/flujo-de-trabajo.md`](https://github.com/EducaShow-TA/workflow-backend/blob/Development/docs/flujo-de-trabajo.md)
+(en el backend).

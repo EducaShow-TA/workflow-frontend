@@ -105,11 +105,11 @@ async function cerrarSesion(): Promise<void> {
         <div v-if="perfilAbierto" id="menu-perfil" class="menu-emergente" role="menu" aria-label="Opciones de usuario">
           <div class="datos-usuario">
             <strong>
-              {{ autenticacion.usuario?.nombre ?? 'Administrador' }}
+              {{ autenticacion.usuario?.nombreCompleto ?? 'Administrador' }}
             </strong>
 
             <span>
-              {{ autenticacion.usuario?.correoElectronico }}
+              {{ autenticacion.usuario?.username }}
             </span>
           </div>
 
