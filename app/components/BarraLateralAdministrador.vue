@@ -23,8 +23,8 @@ const enlaces: EnlaceMenu[] = [
   { nombre: 'Clases', icono: '/icons/menu-clases.svg' },
   { nombre: 'Finanzas', icono: '/icons/menu-finanzas.svg' },
   { nombre: 'Reportes', icono: '/icons/menu-reportes.svg' },
-  { nombre: 'Usuarios', icono: '/icons/menu-usuarios.svg' },
-  { nombre: 'Roles/Permisos', icono: '/icons/menu-roles.svg' },
+  { nombre: 'Usuarios', icono: '/icons/menu-usuarios.svg', destino: '/usuarios' },
+  { nombre: 'Roles/Permisos', icono: '/icons/menu-roles.svg', destino: '/roles-permisos' },
 ]
 
 function estaActivo(enlace: EnlaceMenu): boolean {
