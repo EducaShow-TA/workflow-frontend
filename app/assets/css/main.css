@@ -1,0 +1,48 @@
+:root {
+  /* Colores institucionales */
+  --color-primary: #1e40af;
+  --color-primary-dark: #0f3d8c;
+  --color-primary-light: #93b4fa;
+
+  /* Superficies */
+  --color-background: #f5f6f8;
+  --color-surface: #ffffff;
+  --color-border: #e5e7eb;
+
+  /* Textos */
+  --color-text: #1f2937;
+  --color-text-secondary: #6b7280;
+
+  /* Estados */
+  --color-success: #15803d;
+  --color-warning: #d97706;
+  --color-error: #dc2626;
+
+  /* Tipografia */
+  --font-primary: Inter, Roboto, Arial, sans-serif;
+
+  /* Bordes */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-background);
+  color: var(--color-text);
+  font-family: var(--font-primary);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
