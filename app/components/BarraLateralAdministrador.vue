@@ -1,11 +1,36 @@
 <script setup lang="ts">
+interface EnlaceMenu {
+  nombre: string
+  icono: string
+  destino?: string
+  prefijoActivo?: string
+}
+
 const ruta = useRoute()
-const enlacesPendientes = [
+
+const enlaces: EnlaceMenu[] = [
+  { nombre: 'Panel', icono: '/icons/menu-panel.svg', destino: '/panel' },
+  { nombre: 'Estudiantes', icono: '/icons/menu-estudiantes.svg', destino: '/estudiantes' },
+  {
+    nombre: 'Matrícula',
+    icono: '/icons/menu-matricula.svg',
+    destino: '/matriculas/nueva',
+    prefijoActivo: '/matriculas',
+  },
+  { nombre: 'Grados/Secciones', icono: '/icons/menu-secciones.svg', destino: '/secciones' },
+  { nombre: 'Competencias', icono: '/icons/menu-competencias.svg', destino: '/competencias' },
   { nombre: 'Docentes', icono: '/icons/menu-docentes.svg' },
   { nombre: 'Clases', icono: '/icons/menu-clases.svg' },
   { nombre: 'Finanzas', icono: '/icons/menu-finanzas.svg' },
   { nombre: 'Reportes', icono: '/icons/menu-reportes.svg' },
+  { nombre: 'Usuarios', icono: '/icons/menu-usuarios.svg' },
+  { nombre: 'Roles/Permisos', icono: '/icons/menu-roles.svg' },
 ]
+
+function estaActivo(enlace: EnlaceMenu): boolean {
+  const prefijo = enlace.prefijoActivo ?? enlace.destino
+  return prefijo !== undefined && ruta.path.startsWith(prefijo)
+}
 </script>
 
 <template>
@@ -22,54 +47,27 @@ const enlacesPendientes = [
     </NuxtLink>
 
     <nav class="navegacion" aria-label="Navegación principal">
-      <NuxtLink
-        to="/panel"
-        class="enlace-menu"
-        :class="{ activo: ruta.path === '/panel' }"
-        :aria-current="ruta.path === '/panel' ? 'page' : undefined"
-      >
-        <span class="contenedor-icono">
-          <img src="/icons/menu-panel.svg" alt="" />
-        </span>
-        <span>Panel</span>
-      </NuxtLink>
+      <template v-for="enlace in enlaces" :key="enlace.nombre">
+        <NuxtLink
+          v-if="enlace.destino"
+          :to="enlace.destino"
+          class="enlace-menu"
+          :class="{ activo: estaActivo(enlace) }"
+          :aria-current="estaActivo(enlace) ? 'page' : undefined"
+        >
+          <span class="contenedor-icono">
+            <img :src="enlace.icono" alt="" />
+          </span>
+          <span>{{ enlace.nombre }}</span>
+        </NuxtLink>
 
-      <NuxtLink
-        to="/estudiantes"
-        class="enlace-menu"
-        :class="{ activo: ruta.path.startsWith('/estudiantes') }"
-        :aria-current="ruta.path.startsWith('/estudiantes') ? 'page' : undefined"
-      >
-        <span class="contenedor-icono">
-          <img src="/icons/menu-estudiantes.svg" alt="" />
+        <span v-else class="enlace-menu deshabilitado" aria-disabled="true" title="Módulo pendiente de implementación">
+          <span class="contenedor-icono">
+            <img :src="enlace.icono" alt="" />
+          </span>
+          <span>{{ enlace.nombre }}</span>
         </span>
-
-        <span>Estudiantes</span>
-      </NuxtLink>
-      <NuxtLink
-        to="/matriculas/nueva"
-        class="enlace-menu"
-        :class="{ activo: ruta.path.startsWith('/matriculas') }"
-        :aria-current="ruta.path.startsWith('/matriculas') ? 'page' : undefined"
-      >
-        <span class="contenedor-icono">
-          <img src="/icons/menu-matricula.svg" alt="" />
-        </span>
-        <span>Matrícula</span>
-      </NuxtLink>
-
-      <span
-        v-for="enlace in enlacesPendientes"
-        :key="enlace.nombre"
-        class="enlace-menu deshabilitado"
-        aria-disabled="true"
-        title="Módulo pendiente de implementación"
-      >
-        <span class="contenedor-icono">
-          <img :src="enlace.icono" alt="" />
-        </span>
-        <span>{{ enlace.nombre }}</span>
-      </span>
+      </template>
     </nav>
 
     <div class="parte-inferior">
@@ -214,5 +212,4 @@ const enlacesPendientes = [
   filter: none !important;
   opacity: 1 !important;
 }
-
 </style>
