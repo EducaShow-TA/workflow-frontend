@@ -8,6 +8,10 @@ const ruta = useRoute()
 const nombrePagina = computed(() => {
   if (ruta.path.startsWith('/estudiantes')) return 'Estudiantes'
   if (ruta.path.startsWith('/matriculas')) return 'Matrícula'
+  if (ruta.path.startsWith('/secciones')) return 'Grados y secciones'
+  if (ruta.path.startsWith('/competencias')) return 'Competencias'
+  if (ruta.path.startsWith('/usuarios')) return 'Usuarios'
+  if (ruta.path.startsWith('/roles-permisos')) return 'Roles y permisos'
   return 'Panel'
 })
 
