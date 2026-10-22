@@ -148,26 +148,6 @@ export function validarCompetenciasNuevas(competencias: SolicitudCompetencia[]):
   })
 }
 
-/**
- * Motivo por el que una competencia no se puede eliminar, o cadena vacia si se puede.
- * - Con notas registradas solo se puede desactivar (US-3.5, criterio 2).
- * - La ultima competencia de un area no se elimina, porque toda area agrupa al menos una (1..*).
- */
-export function obtenerMotivoNoEliminable(
-  competencia: Pick<Competencia, 'tieneNotasRegistradas'>,
-  cantidadCompetenciasArea: number,
-): string {
-  if (competencia.tieneNotasRegistradas) {
-    return 'Tiene notas registradas: solo se puede desactivar.'
-  }
-
-  if (cantidadCompetenciasArea <= 1) {
-    return 'Es la única competencia del área; toda área debe tener al menos una.'
-  }
-
-  return ''
-}
-
 function cumpleEstado(activo: boolean, estado: FiltroEstado): boolean {
   if (estado === 'ACTIVOS') {
     return activo
@@ -420,7 +400,17 @@ function buscarAreaPrueba(id: number, ruta: string): Area {
   const area = areasPrueba.find((actual) => actual.id === id)
 
   if (!area) {
-    throw crearErrorPrueba('El área no existe.', 404, ruta)
+    throw crearErrorPrueba('Área no encontrada', 404, ruta)
+  }
+
+  return area
+}
+
+function buscarAreaActivaPrueba(id: number, ruta: string): Area {
+  const area = buscarAreaPrueba(id, ruta)
+
+  if (!area.activo) {
+    throw crearErrorPrueba('Área no encontrada', 404, ruta)
   }
 
   return area
@@ -435,7 +425,7 @@ function buscarCompetenciaPrueba(id: number, ruta: string): { area: Area; compet
     }
   }
 
-  throw crearErrorPrueba('La competencia no existe.', 404, ruta)
+  throw crearErrorPrueba('Competencia no encontrada', 404, ruta)
 }
 
 function lanzarErroresPrueba(errores: Record<string, string | undefined>, esDuplicado: boolean, ruta: string): void {
@@ -451,7 +441,7 @@ export function useCompetencias() {
   const { solicitar } = useApi()
 
   async function listarAreas(): Promise<Area[]> {
-    if (usarDatosPrueba()) {
+    if (usarDatosPrueba('competencias')) {
       await esperarLatencia()
       return ordenarAreas(copiarDatos(areasPrueba))
     }
@@ -466,7 +456,7 @@ export function useCompetencias() {
       competencias: solicitud.competencias.map(limpiarSolicitudCompetencia),
     }
 
-    if (usarDatosPrueba()) {
+    if (usarDatosPrueba('competencias')) {
       await esperarLatencia()
 
       const errorMinimo = validarMinimoCompetencias(cuerpo.competencias)
@@ -505,10 +495,10 @@ export function useCompetencias() {
       descripcion: limpiarTexto(solicitud.descripcion),
     }
 
-    if (usarDatosPrueba()) {
+    if (usarDatosPrueba('competencias')) {
       await esperarLatencia()
 
-      const area = buscarAreaPrueba(id, ruta)
+      const area = buscarAreaActivaPrueba(id, ruta)
       lanzarErroresPrueba(
         validarArea(cuerpo, areasPrueba, id),
         existeAreaConNombre(cuerpo.nombre, areasPrueba, id),
@@ -526,7 +516,7 @@ export function useCompetencias() {
   async function cambiarEstadoArea(id: number, activo: boolean): Promise<Area> {
     const ruta = `${RUTA_AREAS}/${id}/estado`
 
-    if (usarDatosPrueba()) {
+    if (usarDatosPrueba('competencias')) {
       await esperarLatencia()
 
       const area = buscarAreaPrueba(id, ruta)
@@ -541,10 +531,10 @@ export function useCompetencias() {
     const ruta = `${RUTA_AREAS}/${areaId}/competencias`
     const cuerpo = limpiarSolicitudCompetencia(solicitud)
 
-    if (usarDatosPrueba()) {
+    if (usarDatosPrueba('competencias')) {
       await esperarLatencia()
 
-      const area = buscarAreaPrueba(areaId, ruta)
+      const area = buscarAreaActivaPrueba(areaId, ruta)
       lanzarErroresPrueba(validarCompetencia(cuerpo, area), existeCompetenciaEnArea(cuerpo.nombre, area), ruta)
 
       const nueva = crearCompetenciaPrueba(siguienteIdCompetencia++, areaId, cuerpo.nombre, cuerpo.descripcion)
@@ -559,10 +549,15 @@ export function useCompetencias() {
     const ruta = `${RUTA_COMPETENCIAS}/${id}`
     const cuerpo = limpiarSolicitudCompetencia(solicitud)
 
-    if (usarDatosPrueba()) {
+    if (usarDatosPrueba('competencias')) {
       await esperarLatencia()
 
       const { area, competencia } = buscarCompetenciaPrueba(id, ruta)
+
+      if (!competencia.activo) {
+        throw crearErrorPrueba('Competencia no encontrada', 404, ruta)
+      }
+
       lanzarErroresPrueba(validarCompetencia(cuerpo, area, id), existeCompetenciaEnArea(cuerpo.nombre, area, id), ruta)
 
       competencia.nombre = cuerpo.nombre
@@ -576,7 +571,7 @@ export function useCompetencias() {
   async function cambiarEstadoCompetencia(id: number, activo: boolean): Promise<Competencia> {
     const ruta = `${RUTA_COMPETENCIAS}/${id}/estado`
 
-    if (usarDatosPrueba()) {
+    if (usarDatosPrueba('competencias')) {
       await esperarLatencia()
 
       const { competencia } = buscarCompetenciaPrueba(id, ruta)
@@ -587,26 +582,6 @@ export function useCompetencias() {
     return solicitar<Competencia>(ruta, { metodo: 'PATCH', cuerpo: { activo } })
   }
 
-  async function eliminarCompetencia(id: number): Promise<void> {
-    const ruta = `${RUTA_COMPETENCIAS}/${id}`
-
-    if (usarDatosPrueba()) {
-      await esperarLatencia()
-
-      const { area, competencia } = buscarCompetenciaPrueba(id, ruta)
-      const motivo = obtenerMotivoNoEliminable(competencia, area.competencias.length)
-
-      if (motivo) {
-        throw crearErrorPrueba(motivo, 409, ruta)
-      }
-
-      area.competencias = area.competencias.filter((actual) => actual.id !== id)
-      return
-    }
-
-    await solicitar<unknown>(ruta, { metodo: 'DELETE' })
-  }
-
   return {
     listarAreas,
     registrarArea,
@@ -615,6 +590,5 @@ export function useCompetencias() {
     registrarCompetencia,
     actualizarCompetencia,
     cambiarEstadoCompetencia,
-    eliminarCompetencia,
   }
 }

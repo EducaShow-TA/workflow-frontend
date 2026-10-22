@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { useId } from 'vue'
 import type { Area, Competencia } from '~/types/competencia'
-import { obtenerMotivoNoEliminable } from '~/composables/useCompetencias'
 
-const propiedades = defineProps<{
+defineProps<{
   /** Area a mostrar; puede traer solo las competencias que coinciden con el filtro. */
   area: Area
-  /** Cantidad real de competencias del area, sin filtrar. Se usa para la regla de la ultima competencia. */
+  /** Cantidad real de competencias del area, sin filtrar. */
   totalCompetencias: number
   expandida: boolean
 }>()
@@ -18,17 +17,13 @@ const emitir = defineEmits<{
   agregarCompetencia: []
   editarCompetencia: [competencia: Competencia]
   cambiarEstadoCompetencia: [competencia: Competencia]
-  eliminarCompetencia: [competencia: Competencia]
 }>()
 
 const idContenido = useId()
+const MOTIVO_INACTIVA = 'Actívala para editarla.'
 
 function describirCantidad(cantidad: number): string {
   return `${cantidad} ${cantidad === 1 ? 'competencia' : 'competencias'}`
-}
-
-function obtenerMotivo(competencia: Competencia): string {
-  return obtenerMotivoNoEliminable(competencia, propiedades.totalCompetencias)
 }
 </script>
 
@@ -59,6 +54,8 @@ function obtenerMotivo(competencia: Competencia): string {
         <button
           type="button"
           class="boton-tabla"
+          :disabled="!area.activo"
+          :title="area.activo ? undefined : MOTIVO_INACTIVA"
           :aria-label="`Editar área ${area.nombre}`"
           @click="emitir('editarArea')"
         >
@@ -115,6 +112,8 @@ function obtenerMotivo(competencia: Competencia): string {
                   <button
                     type="button"
                     class="boton-tabla"
+                    :disabled="!competencia.activo"
+                    :title="competencia.activo ? undefined : MOTIVO_INACTIVA"
                     :aria-label="`Editar competencia ${competencia.nombre}`"
                     @click="emitir('editarCompetencia', competencia)"
                   >
@@ -129,23 +128,7 @@ function obtenerMotivo(competencia: Competencia): string {
                   >
                     {{ competencia.activo ? 'Desactivar' : 'Activar' }}
                   </button>
-
-                  <button
-                    type="button"
-                    class="boton-tabla peligro"
-                    :disabled="Boolean(obtenerMotivo(competencia))"
-                    :title="obtenerMotivo(competencia) || undefined"
-                    :aria-label="`Eliminar competencia ${competencia.nombre}`"
-                    :aria-describedby="obtenerMotivo(competencia) ? `motivo-${competencia.id}` : undefined"
-                    @click="emitir('eliminarCompetencia', competencia)"
-                  >
-                    Eliminar
-                  </button>
                 </div>
-
-                <small v-if="obtenerMotivo(competencia)" :id="`motivo-${competencia.id}`" class="motivo">
-                  {{ obtenerMotivo(competencia) }}
-                </small>
               </td>
             </tr>
 
@@ -157,7 +140,15 @@ function obtenerMotivo(competencia: Competencia): string {
       </div>
 
       <footer class="pie-area">
-        <button type="button" class="boton-agregar" @click="emitir('agregarCompetencia')">+ Agregar competencia</button>
+        <button
+          type="button"
+          class="boton-agregar"
+          :disabled="!area.activo"
+          :title="area.activo ? undefined : MOTIVO_INACTIVA"
+          @click="emitir('agregarCompetencia')"
+        >
+          + Agregar competencia
+        </button>
       </footer>
     </div>
   </article>
@@ -332,14 +323,6 @@ td {
   background: #eef2ff;
 }
 
-.boton-tabla.peligro {
-  color: #b91c1c;
-}
-
-.boton-tabla.peligro:hover:not(:disabled) {
-  background: #fef2f2;
-}
-
 .boton-tabla:focus-visible {
   outline: 2px solid #004ac6;
   outline-offset: 2px;
@@ -349,14 +332,6 @@ td {
   border-color: #e5e7eb;
   color: #9ca3af;
   cursor: not-allowed;
-}
-
-.motivo {
-  display: block;
-  max-width: 280px;
-  margin-top: 6px;
-  color: #737686;
-  font-size: 12px;
 }
 
 .sin-resultados {
@@ -381,8 +356,14 @@ td {
   cursor: pointer;
 }
 
-.boton-agregar:hover {
+.boton-agregar:hover:not(:disabled) {
   background: #eef2ff;
+}
+
+.boton-agregar:disabled {
+  border-color: #c3c6d7;
+  color: #9ca3af;
+  cursor: not-allowed;
 }
 
 @media (max-width: 760px) {

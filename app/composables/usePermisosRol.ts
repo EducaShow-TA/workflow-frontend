@@ -98,13 +98,6 @@ export const PERMISOS: Permiso[] = [
     sensible: false,
   },
   {
-    codigo: 'COMPETENCIA_ELIMINAR',
-    modulo: 'Competencias',
-    nombre: 'Eliminar competencias',
-    descripcion: 'Eliminar competencias sin notas registradas.',
-    sensible: true,
-  },
-  {
     codigo: 'USUARIO_VER',
     modulo: 'Usuarios y permisos',
     nombre: 'Ver usuarios',
