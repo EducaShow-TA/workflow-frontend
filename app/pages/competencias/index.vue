@@ -38,7 +38,6 @@ const {
   registrarCompetencia,
   actualizarCompetencia,
   cambiarEstadoCompetencia,
-  eliminarCompetencia,
 } = useCompetencias()
 
 const areas = ref<Area[]>([])
@@ -317,7 +316,7 @@ async function guardarCompetencia(): Promise<void> {
   }
 }
 
-// Confirmacion de acciones: desactivar y eliminar piden confirmacion; activar se aplica directamente.
+// Confirmacion de acciones: desactivar pide confirmacion; activar se aplica directamente.
 interface AccionPendiente {
   titulo: string
   mensaje: string
@@ -419,20 +418,6 @@ function solicitarCambioEstadoCompetencia(competencia: Competencia): void {
     ejecutar,
   })
 }
-
-function solicitarEliminacionCompetencia(competencia: Competencia): void {
-  errorGeneral.value = ''
-  pedirConfirmacion({
-    titulo: 'Eliminar competencia',
-    mensaje: `¿Eliminar «${competencia.nombre}»? Esta acción no se puede deshacer.`,
-    textoConfirmar: 'Eliminar',
-    variante: 'peligro',
-    ejecutar: async () => {
-      await eliminarCompetencia(competencia.id)
-      return `Competencia «${competencia.nombre}» eliminada.`
-    },
-  })
-}
 </script>
 
 <template>
@@ -532,7 +517,6 @@ function solicitarEliminacionCompetencia(competencia: Competencia): void {
             @agregar-competencia="abrirNuevaCompetencia(area)"
             @editar-competencia="abrirEdicionCompetencia(area, $event)"
             @cambiar-estado-competencia="solicitarCambioEstadoCompetencia"
-            @eliminar-competencia="solicitarEliminacionCompetencia"
           />
 
           <p v-if="areasFiltradas.length === 0" class="sin-resultados">

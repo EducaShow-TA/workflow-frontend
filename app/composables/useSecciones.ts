@@ -146,7 +146,7 @@ export function useSecciones() {
   const { solicitar } = useApi()
 
   async function listarSecciones(): Promise<Seccion[]> {
-    if (usarDatosPrueba()) {
+    if (usarDatosPrueba('secciones')) {
       await esperarLatencia()
       return ordenarSecciones(copiarDatos(seccionesPrueba))
     }
@@ -155,7 +155,7 @@ export function useSecciones() {
   }
 
   async function registrarSeccion(solicitud: SolicitudSeccion): Promise<Seccion> {
-    if (usarDatosPrueba()) {
+    if (usarDatosPrueba('secciones')) {
       await esperarLatencia()
 
       const errores = validarSeccion(solicitud, seccionesPrueba)
@@ -181,7 +181,7 @@ export function useSecciones() {
   async function actualizarVacantes(id: number, solicitud: SolicitudActualizarVacantes): Promise<Seccion> {
     const ruta = `${RUTA_SECCIONES}/${id}`
 
-    if (usarDatosPrueba()) {
+    if (usarDatosPrueba('secciones')) {
       await esperarLatencia()
 
       const seccion = seccionesPrueba.find((actual) => actual.id === id)

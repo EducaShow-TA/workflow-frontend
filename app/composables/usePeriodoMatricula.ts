@@ -128,7 +128,7 @@ export function usePeriodoMatricula() {
   const { solicitar } = useApi()
 
   async function listarPeriodos(): Promise<PeriodoMatricula[]> {
-    if (usarDatosPrueba()) {
+    if (usarDatosPrueba('periodos-matricula')) {
       await esperarLatencia()
       return listarPeriodosPrueba()
     }
@@ -137,7 +137,7 @@ export function usePeriodoMatricula() {
   }
 
   async function registrarPeriodo(solicitud: SolicitudPeriodoMatricula): Promise<PeriodoMatricula> {
-    if (usarDatosPrueba()) {
+    if (usarDatosPrueba('periodos-matricula')) {
       await esperarLatencia()
       validarEnPrueba(solicitud, null, RUTA_PERIODOS)
 
@@ -152,7 +152,7 @@ export function usePeriodoMatricula() {
   async function actualizarPeriodo(id: number, solicitud: SolicitudPeriodoMatricula): Promise<PeriodoMatricula> {
     const ruta = `${RUTA_PERIODOS}/${id}`
 
-    if (usarDatosPrueba()) {
+    if (usarDatosPrueba('periodos-matricula')) {
       await esperarLatencia()
 
       const indice = periodosPrueba.findIndex((periodo) => periodo.id === id)

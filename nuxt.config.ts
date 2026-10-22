@@ -2,6 +2,7 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       apiBase: '',
+      datosPrueba: 'periodos-matricula',
     },
   },
   css: ['~/assets/css/main.css'],
