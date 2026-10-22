@@ -14,7 +14,7 @@ const enlaces: EnlaceMenu[] = [
   {
     nombre: 'Matrícula',
     icono: '/icons/menu-matricula.svg',
-    destino: '/matriculas/nueva',
+    destino: '/matriculas',
     prefijoActivo: '/matriculas',
   },
   { nombre: 'Grados/Secciones', icono: '/icons/menu-secciones.svg', destino: '/secciones' },
