@@ -42,6 +42,13 @@ export const PERMISOS: Permiso[] = [
     sensible: false,
   },
   {
+    codigo: 'MATRICULA_VER',
+    modulo: 'Matrícula',
+    nombre: 'Ver matrícula',
+    descripcion: 'Consultar el estado del periodo y las vacantes del año escolar.',
+    sensible: false,
+  },
+  {
     codigo: 'MATRICULA_REGISTRAR',
     modulo: 'Matrícula',
     nombre: 'Registrar matrículas',
@@ -138,6 +145,7 @@ export const REGLAS_RUTA: ReglaRuta[] = [
   { prefijo: '/panel', permiso: 'PANEL_VER' },
   { prefijo: '/estudiantes', permiso: 'ESTUDIANTE_VER' },
   { prefijo: '/estudiantes/nuevo', permiso: 'ESTUDIANTE_REGISTRAR' },
+  { prefijo: '/matriculas', permiso: 'MATRICULA_VER' },
   { prefijo: '/matriculas/nueva', permiso: 'MATRICULA_REGISTRAR' },
   { prefijo: '/matriculas/periodo', permiso: 'PERIODO_CONFIGURAR' },
   { prefijo: '/secciones', permiso: 'SECCION_VER' },
