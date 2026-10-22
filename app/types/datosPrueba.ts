@@ -1,1 +1,1 @@
-export type ModuloDatosPrueba = 'periodos-matricula' | 'secciones' | 'competencias'
+export type ModuloDatosPrueba = 'periodos-matricula' | 'secciones' | 'competencias' | 'logs'

@@ -12,6 +12,7 @@ const nombrePagina = computed(() => {
   if (ruta.path.startsWith('/competencias')) return 'Competencias'
   if (ruta.path.startsWith('/usuarios')) return 'Usuarios'
   if (ruta.path.startsWith('/roles-permisos')) return 'Roles y permisos'
+  if (ruta.path.startsWith('/logs-sistema')) return 'Logs del sistema'
   return 'Panel'
 })
 
