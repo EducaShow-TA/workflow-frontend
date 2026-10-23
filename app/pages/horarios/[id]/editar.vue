@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import type { ErroresPlantilla, PlantillaHorario, SolicitudPlantillaHorario } from '~/types/plantillaHorario'
 import { ErrorSolicitudApi } from '~/types/api'
-import { obtenerMensajeError } from '~/composables/useDatosPrueba'
+import { obtenerMensajeError } from '~/composables/useMensajesError'
 import { crearFormularioDesdePlantilla, usePlantillasHorario } from '~/composables/usePlantillasHorario'
 
 definePageMeta({

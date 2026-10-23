@@ -12,7 +12,7 @@ import {
 } from '~/composables/useCuentasUsuario'
 import { ROLES, listarModulosPermitidos, obtenerDescripcionRol, obtenerNombreRol } from '~/composables/usePermisosRol'
 import { normalizarDocumento } from '~/composables/useMascarasFormulario'
-import { obtenerMensajeError } from '~/composables/useDatosPrueba'
+import { obtenerMensajeError } from '~/composables/useMensajesError'
 import { obtenerPrimerError, tieneErrores } from '~/composables/useValidacion'
 
 definePageMeta({

@@ -23,7 +23,7 @@ import {
   validarCompetenciasNuevas,
   validarMinimoCompetencias,
 } from '~/composables/useCompetencias'
-import { obtenerMensajeError } from '~/composables/useDatosPrueba'
+import { obtenerMensajeError } from '~/composables/useMensajesError'
 import { tieneErrores } from '~/composables/useValidacion'
 
 definePageMeta({

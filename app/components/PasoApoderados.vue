@@ -10,10 +10,10 @@ import {
   normalizarNombre,
 } from '~/composables/useMascarasFormulario'
 
-type CampoEditable = 'nombres' | 'apellidos' | 'numeroDocumento' | 'celular' | 'correoElectronico'
+type CampoEditable = 'nombres' | 'apellidoPaterno' | 'apellidoMaterno' | 'numeroDocumento' | 'celular' | 'correoElectronico'
 
 type ErroresApoderado = Record<
-  'nombres' | 'apellidos' | 'parentesco' | 'numeroDocumento' | 'celular' | 'correoElectronico',
+  'nombres' | 'apellidoPaterno' | 'apellidoMaterno' | 'parentesco' | 'numeroDocumento' | 'celular' | 'correoElectronico',
   string
 >
 
@@ -27,7 +27,8 @@ const mensajeGeneral = ref('')
 function crearApoderado(): ApoderadoRegistro {
   return {
     nombres: '',
-    apellidos: '',
+    apellidoPaterno: '',
+    apellidoMaterno: '',
     parentesco: '',
     tipoDocumento: 'DNI',
     numeroDocumento: '',
@@ -134,7 +135,8 @@ function validar(): boolean {
   apoderados.value = apoderados.value.map((apoderado) => ({
     ...apoderado,
     nombres: normalizarNombre(apoderado.nombres),
-    apellidos: normalizarNombre(apoderado.apellidos),
+    apellidoPaterno: normalizarNombre(apoderado.apellidoPaterno),
+    apellidoMaterno: normalizarNombre(apoderado.apellidoMaterno),
     numeroDocumento: normalizarDocumento(apoderado.numeroDocumento, apoderado.tipoDocumento),
     celular: normalizarCelular(apoderado.celular),
     correoElectronico: normalizarCorreo(apoderado.correoElectronico),
@@ -143,7 +145,8 @@ function validar(): boolean {
   errores.value = apoderados.value.map((apoderado) => {
     const error: ErroresApoderado = {
       nombres: '',
-      apellidos: '',
+      apellidoPaterno: '',
+      apellidoMaterno: '',
       parentesco: '',
       numeroDocumento: '',
       celular: '',
@@ -154,8 +157,11 @@ function validar(): boolean {
       error.nombres = 'Los nombres son obligatorios.'
     }
 
-    if (!apoderado.apellidos) {
-      error.apellidos = 'Los apellidos son obligatorios.'
+    if (!apoderado.apellidoPaterno) {
+      error.apellidoPaterno = 'El apellido paterno es obligatorio.'
+    }
+    if (!apoderado.apellidoMaterno) {
+      error.apellidoMaterno = 'El apellido materno es obligatorio.'
     }
 
     if (!apoderado.parentesco) {
@@ -237,18 +243,24 @@ defineExpose({
         </div>
 
         <div class="campo">
-          <label :for="`apellidos-apoderado-${indice}`">Apellidos *</label>
+          <label :for="`apellido-paterno-apoderado-${indice}`">Apellido paterno *</label>
           <input
-            :id="`apellidos-apoderado-${indice}`"
-            :value="apoderado.apellidos"
+            :id="`apellido-paterno-apoderado-${indice}`"
+            :value="apoderado.apellidoPaterno"
             type="text"
-            placeholder="Ej. Pérez Gómez"
+            placeholder="Ej. Pérez"
             autocomplete="off"
-            @input="cambiarCampo($event, indice, 'apellidos')"
+            @input="cambiarCampo($event, indice, 'apellidoPaterno')"
           />
-          <small v-if="errores[indice]?.apellidos" class="error">
-            {{ errores[indice]?.apellidos }}
+          <small v-if="errores[indice]?.apellidoPaterno" class="error">
+            {{ errores[indice]?.apellidoPaterno }}
           </small>
+        </div>
+
+        <div class="campo">
+          <label :for="`apellido-materno-apoderado-${indice}`">Apellido materno *</label>
+          <input :id="`apellido-materno-apoderado-${indice}`" :value="apoderado.apellidoMaterno" type="text" placeholder="Ej. Mamani" autocomplete="off" @input="cambiarCampo($event, indice, 'apellidoMaterno')" />
+          <small v-if="errores[indice]?.apellidoMaterno" class="error">{{ errores[indice]?.apellidoMaterno }}</small>
         </div>
 
         <div class="campo">

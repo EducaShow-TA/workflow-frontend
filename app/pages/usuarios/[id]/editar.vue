@@ -13,7 +13,7 @@ import {
   validarEdicion,
 } from '~/composables/useCuentasUsuario'
 import { ROLES, obtenerNombreRol } from '~/composables/usePermisosRol'
-import { obtenerMensajeError } from '~/composables/useDatosPrueba'
+import { obtenerMensajeError } from '~/composables/useMensajesError'
 import { useCambioEstadoCuenta } from '~/composables/useCambioEstadoCuenta'
 import { normalizarCorreo } from '~/composables/useMascarasFormulario'
 import { obtenerPrimerError, tieneErrores } from '~/composables/useValidacion'

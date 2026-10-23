@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import type { ErroresPeriodoMatricula, PeriodoMatricula, SolicitudPeriodoMatricula } from '~/types/periodoMatricula'
-import { obtenerMensajeError } from '~/composables/useDatosPrueba'
+import { obtenerMensajeError } from '~/composables/useMensajesError'
 import { calcularDiasEntre, formatearFecha, obtenerFechaHoyIso } from '~/composables/useFechas'
 import {
   calcularEstadoPeriodo,

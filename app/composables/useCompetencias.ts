@@ -1,5 +1,4 @@
 import { useApi } from '~/composables/useApi'
-import { copiarDatos, crearErrorPrueba, esperarLatencia, usarDatosPrueba } from '~/composables/useDatosPrueba'
 import { obtenerPrimerError } from '~/composables/useValidacion'
 import type {
   AmbitoFiltro,
@@ -249,203 +248,11 @@ function limpiarSolicitudCompetencia(solicitud: SolicitudCompetencia): Solicitud
   return { nombre: limpiarTexto(solicitud.nombre), descripcion: limpiarTexto(solicitud.descripcion) }
 }
 
-// Datos de prueba basados en el Curriculo Nacional de Educacion Basica (CNEB), nivel secundaria.
-let siguienteIdArea = 6
-let siguienteIdCompetencia = 15
-
-function crearCompetenciaPrueba(
-  id: number,
-  areaId: number,
-  nombre: string,
-  descripcion: string,
-  tieneNotasRegistradas = false,
-  activo = true,
-): Competencia {
-  return { id, areaId, nombre, descripcion, activo, tieneNotasRegistradas }
-}
-
-const areasPrueba: Area[] = [
-  {
-    id: 1,
-    nombre: 'Matemática',
-    descripcion: 'Desarrolla el pensamiento matemático para resolver problemas en diversos contextos.',
-    activo: true,
-    competencias: [
-      crearCompetenciaPrueba(
-        1,
-        1,
-        'Resuelve problemas de cantidad',
-        'Traduce cantidades a expresiones numéricas y usa estrategias de cálculo.',
-        true,
-      ),
-      crearCompetenciaPrueba(
-        2,
-        1,
-        'Resuelve problemas de regularidad, equivalencia y cambio',
-        'Traduce datos y condiciones a expresiones algebraicas y gráficas.',
-        true,
-      ),
-      crearCompetenciaPrueba(
-        3,
-        1,
-        'Resuelve problemas de forma, movimiento y localización',
-        'Modela objetos con formas geométricas y sus transformaciones.',
-      ),
-      crearCompetenciaPrueba(
-        4,
-        1,
-        'Resuelve problemas de gestión de datos e incertidumbre',
-        'Representa datos con gráficos y medidas estadísticas o probabilísticas.',
-      ),
-    ],
-  },
-  {
-    id: 2,
-    nombre: 'Comunicación',
-    descripcion: 'Desarrolla las competencias comunicativas en la lengua materna.',
-    activo: true,
-    competencias: [
-      crearCompetenciaPrueba(
-        5,
-        2,
-        'Se comunica oralmente en su lengua materna',
-        'Obtiene, infiere e interpreta información de textos orales.',
-        true,
-      ),
-      crearCompetenciaPrueba(
-        6,
-        2,
-        'Lee diversos tipos de textos escritos en su lengua materna',
-        'Obtiene información del texto escrito y reflexiona sobre su forma y contenido.',
-      ),
-      crearCompetenciaPrueba(
-        7,
-        2,
-        'Escribe diversos tipos de textos en su lengua materna',
-        'Adecúa, organiza y desarrolla ideas de forma coherente y cohesionada.',
-      ),
-    ],
-  },
-  {
-    id: 3,
-    nombre: 'Inglés como lengua extranjera',
-    descripcion: 'Desarrolla la comunicación en inglés como lengua extranjera.',
-    activo: true,
-    competencias: [
-      crearCompetenciaPrueba(
-        8,
-        3,
-        'Se comunica oralmente en inglés como lengua extranjera',
-        'Interactúa estratégicamente con distintos interlocutores en inglés.',
-      ),
-      crearCompetenciaPrueba(
-        9,
-        3,
-        'Lee diversos tipos de textos escritos en inglés como lengua extranjera',
-        'Infiere e interpreta información de textos escritos en inglés.',
-      ),
-      crearCompetenciaPrueba(
-        10,
-        3,
-        'Escribe diversos tipos de textos en inglés como lengua extranjera',
-        'Organiza y desarrolla ideas en textos escritos en inglés.',
-        false,
-        false,
-      ),
-    ],
-  },
-  {
-    id: 4,
-    nombre: 'Ciencia y Tecnología',
-    descripcion: 'Desarrolla la indagación científica y la alfabetización tecnológica.',
-    activo: true,
-    competencias: [
-      crearCompetenciaPrueba(
-        11,
-        4,
-        'Indaga mediante métodos científicos para construir sus conocimientos',
-        'Problematiza situaciones, diseña estrategias y analiza datos.',
-      ),
-      crearCompetenciaPrueba(
-        12,
-        4,
-        'Explica el mundo físico basándose en conocimientos sobre los seres vivos, materia y energía, biodiversidad, Tierra y universo',
-        'Comprende y usa conocimientos científicos para explicar fenómenos.',
-      ),
-      crearCompetenciaPrueba(
-        13,
-        4,
-        'Diseña y construye soluciones tecnológicas para resolver problemas de su entorno',
-        'Determina, diseña, implementa y evalúa alternativas de solución tecnológica.',
-      ),
-    ],
-  },
-  {
-    id: 5,
-    nombre: 'Educación para el Trabajo',
-    descripcion: 'Desarrolla capacidades para el emprendimiento económico o social.',
-    activo: false,
-    competencias: [
-      crearCompetenciaPrueba(
-        14,
-        5,
-        'Gestiona proyectos de emprendimiento económico o social',
-        'Crea propuestas de valor y trabaja cooperativamente para lograr objetivos.',
-      ),
-    ],
-  },
-]
-
-function buscarAreaPrueba(id: number, ruta: string): Area {
-  const area = areasPrueba.find((actual) => actual.id === id)
-
-  if (!area) {
-    throw crearErrorPrueba('Área no encontrada', 404, ruta)
-  }
-
-  return area
-}
-
-function buscarAreaActivaPrueba(id: number, ruta: string): Area {
-  const area = buscarAreaPrueba(id, ruta)
-
-  if (!area.activo) {
-    throw crearErrorPrueba('Área no encontrada', 404, ruta)
-  }
-
-  return area
-}
-
-function buscarCompetenciaPrueba(id: number, ruta: string): { area: Area; competencia: Competencia } {
-  for (const area of areasPrueba) {
-    const competencia = area.competencias.find((actual) => actual.id === id)
-
-    if (competencia) {
-      return { area, competencia }
-    }
-  }
-
-  throw crearErrorPrueba('Competencia no encontrada', 404, ruta)
-}
-
-function lanzarErroresPrueba(errores: Record<string, string | undefined>, esDuplicado: boolean, ruta: string): void {
-  const primerError = obtenerPrimerError(errores)
-
-  if (primerError) {
-    throw crearErrorPrueba(primerError, esDuplicado ? 409 : 422, ruta)
-  }
-}
-
 /** Acceso al catalogo de areas curriculares y competencias (US-3.5). */
 export function useCompetencias() {
   const { solicitar } = useApi()
 
   async function listarAreas(): Promise<Area[]> {
-    if (usarDatosPrueba('competencias')) {
-      await esperarLatencia()
-      return ordenarAreas(copiarDatos(areasPrueba))
-    }
-
     return ordenarAreas(await solicitar<Area[]>(RUTA_AREAS))
   }
 
@@ -455,131 +262,37 @@ export function useCompetencias() {
       descripcion: limpiarTexto(solicitud.descripcion),
       competencias: solicitud.competencias.map(limpiarSolicitudCompetencia),
     }
-
-    if (usarDatosPrueba('competencias')) {
-      await esperarLatencia()
-
-      const errorMinimo = validarMinimoCompetencias(cuerpo.competencias)
-
-      if (errorMinimo) {
-        throw crearErrorPrueba(errorMinimo, 422, RUTA_AREAS)
-      }
-
-      lanzarErroresPrueba(validarArea(cuerpo, areasPrueba), existeAreaConNombre(cuerpo.nombre, areasPrueba), RUTA_AREAS)
-      const erroresCompetencias = validarCompetenciasNuevas(cuerpo.competencias)
-      // Una competencia repetida dentro de la misma solicitud es un dato invalido (422), no un conflicto (409).
-      erroresCompetencias.forEach((errores) => lanzarErroresPrueba(errores, false, RUTA_AREAS))
-
-      const idArea = siguienteIdArea++
-      const nueva: Area = {
-        id: idArea,
-        nombre: cuerpo.nombre,
-        descripcion: cuerpo.descripcion,
-        activo: true,
-        competencias: cuerpo.competencias.map((competencia) =>
-          crearCompetenciaPrueba(siguienteIdCompetencia++, idArea, competencia.nombre, competencia.descripcion),
-        ),
-      }
-
-      areasPrueba.push(nueva)
-      return copiarDatos(nueva)
-    }
-
     return solicitar<Area>(RUTA_AREAS, { metodo: 'POST', cuerpo })
   }
 
   async function actualizarArea(id: number, solicitud: SolicitudArea): Promise<Area> {
-    const ruta = `${RUTA_AREAS}/${id}`
     const cuerpo: SolicitudArea = {
       nombre: limpiarTexto(solicitud.nombre),
       descripcion: limpiarTexto(solicitud.descripcion),
     }
-
-    if (usarDatosPrueba('competencias')) {
-      await esperarLatencia()
-
-      const area = buscarAreaActivaPrueba(id, ruta)
-      lanzarErroresPrueba(
-        validarArea(cuerpo, areasPrueba, id),
-        existeAreaConNombre(cuerpo.nombre, areasPrueba, id),
-        ruta,
-      )
-
-      area.nombre = cuerpo.nombre
-      area.descripcion = cuerpo.descripcion
-      return copiarDatos(area)
-    }
-
-    return solicitar<Area>(ruta, { metodo: 'PUT', cuerpo })
+    return solicitar<Area>(`${RUTA_AREAS}/${id}`, { metodo: 'PUT', cuerpo })
   }
 
   async function cambiarEstadoArea(id: number, activo: boolean): Promise<Area> {
-    const ruta = `${RUTA_AREAS}/${id}/estado`
-
-    if (usarDatosPrueba('competencias')) {
-      await esperarLatencia()
-
-      const area = buscarAreaPrueba(id, ruta)
-      area.activo = activo
-      return copiarDatos(area)
-    }
-
-    return solicitar<Area>(ruta, { metodo: 'PATCH', cuerpo: { activo } })
+    return solicitar<Area>(`${RUTA_AREAS}/${id}/estado`, { metodo: 'PATCH', cuerpo: { activo } })
   }
 
   async function registrarCompetencia(areaId: number, solicitud: SolicitudCompetencia): Promise<Competencia> {
-    const ruta = `${RUTA_AREAS}/${areaId}/competencias`
-    const cuerpo = limpiarSolicitudCompetencia(solicitud)
-
-    if (usarDatosPrueba('competencias')) {
-      await esperarLatencia()
-
-      const area = buscarAreaActivaPrueba(areaId, ruta)
-      lanzarErroresPrueba(validarCompetencia(cuerpo, area), existeCompetenciaEnArea(cuerpo.nombre, area), ruta)
-
-      const nueva = crearCompetenciaPrueba(siguienteIdCompetencia++, areaId, cuerpo.nombre, cuerpo.descripcion)
-      area.competencias.push(nueva)
-      return copiarDatos(nueva)
-    }
-
-    return solicitar<Competencia>(ruta, { metodo: 'POST', cuerpo })
+    return solicitar<Competencia>(`${RUTA_AREAS}/${areaId}/competencias`, {
+      metodo: 'POST',
+      cuerpo: limpiarSolicitudCompetencia(solicitud),
+    })
   }
 
   async function actualizarCompetencia(id: number, solicitud: SolicitudCompetencia): Promise<Competencia> {
-    const ruta = `${RUTA_COMPETENCIAS}/${id}`
-    const cuerpo = limpiarSolicitudCompetencia(solicitud)
-
-    if (usarDatosPrueba('competencias')) {
-      await esperarLatencia()
-
-      const { area, competencia } = buscarCompetenciaPrueba(id, ruta)
-
-      if (!competencia.activo) {
-        throw crearErrorPrueba('Competencia no encontrada', 404, ruta)
-      }
-
-      lanzarErroresPrueba(validarCompetencia(cuerpo, area, id), existeCompetenciaEnArea(cuerpo.nombre, area, id), ruta)
-
-      competencia.nombre = cuerpo.nombre
-      competencia.descripcion = cuerpo.descripcion
-      return copiarDatos(competencia)
-    }
-
-    return solicitar<Competencia>(ruta, { metodo: 'PUT', cuerpo })
+    return solicitar<Competencia>(`${RUTA_COMPETENCIAS}/${id}`, {
+      metodo: 'PUT',
+      cuerpo: limpiarSolicitudCompetencia(solicitud),
+    })
   }
 
   async function cambiarEstadoCompetencia(id: number, activo: boolean): Promise<Competencia> {
-    const ruta = `${RUTA_COMPETENCIAS}/${id}/estado`
-
-    if (usarDatosPrueba('competencias')) {
-      await esperarLatencia()
-
-      const { competencia } = buscarCompetenciaPrueba(id, ruta)
-      competencia.activo = activo
-      return copiarDatos(competencia)
-    }
-
-    return solicitar<Competencia>(ruta, { metodo: 'PATCH', cuerpo: { activo } })
+    return solicitar<Competencia>(`${RUTA_COMPETENCIAS}/${id}/estado`, { metodo: 'PATCH', cuerpo: { activo } })
   }
 
   return {

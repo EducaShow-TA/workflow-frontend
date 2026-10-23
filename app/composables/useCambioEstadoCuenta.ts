@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import type { CuentaUsuario } from '~/types/cuentaUsuario'
 import { useCuentasUsuario } from '~/composables/useCuentasUsuario'
-import { obtenerMensajeError } from '~/composables/useDatosPrueba'
+import { obtenerMensajeError } from '~/composables/useMensajesError'
 
 /** Activar se aplica directamente; desactivar pide confirmación porque impide iniciar sesión (US-5.1). */
 export function useCambioEstadoCuenta(alActualizar: (cuenta: CuentaUsuario, mensaje: string) => void) {

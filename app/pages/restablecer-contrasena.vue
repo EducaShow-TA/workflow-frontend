@@ -2,7 +2,7 @@
 import { computed, reactive, ref } from 'vue'
 import type { ErroresRestablecimiento } from '~/types/autenticacion'
 import { ErrorSolicitudApi } from '~/types/api'
-import { obtenerMensajeError } from '~/composables/useDatosPrueba'
+import { obtenerMensajeError } from '~/composables/useMensajesError'
 import {
   LONGITUD_MINIMA_CONTRASENA,
   evaluarFuerzaContrasena,

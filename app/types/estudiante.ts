@@ -1,4 +1,4 @@
-export type EstadoEstudiante = 'ACTIVO' | 'INACTIVO'
+export type EstadoEstudiante = 'REGISTRADO'
 
 export interface EstudianteListado {
   codigo: string

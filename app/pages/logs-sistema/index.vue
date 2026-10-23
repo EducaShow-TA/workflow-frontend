@@ -10,7 +10,7 @@ import {
   obtenerEtiquetaNivel,
   useRegistrosError,
 } from '~/composables/useRegistrosError'
-import { obtenerMensajeError } from '~/composables/useDatosPrueba'
+import { obtenerMensajeError } from '~/composables/useMensajesError'
 import { obtenerNombreRol } from '~/composables/usePermisosRol'
 
 definePageMeta({

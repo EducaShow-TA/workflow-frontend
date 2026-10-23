@@ -2,7 +2,6 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       apiBase: '',
-      datosPrueba: '',
     },
   },
   css: ['~/assets/css/main.css'],

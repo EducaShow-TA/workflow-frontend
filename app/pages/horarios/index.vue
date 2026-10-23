@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import type { FiltroEstadoPlantilla, FiltroTurno, PlantillaHorario } from '~/types/plantillaHorario'
-import { obtenerMensajeError } from '~/composables/useDatosPrueba'
+import { obtenerMensajeError } from '~/composables/useMensajesError'
 import {
   TURNOS,
   filtrarPlantillas,

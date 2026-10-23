@@ -21,7 +21,7 @@ import {
   obtenerSituacionPeriodo,
 } from '~/composables/useResumenMatricula'
 import { formatearFecha, obtenerFechaHoyIso } from '~/composables/useFechas'
-import { obtenerMensajeError } from '~/composables/useDatosPrueba'
+import { obtenerMensajeError } from '~/composables/useMensajesError'
 import { usePermisosRol } from '~/composables/usePermisosRol'
 
 definePageMeta({
