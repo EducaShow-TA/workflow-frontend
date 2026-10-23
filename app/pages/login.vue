@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useAutenticacionStore } from '~/stores/autenticacion'
+import { INTENTOS_ANTES_DE_BLOQUEO, MINUTOS_BLOQUEO } from '~/composables/useRecuperacionContrasena'
 definePageMeta({
   layout: 'autenticacion',
 })
@@ -10,6 +11,15 @@ const correoElectronico = ref('')
 const contrasenia = ref('')
 const mostrarContrasenia = ref(false)
 const mensajeInformativo = ref('')
+const credencialesInvalidas = ref(false)
+const avisoCorreoActualizado = ref('')
+
+const correoActualizado = autenticacion.tomarCorreoActualizado()
+
+if (correoActualizado) {
+  correoElectronico.value = correoActualizado
+  avisoCorreoActualizado.value = 'Tu correo se actualizó. Inicia sesión con el nuevo correo.'
+}
 
 const errores = reactive({
   correoElectronico: '',
@@ -38,6 +48,7 @@ function validarFormulario(): boolean {
 
 async function procesarInicioSesion(): Promise<void> {
   mensajeInformativo.value = ''
+  credencialesInvalidas.value = false
 
   if (!validarFormulario()) {
     return
@@ -46,6 +57,7 @@ async function procesarInicioSesion(): Promise<void> {
   const resultado = await autenticacion.iniciarSesion(correoElectronico.value.trim(), contrasenia.value)
 
   if (!resultado.exito) {
+    credencialesInvalidas.value = resultado.estado === 401
     mensajeInformativo.value = resultado.mensaje
     return
   }
@@ -53,8 +65,9 @@ async function procesarInicioSesion(): Promise<void> {
   await navigateTo('/panel')
 }
 
-function informarRecuperacion(): void {
-  mensajeInformativo.value = 'La recuperación de contraseña se implementará en el siguiente paso.'
+function irARecuperacion(): void {
+  const correo = correoElectronico.value.trim()
+  void navigateTo({ path: '/recuperar-contrasena', query: correo ? { correo } : {} })
 }
 </script>
 
@@ -71,6 +84,8 @@ function informarRecuperacion(): void {
 
       <p>Ingresa tus credenciales para acceder al portal.</p>
     </header>
+
+    <AvisoMensaje v-if="avisoCorreoActualizado" class="aviso-correo" :mensaje="avisoCorreoActualizado" tipo="exito" />
 
     <form class="formulario" novalidate @submit.prevent="procesarInicioSesion">
       <CampoFormulario
@@ -111,14 +126,19 @@ function informarRecuperacion(): void {
           <span>Recordar sesión</span>
         </label>
 
-        <button type="button" class="enlace-recuperacion" @click="informarRecuperacion">
-          ¿Olvidaste tu contraseña?
-        </button>
+        <button type="button" class="enlace-recuperacion" @click="irARecuperacion">¿Olvidaste tu contraseña?</button>
       </div>
 
       <BotonPrincipal tipo="submit"> Iniciar sesión </BotonPrincipal>
 
-      <p v-if="mensajeInformativo" class="mensaje-informativo" role="status">
+      <p v-if="credencialesInvalidas" class="mensaje-error-acceso" role="alert">
+        Correo o contraseña incorrectos. Después de {{ INTENTOS_ANTES_DE_BLOQUEO }} intentos fallidos la cuenta se
+        bloquea por {{ MINUTOS_BLOQUEO }} minutos.
+        <button type="button" class="enlace-recuperacion" @click="irARecuperacion">Restablece tu contraseña</button>
+        si no la recuerdas.
+      </p>
+
+      <p v-else-if="mensajeInformativo" class="mensaje-informativo" role="status">
         {{ mensajeInformativo }}
       </p>
     </form>
@@ -218,6 +238,22 @@ function informarRecuperacion(): void {
   text-decoration: underline;
 }
 
+.mensaje-error-acceso {
+  margin: 0;
+  padding: 12px;
+  border: 1px solid #fecaca;
+  border-radius: var(--radius-md);
+  background-color: #fef2f2;
+  color: #991b1b;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.mensaje-error-acceso .enlace-recuperacion {
+  font-size: 13px;
+  text-decoration: underline;
+}
+
 .mensaje-informativo {
   margin: 0;
   padding: 12px;
@@ -237,5 +273,8 @@ function informarRecuperacion(): void {
   .encabezado h1 {
     font-size: 28px;
   }
+}
+.aviso-correo {
+  margin-bottom: 20px;
 }
 </style>

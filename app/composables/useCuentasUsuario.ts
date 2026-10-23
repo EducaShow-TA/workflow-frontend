@@ -1,8 +1,10 @@
 import type { RolUsuario } from '~/types/autenticacion'
 import type {
+  ConteoEstadoCuentas,
   CuentaUsuario,
   ErroresCuenta,
   ErroresEdicion,
+  FiltroEstadoCuenta,
   FiltroRol,
   FormularioCuenta,
   SolicitudActualizarCuenta,
@@ -20,9 +22,7 @@ export const LONGITUD_MAXIMA_NOMBRE_PERSONA = 100
 export const LONGITUD_MINIMA_PASSWORD = 8
 export const CUENTAS_POR_PAGINA = 10
 
-export const EDICION_DISPONIBLE = true
-export const CAMBIO_ESTADO_DISPONIBLE = true
-export const CAMBIO_ROL_DISPONIBLE = false
+export const MOTIVO_ROL_FIJO = 'El rol se define al crear la cuenta y no se modifica.'
 
 const FORMATO_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -167,21 +167,30 @@ export function construirSolicitudEdicion(formulario: SolicitudActualizarCuenta)
   }
 }
 
-export function contarAdministradores(cuentas: CuentaUsuario[]): number {
-  return cuentas.filter((cuenta) => cuenta.rol === 'ADMINISTRADOR').length
+export function estaActiva(cuenta: Pick<CuentaUsuario, 'activo'>): boolean {
+  return cuenta.activo !== false
 }
 
+export function esCuentaPropia(cuenta: Pick<CuentaUsuario, 'username'>, usernameActual: string): boolean {
+  return normalizarCorreo(cuenta.username) === normalizarCorreo(usernameActual)
+}
+
+export function contarAdministradoresActivos(cuentas: CuentaUsuario[]): number {
+  return cuentas.filter((cuenta) => cuenta.rol === 'ADMINISTRADOR' && estaActiva(cuenta)).length
+}
+
+/** Motivo por el que no se puede cambiar el estado de la cuenta, o cadena vacía si se puede. */
 export function obtenerMotivoProteccion(
   cuenta: CuentaUsuario,
   cuentas: CuentaUsuario[],
   usernameActual: string,
 ): string {
-  if (normalizarCorreo(cuenta.username) === normalizarCorreo(usernameActual)) {
-    return 'Es tu propia cuenta: no puedes desactivarla ni cambiar su rol.'
+  if (esCuentaPropia(cuenta, usernameActual)) {
+    return 'Es tu propia cuenta: no puedes desactivarla.'
   }
 
-  if (cuenta.rol === 'ADMINISTRADOR' && contarAdministradores(cuentas) <= 1) {
-    return 'Es el único administrador: el sistema debe tener al menos uno.'
+  if (cuenta.rol === 'ADMINISTRADOR' && estaActiva(cuenta) && contarAdministradoresActivos(cuentas) <= 1) {
+    return 'Es el único administrador activo: el sistema debe tener al menos uno.'
   }
 
   return ''
@@ -195,19 +204,30 @@ function normalizarParaBuscar(texto: string): string {
     .trim()
 }
 
-export function filtrarCuentas(cuentas: CuentaUsuario[], texto: string, rol: FiltroRol): CuentaUsuario[] {
+export function filtrarCuentas(
+  cuentas: CuentaUsuario[],
+  texto: string,
+  rol: FiltroRol,
+  estado: FiltroEstadoCuenta = 'TODOS',
+): CuentaUsuario[] {
   const buscado = normalizarParaBuscar(texto)
 
   return cuentas.filter((cuenta) => {
     const coincideRol = rol === 'TODOS' || cuenta.rol === rol
+    const coincideEstado = estado === 'TODOS' || (estado === 'ACTIVOS') === estaActiva(cuenta)
     const coincideTexto =
       !buscado ||
       normalizarParaBuscar(cuenta.nombreCompleto).includes(buscado) ||
       normalizarParaBuscar(cuenta.username).includes(buscado) ||
       cuenta.dni.includes(buscado)
 
-    return coincideRol && coincideTexto
+    return coincideRol && coincideEstado && coincideTexto
   })
+}
+
+export function contarPorEstado(cuentas: CuentaUsuario[]): ConteoEstadoCuentas {
+  const activos = cuentas.filter(estaActiva).length
+  return { activos, inactivos: cuentas.length - activos }
 }
 
 export function ordenarCuentas(cuentas: CuentaUsuario[]): CuentaUsuario[] {
@@ -268,10 +288,7 @@ export function useCuentasUsuario() {
   }
 
   async function cambiarEstadoCuenta(id: number, activo: boolean): Promise<CuentaUsuario> {
-    return solicitar<CuentaUsuario>(`${RUTA_CUENTAS}/${id}/estado`, {
-      metodo: 'PATCH',
-      cuerpo: { activo },
-    })
+    return solicitar<CuentaUsuario>(`${RUTA_CUENTAS}/${id}/estado`, { metodo: 'PATCH', cuerpo: { activo } })
   }
 
   return {

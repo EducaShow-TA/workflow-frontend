@@ -5,19 +5,22 @@ import { obtenerMensajeError } from '~/composables/useDatosPrueba'
 import { calcularDiasEntre, formatearFecha, obtenerFechaHoyIso } from '~/composables/useFechas'
 import {
   calcularEstadoPeriodo,
+  describirPeriodo,
   estaPeriodoVigente,
   obtenerEtiquetaEstadoPeriodo,
+  obtenerMotivoNoEditable,
   obtenerVarianteEstadoPeriodo,
   usePeriodoMatricula,
   validarPeriodoMatricula,
 } from '~/composables/usePeriodoMatricula'
+import { obtenerAnhio } from '~/composables/useAnhioEscolar'
 import { tieneErrores } from '~/composables/useValidacion'
 
 definePageMeta({
   middleware: 'autenticacion',
 })
 
-const { listarPeriodos, registrarPeriodo, actualizarPeriodo } = usePeriodoMatricula()
+const { listarPeriodos, registrarPeriodo, actualizarPeriodo, desactivarPeriodo } = usePeriodoMatricula()
 
 const periodos = ref<PeriodoMatricula[]>([])
 const cargando = ref(true)
@@ -25,7 +28,6 @@ const errorCarga = ref('')
 const mensajeExito = ref('')
 
 const fechaHoy = obtenerFechaHoyIso()
-const anhioActual = Number(fechaHoy.slice(0, 4))
 
 const periodoVigente = computed(() => periodos.value.find(estaPeriodoVigente) ?? null)
 
@@ -35,6 +37,12 @@ const proximoPeriodo = computed(() =>
     .sort((primero, segundo) => primero.fechaInicio.localeCompare(segundo.fechaInicio))
     .at(0),
 )
+
+// La matrícula de Dic 2026 – Feb 2027 llena las vacantes del año escolar 2027.
+const anhioVacantes = computed(() => {
+  const periodo = periodoVigente.value ?? proximoPeriodo.value
+  return periodo ? obtenerAnhio(periodo.fechaLimite) : null
+})
 
 async function cargarPeriodos(): Promise<void> {
   cargando.value = true
@@ -52,7 +60,7 @@ async function cargarPeriodos(): Promise<void> {
 onMounted(cargarPeriodos)
 
 function describirDuracion(periodo: PeriodoMatricula): string {
-  const dias = calcularDiasEntre(periodo.fechaInicio, periodo.fechaFin) + 1
+  const dias = calcularDiasEntre(periodo.fechaInicio, periodo.fechaLimite) + 1
   return `${dias} ${dias === 1 ? 'día' : 'días'}`
 }
 
@@ -73,48 +81,39 @@ const errorGuardado = ref('')
 const idEnEdicion = ref<number | null>(null)
 
 const formulario = reactive<SolicitudPeriodoMatricula>({
-  anhio: anhioActual + 1,
   fechaInicio: '',
-  fechaFin: '',
+  fechaLimite: '',
 })
 
 const errores = reactive<ErroresPeriodoMatricula>({})
 
-const anhiosDisponibles = computed(() => {
-  const anhios = new Set([anhioActual, anhioActual + 1, anhioActual + 2, formulario.anhio])
-  return [...anhios].sort((primero, segundo) => primero - segundo)
-})
-
 // Vista previa del estado con las fechas ingresadas, antes de guardar.
 const estadoPrevisto = computed(() => {
-  if (!formulario.fechaInicio || !formulario.fechaFin || formulario.fechaFin <= formulario.fechaInicio) {
+  if (!formulario.fechaInicio || !formulario.fechaLimite || formulario.fechaLimite <= formulario.fechaInicio) {
     return null
   }
 
-  return calcularEstadoPeriodo(formulario.fechaInicio, formulario.fechaFin, fechaHoy)
+  return calcularEstadoPeriodo(formulario.fechaInicio, formulario.fechaLimite, fechaHoy)
 })
 
 function limpiarErrores(): void {
-  errores.anhio = undefined
   errores.fechaInicio = undefined
-  errores.fechaFin = undefined
+  errores.fechaLimite = undefined
   errorGuardado.value = ''
 }
 
 function abrirRegistro(): void {
   idEnEdicion.value = null
-  formulario.anhio = anhioActual + 1
   formulario.fechaInicio = ''
-  formulario.fechaFin = ''
+  formulario.fechaLimite = ''
   limpiarErrores()
   modalAbierto.value = true
 }
 
 function abrirEdicion(periodo: PeriodoMatricula): void {
   idEnEdicion.value = periodo.id
-  formulario.anhio = periodo.anhio
   formulario.fechaInicio = periodo.fechaInicio
-  formulario.fechaFin = periodo.fechaFin
+  formulario.fechaLimite = periodo.fechaLimite
   limpiarErrores()
   modalAbierto.value = true
 }
@@ -144,12 +143,55 @@ async function guardarPeriodo(): Promise<void> {
     }
 
     modalAbierto.value = false
-    mensajeExito.value = `Periodo de matrícula ${solicitud.anhio} ${esEdicion ? 'actualizado' : 'registrado'} correctamente.`
+    mensajeExito.value = `Periodo ${describirPeriodo(solicitud)} ${esEdicion ? 'actualizado' : 'registrado'} correctamente.`
     await cargarPeriodos()
   } catch (error: unknown) {
     errorGuardado.value = obtenerMensajeError(error, 'No se pudo guardar el periodo de matrícula.')
   } finally {
     guardando.value = false
+  }
+}
+
+// Desactivar es una baja lógica: el periodo deja de aparecer, pero su historia se conserva.
+const periodoPorDesactivar = ref<PeriodoMatricula | null>(null)
+const desactivando = ref(false)
+const errorDesactivacion = ref('')
+
+const mensajeDesactivacion = computed(() => {
+  const periodo = periodoPorDesactivar.value
+
+  if (!periodo) {
+    return ''
+  }
+
+  const rango = `del ${formatearFecha(periodo.fechaInicio)} al ${formatearFecha(periodo.fechaLimite)}`
+  const cierre = estaPeriodoVigente(periodo) ? ' La matrícula se cerrará de inmediato.' : ''
+  return `¿Desactivar el periodo ${rango}? Dejará de aparecer en la lista y no se podrán registrar matrículas con él. Las matrículas ya registradas se conservan.${cierre}`
+})
+
+function solicitarDesactivacion(periodo: PeriodoMatricula): void {
+  errorDesactivacion.value = ''
+  periodoPorDesactivar.value = periodo
+}
+
+async function confirmarDesactivacion(): Promise<void> {
+  const periodo = periodoPorDesactivar.value
+
+  if (!periodo) {
+    return
+  }
+
+  desactivando.value = true
+
+  try {
+    await desactivarPeriodo(periodo.id)
+    periodoPorDesactivar.value = null
+    mensajeExito.value = `Periodo ${describirPeriodo(periodo)} desactivado.`
+    await cargarPeriodos()
+  } catch (error: unknown) {
+    errorDesactivacion.value = obtenerMensajeError(error, 'No se pudo desactivar el periodo.')
+  } finally {
+    desactivando.value = false
   }
 }
 </script>
@@ -158,10 +200,15 @@ async function guardarPeriodo(): Promise<void> {
   <main class="pagina-periodo">
     <EncabezadoPagina
       titulo="Periodo de Matrícula"
-      descripcion="Define las fechas en las que se pueden registrar matrículas para cada año escolar."
+      descripcion="Define las fechas en las que se pueden registrar matrículas."
     >
       <template #acciones>
-        <BotonAccion variante="secundario" destino="/secciones">Vacantes por sección</BotonAccion>
+        <BotonAccion
+          variante="secundario"
+          :destino="anhioVacantes ? `/secciones?anhio=${anhioVacantes}` : '/secciones'"
+        >
+          {{ anhioVacantes ? `Ver vacantes de ${anhioVacantes}` : 'Vacantes por sección' }}
+        </BotonAccion>
         <BotonAccion @click="abrirRegistro">+ Nuevo periodo</BotonAccion>
       </template>
     </EncabezadoPagina>
@@ -179,10 +226,10 @@ async function guardarPeriodo(): Promise<void> {
             <InsigniaEstado texto="Matrícula abierta" variante="exito" />
 
             <p>
-              Periodo <strong>{{ periodoVigente.anhio }}</strong
+              Periodo <strong>{{ describirPeriodo(periodoVigente) }}</strong
               >: del <strong>{{ formatearFecha(periodoVigente.fechaInicio) }}</strong> al
-              <strong>{{ formatearFecha(periodoVigente.fechaFin) }}</strong
-              >. Cierra {{ describirDiasHasta(periodoVigente.fechaFin) }}.
+              <strong>{{ formatearFecha(periodoVigente.fechaLimite) }}</strong
+              >. Cierra {{ describirDiasHasta(periodoVigente.fechaLimite) }}.
             </p>
           </div>
 
@@ -192,7 +239,7 @@ async function guardarPeriodo(): Promise<void> {
             <p>
               No hay un periodo de matrícula vigente, por lo que no se pueden registrar matrículas.
               <template v-if="proximoPeriodo">
-                El periodo {{ proximoPeriodo.anhio }} inicia el
+                El próximo periodo inicia el
                 <strong>{{ formatearFecha(proximoPeriodo.fechaInicio) }}</strong>
                 ({{ describirDiasHasta(proximoPeriodo.fechaInicio) }}).
               </template>
@@ -206,7 +253,7 @@ async function guardarPeriodo(): Promise<void> {
           <table>
             <thead>
               <tr>
-                <th scope="col">Año escolar</th>
+                <th scope="col">Periodo</th>
                 <th scope="col">Fecha de inicio</th>
                 <th scope="col">Fecha límite</th>
                 <th scope="col">Duración</th>
@@ -217,9 +264,9 @@ async function guardarPeriodo(): Promise<void> {
 
             <tbody>
               <tr v-for="periodo in periodos" :key="periodo.id">
-                <td class="dato-destacado">{{ periodo.anhio }}</td>
+                <td class="dato-destacado">{{ describirPeriodo(periodo) }}</td>
                 <td>{{ formatearFecha(periodo.fechaInicio) }}</td>
-                <td>{{ formatearFecha(periodo.fechaFin) }}</td>
+                <td>{{ formatearFecha(periodo.fechaLimite) }}</td>
                 <td>{{ describirDuracion(periodo) }}</td>
                 <td>
                   <InsigniaEstado
@@ -228,14 +275,27 @@ async function guardarPeriodo(): Promise<void> {
                   />
                 </td>
                 <td>
-                  <button
-                    type="button"
-                    class="boton-tabla"
-                    :aria-label="`Editar periodo ${periodo.anhio}`"
-                    @click="abrirEdicion(periodo)"
-                  >
-                    Editar
-                  </button>
+                  <div class="acciones-fila">
+                    <button
+                      type="button"
+                      class="boton-tabla"
+                      :disabled="Boolean(obtenerMotivoNoEditable(periodo))"
+                      :title="obtenerMotivoNoEditable(periodo) || undefined"
+                      :aria-label="`Editar periodo ${describirPeriodo(periodo)}`"
+                      @click="abrirEdicion(periodo)"
+                    >
+                      Editar
+                    </button>
+
+                    <button
+                      type="button"
+                      class="boton-tabla"
+                      :aria-label="`Desactivar periodo ${describirPeriodo(periodo)}`"
+                      @click="solicitarDesactivacion(periodo)"
+                    >
+                      Desactivar
+                    </button>
+                  </div>
                 </td>
               </tr>
 
@@ -258,22 +318,6 @@ async function guardarPeriodo(): Promise<void> {
       @cerrar="cerrarModal"
     >
       <form id="formulario-periodo" class="formulario" novalidate @submit.prevent="guardarPeriodo">
-        <div class="campo">
-          <label for="anhio-periodo">Año escolar <span class="obligatorio">*</span></label>
-
-          <select
-            id="anhio-periodo"
-            v-model.number="formulario.anhio"
-            :aria-invalid="Boolean(errores.anhio)"
-            :aria-describedby="errores.anhio ? 'error-anhio' : undefined"
-            @change="errores.anhio = undefined"
-          >
-            <option v-for="anhio in anhiosDisponibles" :key="anhio" :value="anhio">{{ anhio }}</option>
-          </select>
-
-          <small v-if="errores.anhio" id="error-anhio" class="error">{{ errores.anhio }}</small>
-        </div>
-
         <div class="cuadricula-fechas">
           <div class="campo">
             <label for="fecha-inicio">Fecha de inicio <span class="obligatorio">*</span></label>
@@ -291,19 +335,19 @@ async function guardarPeriodo(): Promise<void> {
           </div>
 
           <div class="campo">
-            <label for="fecha-fin">Fecha límite <span class="obligatorio">*</span></label>
+            <label for="fecha-limite">Fecha límite <span class="obligatorio">*</span></label>
 
             <input
-              id="fecha-fin"
-              v-model="formulario.fechaFin"
+              id="fecha-limite"
+              v-model="formulario.fechaLimite"
               type="date"
               :min="formulario.fechaInicio || undefined"
-              :aria-invalid="Boolean(errores.fechaFin)"
-              :aria-describedby="errores.fechaFin ? 'error-fecha-fin' : undefined"
-              @input="errores.fechaFin = undefined"
+              :aria-invalid="Boolean(errores.fechaLimite)"
+              :aria-describedby="errores.fechaLimite ? 'error-fecha-limite' : undefined"
+              @input="errores.fechaLimite = undefined"
             />
 
-            <small v-if="errores.fechaFin" id="error-fecha-fin" class="error">{{ errores.fechaFin }}</small>
+            <small v-if="errores.fechaLimite" id="error-fecha-limite" class="error">{{ errores.fechaLimite }}</small>
           </div>
         </div>
 
@@ -325,6 +369,17 @@ async function guardarPeriodo(): Promise<void> {
         </BotonAccion>
       </template>
     </VentanaModal>
+
+    <VentanaConfirmacion
+      :abierta="periodoPorDesactivar !== null"
+      titulo="Desactivar periodo"
+      :mensaje="mensajeDesactivacion"
+      texto-confirmar="Desactivar periodo"
+      :procesando="desactivando"
+      :error="errorDesactivacion"
+      @confirmar="confirmarDesactivacion"
+      @cancelar="periodoPorDesactivar = null"
+    />
   </main>
 </template>
 
@@ -425,8 +480,19 @@ td {
   cursor: pointer;
 }
 
-.boton-tabla:hover {
+.boton-tabla:hover:not(:disabled) {
   background: #eef2ff;
+}
+
+.boton-tabla:disabled {
+  border-color: #e5e7eb;
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.acciones-fila {
+  display: flex;
+  gap: 8px;
 }
 
 .sin-resultados {

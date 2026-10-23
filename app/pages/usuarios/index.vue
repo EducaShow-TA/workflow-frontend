@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import type { RolUsuario } from '~/types/autenticacion'
-import type { CuentaUsuario, FiltroRol } from '~/types/cuentaUsuario'
+import type { CuentaUsuario, FiltroEstadoCuenta, FiltroRol } from '~/types/cuentaUsuario'
 import type { VarianteInsignia } from '~/types/interfaz'
 import {
-  CAMBIO_ESTADO_DISPONIBLE,
   CUENTAS_POR_PAGINA,
   calcularTotalPaginas,
+  contarPorEstado,
   contarPorRol,
   filtrarCuentas,
   obtenerIniciales,
@@ -16,6 +16,7 @@ import {
 } from '~/composables/useCuentasUsuario'
 import { ROLES, obtenerNombreRol, usePermisosRol } from '~/composables/usePermisosRol'
 import { obtenerMensajeError } from '~/composables/useDatosPrueba'
+import { useCambioEstadoCuenta } from '~/composables/useCambioEstadoCuenta'
 import { useAutenticacionStore } from '~/stores/autenticacion'
 
 definePageMeta({
@@ -80,13 +81,19 @@ onMounted(async () => {
 
 const busqueda = ref('')
 const filtroRol = ref<FiltroRol>('TODOS')
+const filtroEstado = ref<FiltroEstadoCuenta>('TODOS')
 const paginaActual = ref(1)
 
 const conteoPorRol = computed(() => contarPorRol(cuentas.value))
-const cuentasFiltradas = computed(() => filtrarCuentas(cuentas.value, busqueda.value, filtroRol.value))
+const conteoPorEstado = computed(() => contarPorEstado(cuentas.value))
+const cuentasFiltradas = computed(() =>
+  filtrarCuentas(cuentas.value, busqueda.value, filtroRol.value, filtroEstado.value),
+)
 const totalPaginas = computed(() => calcularTotalPaginas(cuentasFiltradas.value.length))
 const cuentasPagina = computed(() => obtenerPagina(cuentasFiltradas.value, paginaActual.value))
-const hayFiltros = computed(() => Boolean(busqueda.value.trim()) || filtroRol.value !== 'TODOS')
+const hayFiltros = computed(
+  () => Boolean(busqueda.value.trim()) || filtroRol.value !== 'TODOS' || filtroEstado.value !== 'TODOS',
+)
 
 const rangoMostrado = computed(() => {
   if (cuentasFiltradas.value.length === 0) {
@@ -98,24 +105,32 @@ const rangoMostrado = computed(() => {
   return `Mostrando ${inicio}–${fin} de ${cuentasFiltradas.value.length} usuarios`
 })
 
-watch([busqueda, filtroRol], () => {
+watch([busqueda, filtroRol, filtroEstado], () => {
   paginaActual.value = 1
 })
 
 function limpiarFiltros(): void {
   busqueda.value = ''
   filtroRol.value = 'TODOS'
+  filtroEstado.value = 'TODOS'
 }
 
 function describirBloqueoEstado(cuenta: CuentaUsuario): string {
-  const proteccion = obtenerMotivoProteccion(cuenta, cuentas.value, autenticacion.usuario?.username ?? '')
-
-  if (proteccion) {
-    return proteccion
-  }
-
-  return CAMBIO_ESTADO_DISPONIBLE ? '' : 'Activar y desactivar cuentas estará disponible con US-5.1.'
+  return obtenerMotivoProteccion(cuenta, cuentas.value, autenticacion.usuario?.username ?? '')
 }
+
+const {
+  cuentaPorDesactivar,
+  idProcesando,
+  errorConfirmacion,
+  errorEstado,
+  solicitarCambio,
+  confirmarDesactivacion,
+  cancelarDesactivacion,
+} = useCambioEstadoCuenta((actualizada, mensaje) => {
+  cuentas.value = cuentas.value.map((cuenta) => (cuenta.id === actualizada.id ? actualizada : cuenta))
+  mensajeExito.value = mensaje
+})
 
 function describirEstado(cuenta: CuentaUsuario): string {
   if (cuenta.activo === undefined) {
@@ -166,6 +181,12 @@ function irAPagina(pagina: number): void {
         <div class="indicador">
           <span>Total de usuarios</span>
           <strong>{{ cuentas.length }}</strong>
+          <small class="detalle-estado">
+            {{ conteoPorEstado.activos }} {{ conteoPorEstado.activos === 1 ? 'activo' : 'activos' }} ·
+            <span :class="{ inactivos: conteoPorEstado.inactivos > 0 }">
+              {{ conteoPorEstado.inactivos }} {{ conteoPorEstado.inactivos === 1 ? 'inactivo' : 'inactivos' }}
+            </span>
+          </small>
         </div>
 
         <div v-for="rol in ROLES" :key="rol" class="indicador">
@@ -182,6 +203,16 @@ function irAPagina(pagina: number): void {
             <select id="filtro-rol" v-model="filtroRol">
               <option value="TODOS">Todos los roles</option>
               <option v-for="rol in ROLES" :key="rol" :value="rol">{{ obtenerNombreRol(rol) }}</option>
+            </select>
+          </div>
+
+          <div class="campo-filtro filtro-estado">
+            <label for="filtro-estado">Estado</label>
+
+            <select id="filtro-estado" v-model="filtroEstado">
+              <option value="TODOS">Todos</option>
+              <option value="ACTIVOS">Activos</option>
+              <option value="INACTIVOS">Inactivos</option>
             </select>
           </div>
 
@@ -243,12 +274,8 @@ function irAPagina(pagina: number): void {
                     :activo="cuenta.activo"
                     :etiqueta="describirEstado(cuenta)"
                     :motivo="describirBloqueoEstado(cuenta)"
-                    :deshabilitado="
-                      !CAMBIO_ESTADO_DISPONIBLE ||
-                      Boolean(obtenerMotivoProteccion(cuenta, cuentas, autenticacion.usuario?.username ?? '')) ||
-                      cuentaActualizando !== null
-                    "
-                    @alternar="alternarEstado(cuenta)"
+                    :procesando="idProcesando === cuenta.id"
+                    @cambiar="(activo) => solicitarCambio(cuenta, activo)"
                   />
                 </td>
                 <td class="columna-acciones">
@@ -306,6 +333,17 @@ function irAPagina(pagina: number): void {
         </footer>
       </section>
     </PanelEstadoCarga>
+
+    <VentanaConfirmacion
+      :abierta="cuentaPorDesactivar !== null"
+      titulo="Desactivar cuenta"
+      :mensaje="`¿Desactivar la cuenta de ${cuentaPorDesactivar?.nombreCompleto ?? ''}? No podrá iniciar sesión mientras esté inactiva. Su información histórica se conserva.`"
+      texto-confirmar="Desactivar cuenta"
+      :procesando="idProcesando !== null"
+      :error="errorConfirmacion"
+      @confirmar="confirmarDesactivacion"
+      @cancelar="cancelarDesactivacion"
+    />
   </main>
 </template>
 
@@ -344,6 +382,16 @@ function irAPagina(pagina: number): void {
   font-size: 30px;
 }
 
+.detalle-estado {
+  color: #737686;
+  font-size: 12px;
+}
+
+.detalle-estado .inactivos {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
 .panel-tabla {
   display: flex;
   flex-direction: column;
@@ -355,7 +403,7 @@ function irAPagina(pagina: number): void {
 
 .barra-filtros {
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr) auto;
+  grid-template-columns: 200px 160px minmax(0, 1fr) auto;
   align-items: end;
   gap: 16px;
   padding: 16px;

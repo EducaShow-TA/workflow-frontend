@@ -7,6 +7,10 @@ const RUTA_PERIODOS = '/api/v1/periodos'
 export function usePeriodosAcademicos() {
   const { solicitar } = useApi()
 
+  function listar(): Promise<PeriodoAcademico[]> {
+    return solicitar<PeriodoAcademico[]>(RUTA_PERIODOS)
+  }
+
   function listarPorAnhio(anhio: number): Promise<PeriodoAcademico[]> {
     return solicitar<PeriodoAcademico[]>(`${RUTA_PERIODOS}?anhio=${anhio}`)
   }
@@ -15,5 +19,5 @@ export function usePeriodosAcademicos() {
     return solicitar<PeriodoAcademico[]>(`${RUTA_PERIODOS}/anhio`, { metodo: 'POST', cuerpo: solicitud })
   }
 
-  return { listarPorAnhio, abrirAnhio }
+  return { listar, listarPorAnhio, abrirAnhio }
 }

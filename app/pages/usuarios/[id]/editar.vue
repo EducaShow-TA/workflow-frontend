@@ -2,12 +2,11 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import type { CuentaUsuario, ErroresEdicion, SolicitudActualizarCuenta } from '~/types/cuentaUsuario'
 import {
-  CAMBIO_ESTADO_DISPONIBLE,
-  CAMBIO_ROL_DISPONIBLE,
-  EDICION_DISPONIBLE,
   LONGITUD_MAXIMA_CORREO,
+  MOTIVO_ROL_FIJO,
   construirSolicitudEdicion,
   crearFormularioEdicion,
+  esCuentaPropia,
   obtenerMotivoProteccion,
   tieneNombreSeparado,
   useCuentasUsuario,
@@ -15,6 +14,8 @@ import {
 } from '~/composables/useCuentasUsuario'
 import { ROLES, obtenerNombreRol } from '~/composables/usePermisosRol'
 import { obtenerMensajeError } from '~/composables/useDatosPrueba'
+import { useCambioEstadoCuenta } from '~/composables/useCambioEstadoCuenta'
+import { normalizarCorreo } from '~/composables/useMascarasFormulario'
 import { obtenerPrimerError, tieneErrores } from '~/composables/useValidacion'
 import { useAutenticacionStore } from '~/stores/autenticacion'
 
@@ -72,15 +73,36 @@ const motivoProteccion = computed(() =>
   cuenta.value ? obtenerMotivoProteccion(cuenta.value, cuentas.value, autenticacion.usuario?.username ?? '') : '',
 )
 
-const motivoRol = computed(
-  () => motivoProteccion.value || (CAMBIO_ROL_DISPONIBLE ? '' : 'El cambio de rol todavía no está disponible.'),
+const esPropia = computed(() =>
+  cuenta.value ? esCuentaPropia(cuenta.value, autenticacion.usuario?.username ?? '') : false,
 )
 
-const motivoEstado = computed(
-  () =>
-    motivoProteccion.value ||
-    (CAMBIO_ESTADO_DISPONIBLE ? '' : 'Activar y desactivar cuentas estará disponible con US-5.1.'),
-)
+const ayudaEstado = computed(() => {
+  if (motivoProteccion.value) {
+    return motivoProteccion.value
+  }
+
+  return cuenta.value?.activo === false
+    ? 'Actívala para que pueda volver a iniciar sesión.'
+    : 'Si la desactivas, no podrá iniciar sesión.'
+})
+
+const mensajeEstado = ref('')
+const confirmandoCambioCorreo = ref(false)
+
+const {
+  cuentaPorDesactivar,
+  idProcesando,
+  errorConfirmacion,
+  errorEstado,
+  solicitarCambio,
+  confirmarDesactivacion,
+  cancelarDesactivacion,
+} = useCambioEstadoCuenta((actualizada, mensaje) => {
+  cuenta.value = actualizada
+  cuentas.value = cuentas.value.map((existente) => (existente.id === actualizada.id ? actualizada : existente))
+  mensajeEstado.value = mensaje
+})
 
 const textoEstado = computed(() => {
   if (cuenta.value?.activo === undefined) {
@@ -95,8 +117,15 @@ function limpiarError(campo: keyof SolicitudActualizarCuenta): void {
   errorGuardado.value = ''
 }
 
+const cambiaCorreoPropio = computed(
+  () =>
+    esPropia.value &&
+    cuenta.value !== null &&
+    normalizarCorreo(formulario.username) !== normalizarCorreo(cuenta.value.username),
+)
+
 async function guardar(): Promise<void> {
-  if (!cuenta.value || !EDICION_DISPONIBLE) {
+  if (!cuenta.value) {
     return
   }
 
@@ -107,14 +136,40 @@ async function guardar(): Promise<void> {
     return
   }
 
+  if (cambiaCorreoPropio.value) {
+    confirmandoCambioCorreo.value = true
+    return
+  }
+
+  await enviarCambios()
+}
+
+async function enviarCambios(): Promise<void> {
+  if (!cuenta.value) {
+    return
+  }
+
   guardando.value = true
   errorGuardado.value = ''
+  const cerrarSesion = cambiaCorreoPropio.value
 
   try {
     const actualizada = await actualizarCuenta(cuenta.value.id, construirSolicitudEdicion(formulario))
+
+    if (cerrarSesion) {
+      autenticacion.cerrarSesionPorCambioDeCorreo(actualizada.username)
+      await navigateTo('/login')
+      return
+    }
+
+    if (esPropia.value && autenticacion.usuario) {
+      autenticacion.usuario.nombreCompleto = actualizada.nombreCompleto
+    }
+
     await navigateTo({ path: '/usuarios', query: { editado: actualizada.username } })
   } catch (error: unknown) {
     errorGuardado.value = obtenerMensajeError(error, 'No se pudieron guardar los cambios.')
+    confirmandoCambioCorreo.value = false
   } finally {
     guardando.value = false
   }
@@ -133,25 +188,16 @@ async function cancelar(): Promise<void> {
     >
       <template #acciones>
         <BotonAccion variante="secundario" :deshabilitado="guardando" @click="cancelar">Cancelar</BotonAccion>
-        <BotonAccion
-          tipo="submit"
-          form="formulario-edicion"
-          :deshabilitado="guardando || !EDICION_DISPONIBLE || !cuenta"
-          :title="EDICION_DISPONIBLE ? undefined : 'Disponible cuando el backend implemente la edición de cuentas.'"
-        >
+        <BotonAccion tipo="submit" form="formulario-edicion" :deshabilitado="guardando || !cuenta">
           {{ guardando ? 'Guardando...' : 'Guardar cambios' }}
         </BotonAccion>
       </template>
     </EncabezadoPagina>
 
     <PanelEstadoCarga :cargando="cargando" :error="errorCarga" @reintentar="cargarCuenta">
-      <AvisoMensaje
-        v-if="!EDICION_DISPONIBLE"
-        mensaje="La edición de cuentas todavía no está disponible."
-        tipo="informacion"
-      />
-
       <AvisoMensaje v-if="errorGuardado" :mensaje="errorGuardado" tipo="error" />
+      <AvisoMensaje v-if="mensajeEstado" :mensaje="mensajeEstado" tipo="exito" cerrable @cerrar="mensajeEstado = ''" />
+      <AvisoMensaje v-if="errorEstado" :mensaje="errorEstado" tipo="error" cerrable @cerrar="errorEstado = ''" />
 
       <form v-if="cuenta" id="formulario-edicion" class="cuadricula" novalidate @submit.prevent="guardar">
         <div class="columna-principal">
@@ -229,7 +275,10 @@ async function cancelar(): Promise<void> {
                   @input="limpiarError('username')"
                 />
                 <small v-if="errores.username" class="error">{{ errores.username }}</small>
-                <small id="ayuda-correo" class="ayuda">
+                <small v-if="esPropia" id="ayuda-correo" class="aviso-correo-propio">
+                  Es tu cuenta: si cambias el correo, se cerrará tu sesión y deberás ingresar con el nuevo.
+                </small>
+                <small v-else id="ayuda-correo" class="ayuda">
                   Es el usuario con el que inicia sesión: si lo cambias, deberá ingresar con el nuevo correo.
                 </small>
               </div>
@@ -246,21 +295,48 @@ async function cancelar(): Promise<void> {
               <select id="rol" :value="cuenta.rol" disabled aria-describedby="ayuda-rol">
                 <option v-for="rol in ROLES" :key="rol" :value="rol">{{ obtenerNombreRol(rol) }}</option>
               </select>
-              <small id="ayuda-rol" class="ayuda">{{ motivoRol }}</small>
+              <small id="ayuda-rol" class="ayuda">{{ MOTIVO_ROL_FIJO }}</small>
             </div>
 
             <div class="fila-estado">
-              <InterruptorEstado :activo="cuenta.activo" etiqueta="Estado de la cuenta" :motivo="motivoEstado" />
+              <InterruptorEstado
+                :activo="cuenta.activo"
+                etiqueta="Estado de la cuenta"
+                :motivo="motivoProteccion"
+                :procesando="idProcesando === cuenta.id"
+                @cambiar="(activo) => cuenta && solicitarCambio(cuenta, activo)"
+              />
 
               <div>
                 <span class="texto-estado">{{ textoEstado }}</span>
-                <small class="ayuda">{{ motivoEstado }}</small>
+                <small class="ayuda">{{ ayudaEstado }}</small>
               </div>
             </div>
           </section>
         </aside>
       </form>
     </PanelEstadoCarga>
+
+    <VentanaConfirmacion
+      :abierta="cuentaPorDesactivar !== null"
+      titulo="Desactivar cuenta"
+      :mensaje="`¿Desactivar la cuenta de ${cuentaPorDesactivar?.nombreCompleto ?? ''}? No podrá iniciar sesión mientras esté inactiva. Su información histórica se conserva.`"
+      texto-confirmar="Desactivar cuenta"
+      :procesando="idProcesando !== null"
+      :error="errorConfirmacion"
+      @confirmar="confirmarDesactivacion"
+      @cancelar="cancelarDesactivacion"
+    />
+
+    <VentanaConfirmacion
+      :abierta="confirmandoCambioCorreo"
+      titulo="Cambiar tu correo"
+      :mensaje="`Tu nuevo correo será ${normalizarCorreo(formulario.username)}. Al guardar se cerrará tu sesión: ingresa de nuevo con el nuevo correo y tu misma contraseña.`"
+      texto-confirmar="Guardar y cerrar sesión"
+      :procesando="guardando"
+      @confirmar="enviarCambios"
+      @cancelar="confirmandoCambioCorreo = false"
+    />
   </main>
 </template>
 
@@ -415,5 +491,13 @@ async function cancelar(): Promise<void> {
   .campos {
     grid-template-columns: 1fr;
   }
+}
+.aviso-correo-propio {
+  padding: 8px 10px;
+  border: 1px solid #fde68a;
+  border-radius: 7px;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 12px;
 }
 </style>
