@@ -141,6 +141,7 @@ export const REGLAS_RUTA: ReglaRuta[] = [
   { prefijo: '/matriculas', permiso: 'MATRICULA_VER' },
   { prefijo: '/matriculas/nueva', permiso: 'MATRICULA_REGISTRAR' },
   { prefijo: '/matriculas/periodo', permiso: 'PERIODO_CONFIGURAR' },
+  { prefijo: '/matriculas/periodos-anuales', permiso: 'PERIODO_CONFIGURAR' },
   { prefijo: '/secciones', permiso: 'SECCION_VER' },
   { prefijo: '/competencias', permiso: 'COMPETENCIA_VER' },
   { prefijo: '/usuarios', permiso: 'USUARIO_VER' },

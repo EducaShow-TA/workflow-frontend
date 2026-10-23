@@ -1,45 +1,56 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { useListadoEstudiantes } from '~/composables/useListadoEstudiantes'
-import { useVacantesDemo } from '~/composables/useVacantesDemo'
-import { calcularVacantes, porcentajeOcupacion } from '~/types/matricula'
+import { computed, onMounted, ref } from 'vue'
+import type { EstudianteMatriculable, MatriculaApi } from '~/types/matricula'
+import type { PeriodoAcademico } from '~/types/periodoAcademico'
+import { obtenerMensajeError } from '~/composables/useDatosPrueba'
+import { useEstudiantesMatriculables } from '~/composables/useEstudiantesMatriculables'
+import { useMatriculas } from '~/composables/useMatriculas'
+import { usePeriodoMatricula } from '~/composables/usePeriodoMatricula'
+import { usePeriodosAcademicos } from '~/composables/usePeriodosAcademicos'
 
 definePageMeta({ middleware: 'autenticacion' })
 
-const estudiantes = useListadoEstudiantes().filter((estudiante) => estudiante.estado === 'ACTIVO')
-const cupos = useVacantesDemo()
+const { listar } = useEstudiantesMatriculables()
+const { listarPorAnhio } = usePeriodosAcademicos()
+const { obtenerPeriodoVigente } = usePeriodoMatricula()
+const { registrar, confirmar } = useMatriculas()
 
-const estudianteCodigo = ref(estudiantes[0]?.codigo ?? '')
-const anhioAcademico = ref('2026')
-const gradoSeleccionado = ref('3ro Secundaria')
-const seccionSeleccionada = ref('A')
+const estudiantes = ref<EstudianteMatriculable[]>([])
+const periodos = ref<PeriodoAcademico[]>([])
+const ventanaVigente = ref<Awaited<ReturnType<typeof obtenerPeriodoVigente>>>(null)
+const estudianteId = ref<number | null>(null)
+const periodoId = ref<number | null>(null)
+const matriculaPendiente = ref<MatriculaApi | null>(null)
+const cargando = ref(true)
+const guardando = ref(false)
+const error = ref('')
+const aviso = ref('')
 
-const grados = [...new Set(cupos.map((cupo) => cupo.grado))]
+const periodoSeleccionado = computed(() => periodos.value.find((periodo) => periodo.periodoId === periodoId.value))
+const estudiantesDisponibles = computed(() => {
+  if (!periodoSeleccionado.value) return []
 
-const estudianteSeleccionado = computed(() =>
-  estudiantes.find((estudiante) => estudiante.codigo === estudianteCodigo.value),
-)
-
-const seccionesDisponibles = computed(() =>
-  cupos.filter((cupo) => cupo.grado === gradoSeleccionado.value).map((cupo) => cupo.seccion),
-)
-
-watch(gradoSeleccionado, () => {
-  if (!seccionesDisponibles.value.includes(seccionSeleccionada.value)) {
-    seccionSeleccionada.value = seccionesDisponibles.value[0] ?? ''
-  }
+  return estudiantes.value.filter((estudiante) =>
+    !estudiante.matriculas.some(
+      (matricula) =>
+        matricula.periodoId === periodoSeleccionado.value!.periodoId && matricula.estado !== 'RETIRADA',
+    ),
+  )
 })
 
-const cupoSeleccionado = computed(() =>
-  cupos.find((cupo) => cupo.grado === gradoSeleccionado.value && cupo.seccion === seccionSeleccionada.value),
+const estudianteSeleccionado = computed(() =>
+  estudiantesDisponibles.value.find((estudiante) => estudiante.estudianteId === estudianteId.value),
 )
 
-const vacantesDisponibles = computed(() => (cupoSeleccionado.value ? calcularVacantes(cupoSeleccionado.value) : 0))
-
-const ocupacion = computed(() => (cupoSeleccionado.value ? porcentajeOcupacion(cupoSeleccionado.value) : 0))
+const vacantesDisponibles = computed(() => periodoSeleccionado.value?.vacantesDisponibles ?? 0)
+const capacidadMaxima = computed(() => periodoSeleccionado.value?.vacantesTotales ?? 0)
+const matriculados = computed(() => periodoSeleccionado.value?.matriculasActivas ?? 0)
+const ocupacion = computed(() =>
+  capacidadMaxima.value > 0 ? Math.min(100, Math.round((matriculados.value / capacidadMaxima.value) * 100)) : 0,
+)
 
 const estadoCupos = computed(() => {
-  if (!cupoSeleccionado.value) return 'sin-datos'
+  if (!periodoSeleccionado.value) return 'sin-datos'
   if (vacantesDisponibles.value === 0) return 'agotado'
   if (vacantesDisponibles.value <= 2) return 'limitado'
   return 'disponible'
@@ -53,7 +64,7 @@ const etiquetaEstado = computed(() => {
 })
 
 const mensajeCupos = computed(() => {
-  if (!cupoSeleccionado.value) return 'Selecciona un grado y una sección para consultar los cupos.'
+  if (!periodoSeleccionado.value) return 'No hay periodos académicos disponibles para seleccionar.'
   if (vacantesDisponibles.value === 0) {
     return 'Esta sección no dispone de vacantes. Selecciona otra sección.'
   }
@@ -63,9 +74,84 @@ const mensajeCupos = computed(() => {
   return `Hay ${vacantesDisponibles.value} vacantes disponibles en esta sección.`
 })
 
-async function cancelar(): Promise<void> {
-  await navigateTo('/estudiantes')
+const grados = computed(() => [...new Set(periodos.value.map((periodo) => periodo.numeroGrado))].sort((a, b) => a - b))
+
+const nombreCompleto = (estudiante: EstudianteMatriculable) =>
+  [estudiante.nombre, estudiante.apellidoPaterno, estudiante.apellidoMaterno].filter(Boolean).join(' ')
+
+async function cargarDatos(): Promise<void> {
+  cargando.value = true
+  error.value = ''
+  aviso.value = ''
+
+  try {
+    const vigente = await obtenerPeriodoVigente()
+    ventanaVigente.value = vigente
+    if (!vigente) {
+      estudiantes.value = []
+      periodos.value = []
+      estudianteId.value = null
+      periodoId.value = null
+      return
+    }
+
+    const [estudiantesCargados, periodosCargados] = await Promise.all([
+      listar(),
+      listarPorAnhio(vigente.anhio),
+    ])
+    estudiantes.value = estudiantesCargados
+    periodos.value = periodosCargados
+    periodoId.value =
+      periodosCargados.find((periodo) => periodo.vacantesDisponibles > 0)?.periodoId ??
+      periodosCargados[0]?.periodoId ??
+      null
+    estudianteId.value = null
+  } catch (fallo: unknown) {
+    error.value = obtenerMensajeError(fallo, 'No se pudieron cargar estudiantes y vacantes.')
+  } finally {
+    cargando.value = false
+  }
 }
+
+async function registrarMatricula(): Promise<void> {
+  if (!periodoSeleccionado.value || !estudianteSeleccionado.value || vacantesDisponibles.value < 1) return
+
+  guardando.value = true
+  error.value = ''
+  aviso.value = ''
+  try {
+    matriculaPendiente.value = await registrar(periodoSeleccionado.value.periodoId, estudianteSeleccionado.value.estudianteId)
+    await cargarDatos()
+    aviso.value = 'La matrícula se registró y quedó pendiente de confirmación.'
+  } catch (fallo: unknown) {
+    error.value = obtenerMensajeError(fallo, 'No se pudo registrar la matrícula.')
+  } finally {
+    guardando.value = false
+  }
+}
+
+async function confirmarMatricula(): Promise<void> {
+  if (!matriculaPendiente.value) return
+
+  guardando.value = true
+  error.value = ''
+  try {
+    const resultado = await confirmar(matriculaPendiente.value.periodoId, matriculaPendiente.value.estudianteId)
+    matriculaPendiente.value = null
+    await cargarDatos()
+    aviso.value = `Matrícula confirmada correctamente (N.° ${resultado.matriculaId}).`
+  } catch (fallo: unknown) {
+    error.value = obtenerMensajeError(fallo, 'La matrícula quedó registrada, pero no se pudo confirmar.')
+  } finally {
+    guardando.value = false
+  }
+}
+
+async function cancelar(): Promise<void> {
+  await navigateTo('/matriculas')
+}
+
+onMounted(cargarDatos)
 </script>
 
 <template>
@@ -75,7 +161,7 @@ async function cancelar(): Promise<void> {
         <h1>Crear Matrícula</h1>
         <p>Selecciona un estudiante y consulta la disponibilidad de vacantes.</p>
       </div>
-      <span class="etiqueta-demo">Datos de demostración</span>
+      <span class="etiqueta-demo">Año escolar {{ ventanaVigente?.anhio ?? '—' }}</span>
     </header>
 
     <section class="tarjeta" aria-labelledby="titulo-estudiante">
@@ -83,45 +169,43 @@ async function cancelar(): Promise<void> {
         <h2 id="titulo-estudiante">Información del estudiante</h2>
       </div>
 
-      <div class="contenido-tarjeta">
+      <div v-if="!cargando" class="contenido-tarjeta">
         <div class="campo">
           <label for="estudiante">Seleccionar estudiante</label>
-          <select id="estudiante" v-model="estudianteCodigo">
-            <option value="" disabled>Selecciona un estudiante</option>
-            <option v-for="estudiante in estudiantes" :key="estudiante.codigo" :value="estudiante.codigo">
-              {{ estudiante.nombres }} {{ estudiante.apellidos }} — {{ estudiante.codigo }}
+          <select id="estudiante" v-model="estudianteId" :disabled="estudiantesDisponibles.length === 0">
+            <option :value="null" disabled>Selecciona un estudiante</option>
+            <option
+              v-for="estudiante in estudiantesDisponibles"
+              :key="estudiante.estudianteId"
+              :value="estudiante.estudianteId"
+            >
+              {{ nombreCompleto(estudiante) }} — DNI {{ estudiante.dni }}
             </option>
           </select>
         </div>
 
         <div v-if="estudianteSeleccionado" class="perfil-estudiante">
-          <img
-            v-if="estudianteSeleccionado.avatar"
-            :src="estudianteSeleccionado.avatar"
-            alt=""
-            class="avatar-estudiante"
-          />
-          <div v-else class="avatar-estudiante avatar-iniciales" aria-hidden="true">
-            {{ estudianteSeleccionado.nombres.charAt(0) }}{{ estudianteSeleccionado.apellidos.charAt(0) }}
+          <div class="avatar-estudiante avatar-iniciales" aria-hidden="true">
+            {{ estudianteSeleccionado.nombre.charAt(0) }}{{ estudianteSeleccionado.apellidoPaterno.charAt(0) }}
           </div>
 
           <div class="detalle-estudiante">
             <div class="nombre-estudiante">
-              <h3>{{ estudianteSeleccionado.nombres }} {{ estudianteSeleccionado.apellidos }}</h3>
-              <span class="etiqueta-activo">Activo</span>
+              <h3>{{ nombreCompleto(estudianteSeleccionado) }}</h3>
+              <span class="etiqueta-activo">Registrado</span>
             </div>
             <div class="datos-estudiante">
-              <p><strong>Código:</strong> {{ estudianteSeleccionado.codigo }}</p>
-              <p><strong>Documento:</strong> {{ estudianteSeleccionado.numeroDocumento }}</p>
-              <p>
-                <strong>Grado de referencia:</strong>
-                {{ estudianteSeleccionado.grado }} - {{ estudianteSeleccionado.seccion }}
-              </p>
-              <p><strong>Correo:</strong> {{ estudianteSeleccionado.correoElectronico }}</p>
+              <p><strong>Documento:</strong> {{ estudianteSeleccionado.dni }}</p>
+              <p><strong>Correo:</strong> {{ estudianteSeleccionado.correo || 'No registrado' }}</p>
             </div>
           </div>
         </div>
-        <p v-else class="aviso-neutral" role="status">Selecciona un estudiante para visualizar su información.</p>
+        <p v-else-if="estudiantesDisponibles.length" class="aviso-neutral" role="status">
+          Selecciona un estudiante para visualizar su información.
+        </p>
+        <p v-else class="aviso-neutral" role="status">
+          {{ estudiantes.length ? 'Todos los estudiantes ya tienen matrícula en este periodo.' : 'No hay estudiantes registrados. Registra un estudiante antes de continuar.' }}
+        </p>
       </div>
     </section>
 
@@ -134,22 +218,22 @@ async function cancelar(): Promise<void> {
         <div class="cuadricula-campos">
           <div class="campo">
             <label for="anhio-academico">Año Académico</label>
-            <input id="anhio-academico" v-model="anhioAcademico" type="text" readonly aria-describedby="ayuda-anhio" />
-            <small id="ayuda-anhio">Período de prueba; falta configurar fechas.</small>
+            <input id="anhio-academico" :value="ventanaVigente?.anhio ?? ''" type="text" readonly aria-describedby="ayuda-anhio" />
+            <small id="ayuda-anhio">Año de la ventana de matrícula vigente.</small>
           </div>
           <div class="campo">
             <label for="grado-matricula">Grado</label>
-            <select id="grado-matricula" v-model="gradoSeleccionado">
+            <select id="grado-matricula" :value="periodoSeleccionado?.numeroGrado ?? ''" disabled>
               <option v-for="grado in grados" :key="grado" :value="grado">
-                {{ grado }}
+                {{ grado }}.° de secundaria
               </option>
             </select>
           </div>
           <div class="campo">
             <label for="seccion-matricula">Sección</label>
-            <select id="seccion-matricula" v-model="seccionSeleccionada">
-              <option v-for="seccion in seccionesDisponibles" :key="seccion" :value="seccion">
-                Sección {{ seccion }}
+            <select id="seccion-matricula" v-model.number="periodoId">
+              <option v-for="periodo in periodos" :key="periodo.periodoId" :value="periodo.periodoId">
+                {{ periodo.numeroGrado }}.° {{ periodo.nivelEducativo }} — Sección {{ periodo.seccion }}
               </option>
             </select>
           </div>
@@ -157,7 +241,14 @@ async function cancelar(): Promise<void> {
 
         <div class="panel-vacantes">
           <div class="encabezado-vacantes">
-            <h3>Estado de Cupos — {{ gradoSeleccionado }} Sección {{ seccionSeleccionada }}</h3>
+            <h3>
+              Estado de cupos —
+              {{
+                periodoSeleccionado
+                  ? `${periodoSeleccionado.numeroGrado}.° ${periodoSeleccionado.nivelEducativo}, sección ${periodoSeleccionado.seccion}`
+                  : 'sin periodo'
+              }}
+            </h3>
             <span class="etiqueta-estado" :class="estadoCupos">{{ etiquetaEstado }}</span>
           </div>
           <p class="mensaje-disponibilidad" :class="estadoCupos" role="status" aria-live="polite">
@@ -169,22 +260,22 @@ async function cancelar(): Promise<void> {
             :aria-valuenow="ocupacion"
             aria-valuemin="0"
             aria-valuemax="100"
-            :aria-label="`Ocupación de ${gradoSeleccionado}, sección ${seccionSeleccionada}`"
+            :aria-label="`Ocupación de ${periodoSeleccionado?.numeroGrado ?? ''}.° ${periodoSeleccionado?.nivelEducativo ?? ''}, sección ${periodoSeleccionado?.seccion ?? ''}`"
           >
             <div class="avance-progreso" :class="estadoCupos" :style="{ width: `${ocupacion}%` }" />
           </div>
           <div class="leyenda-ocupacion">
-            <span>Matriculados: {{ cupoSeleccionado?.matriculados ?? 0 }}</span>
-            <span>Máximo: {{ cupoSeleccionado?.capacidadMaxima ?? 0 }}</span>
+            <span>Matriculados: {{ matriculados }}</span>
+            <span>Máximo: {{ capacidadMaxima }}</span>
           </div>
           <div class="cuadricula-indicadores">
             <div class="indicador">
               <span>Capacidad máxima</span>
-              <strong>{{ cupoSeleccionado?.capacidadMaxima ?? 0 }}</strong>
+              <strong>{{ capacidadMaxima }}</strong>
             </div>
             <div class="indicador">
               <span>Matriculados</span>
-              <strong>{{ cupoSeleccionado?.matriculados ?? 0 }}</strong>
+              <strong>{{ matriculados }}</strong>
             </div>
             <div class="indicador destacado" :class="estadoCupos">
               <span>Vacantes disponibles</span>
@@ -195,15 +286,38 @@ async function cancelar(): Promise<void> {
       </div>
     </section>
 
-    <p class="aviso-integracion" role="note">
-      Esta pantalla usa datos simulados. La matrícula definitiva estará disponible cuando se integre el backend, se
-      valide el período académico y se confirme la disponibilidad real de vacantes.
-    </p>
+    <PanelEstadoCarga v-if="cargando" :cargando="true" texto-carga="Cargando estudiantes y vacantes..." />
+    <AvisoMensaje v-if="error" :mensaje="error" tipo="error" />
+    <AvisoMensaje v-if="aviso" :mensaje="aviso" tipo="exito" />
+    <AvisoMensaje
+      v-if="!cargando && !ventanaVigente"
+      mensaje="No hay un periodo de matrícula vigente. Configura uno antes de registrar matrículas."
+      tipo="advertencia"
+    />
+    <AvisoMensaje
+      v-if="!cargando && ventanaVigente && periodos.length === 0"
+      mensaje="No hay periodos académicos abiertos para el año de matrícula vigente."
+      tipo="advertencia"
+    />
 
     <div class="acciones-matricula">
       <button type="button" class="boton-cancelar" @click="cancelar">Cancelar</button>
-      <button type="button" class="boton-confirmar" disabled title="Pendiente de integración con Spring Boot">
-        Confirmar Matrícula (pendiente)
+      <button
+        type="button"
+        class="boton-confirmar"
+        :disabled="guardando || !estudianteSeleccionado || !periodoSeleccionado || vacantesDisponibles < 1"
+        @click="registrarMatricula"
+      >
+        {{ guardando ? 'Registrando...' : 'Registrar matrícula' }}
+      </button>
+      <button
+        v-if="matriculaPendiente"
+        type="button"
+        class="boton-confirmar"
+        :disabled="guardando"
+        @click="confirmarMatricula"
+      >
+        {{ guardando ? 'Confirmando...' : 'Confirmar matrícula' }}
       </button>
     </div>
   </main>
