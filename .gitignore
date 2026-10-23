@@ -35,3 +35,7 @@ logs
 .DS_Store
 Thumbs.db
 *.bak
+
+# Visual Studio y NetBeans
+.vs/
+nbproject/private/

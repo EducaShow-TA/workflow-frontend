@@ -113,6 +113,14 @@ const motivoBloqueo = computed(() => {
             Configurar periodo
           </BotonAccion>
         </article>
+
+        <article v-if="puede('PERIODO_CONFIGURAR')" class="tarjeta-accion">
+          <h2>Año escolar por secciones</h2>
+          <p>Abre los periodos de clases y consulta las vacantes de cada grado y sección.</p>
+          <BotonAccion variante="secundario" destino="/matriculas/periodos-anuales">
+            Gestionar año escolar
+          </BotonAccion>
+        </article>
       </section>
 
       <section class="vacantes" aria-labelledby="titulo-vacantes">

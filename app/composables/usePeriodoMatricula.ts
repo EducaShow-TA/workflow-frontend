@@ -12,6 +12,32 @@ import { obtenerPrimerError } from '~/composables/useValidacion'
 
 const RUTA_PERIODOS = '/api/v1/periodos-matricula'
 
+/** DTO real de PeriodoMatriculaController. */
+interface PeriodoMatriculaApiResponse {
+  id: number
+  fechaInicio: string
+  fechaLimite: string
+  estado: EstadoPeriodo
+  tieneMatriculas: boolean
+}
+
+function convertirPeriodoApi(periodo: PeriodoMatriculaApiResponse): PeriodoMatricula {
+  return {
+    id: periodo.id,
+    anhio: Number(periodo.fechaInicio.slice(0, 4)),
+    fechaInicio: periodo.fechaInicio,
+    fechaFin: periodo.fechaLimite,
+    estado: periodo.estado,
+  }
+}
+
+function convertirSolicitudApi(solicitud: SolicitudPeriodoMatricula) {
+  return {
+    fechaInicio: solicitud.fechaInicio,
+    fechaLimite: solicitud.fechaFin,
+  }
+}
+
 /**
  * Equivale a PeriodoMatricula.getEstado() (US-1.1, criterio 3).
  * Las fechas son yyyy-MM-dd, por eso la comparacion de textos respeta el orden cronologico.
@@ -78,6 +104,8 @@ export function validarPeriodoMatricula(
 
   if (!esFechaIsoValida(solicitud.fechaInicio)) {
     errores.fechaInicio = 'La fecha de inicio es obligatoria.'
+  } else if (Number(solicitud.fechaInicio.slice(0, 4)) !== solicitud.anhio) {
+    errores.fechaInicio = 'La fecha de inicio debe pertenecer al año escolar seleccionado.'
   }
 
   if (!esFechaIsoValida(solicitud.fechaFin)) {
@@ -89,7 +117,7 @@ export function validarPeriodoMatricula(
   return errores
 }
 
-// Datos de prueba: se usan mientras no exista el endpoint en Spring Boot (ver usarDatosPrueba).
+// Datos de prueba: solo se usan cuando el modulo esta configurado en NUXT_PUBLIC_DATOS_PRUEBA.
 let siguienteIdPrueba = 3
 
 const periodosPrueba: Omit<PeriodoMatricula, 'estado'>[] = [
@@ -133,7 +161,8 @@ export function usePeriodoMatricula() {
       return listarPeriodosPrueba()
     }
 
-    return solicitar<PeriodoMatricula[]>(RUTA_PERIODOS)
+    const respuesta = await solicitar<PeriodoMatriculaApiResponse[]>(RUTA_PERIODOS)
+    return respuesta.map(convertirPeriodoApi)
   }
 
   async function registrarPeriodo(solicitud: SolicitudPeriodoMatricula): Promise<PeriodoMatricula> {
@@ -146,7 +175,11 @@ export function usePeriodoMatricula() {
       return completarEstado(copiarDatos(nuevo))
     }
 
-    return solicitar<PeriodoMatricula>(RUTA_PERIODOS, { metodo: 'POST', cuerpo: solicitud })
+    const respuesta = await solicitar<PeriodoMatriculaApiResponse>(RUTA_PERIODOS, {
+      metodo: 'POST',
+      cuerpo: convertirSolicitudApi(solicitud),
+    })
+    return convertirPeriodoApi(respuesta)
   }
 
   async function actualizarPeriodo(id: number, solicitud: SolicitudPeriodoMatricula): Promise<PeriodoMatricula> {
@@ -167,7 +200,11 @@ export function usePeriodoMatricula() {
       return completarEstado(copiarDatos(periodosPrueba[indice]!))
     }
 
-    return solicitar<PeriodoMatricula>(ruta, { metodo: 'PUT', cuerpo: solicitud })
+    const respuesta = await solicitar<PeriodoMatriculaApiResponse>(ruta, {
+      metodo: 'PUT',
+      cuerpo: convertirSolicitudApi(solicitud),
+    })
+    return convertirPeriodoApi(respuesta)
   }
 
   /**
