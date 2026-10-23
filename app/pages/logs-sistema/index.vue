@@ -188,6 +188,18 @@ const datosDetalle = computed(() => {
       descripcion="Monitoreo de errores y eventos registrados por el servidor."
     >
       <template #acciones>
+        <BotonAccion variante="secundario" :deshabilitado="cargando" @click="cargarRegistros()">
+          <svg class="icono-boton" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path
+              d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v2.5H11"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          {{ cargando ? 'Actualizando...' : 'Actualizar' }}
+        </BotonAccion>
         <BotonAccion variante="secundario" deshabilitado title="Exportación disponible próximamente">
           <svg class="icono-boton" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <path
