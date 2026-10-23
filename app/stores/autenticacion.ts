@@ -36,11 +36,27 @@ export const useAutenticacionStore = defineStore('autenticacion', () => {
     usuario.value = null
   }
 
+  // El token identifica al usuario por su correo: si lo cambia, debe volver a iniciar sesión con el nuevo.
+  const correoActualizado = ref('')
+
+  function cerrarSesionPorCambioDeCorreo(nuevoCorreo: string): void {
+    cerrarSesion()
+    correoActualizado.value = nuevoCorreo
+  }
+
+  function tomarCorreoActualizado(): string {
+    const correo = correoActualizado.value
+    correoActualizado.value = ''
+    return correo
+  }
+
   return {
     token,
     usuario,
     autenticado,
     iniciarSesion,
     cerrarSesion,
+    cerrarSesionPorCambioDeCorreo,
+    tomarCorreoActualizado,
   }
 })

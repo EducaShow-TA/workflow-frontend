@@ -39,3 +39,10 @@ export type ErroresCuenta = Partial<Record<keyof FormularioCuenta, string>>
 export type ErroresEdicion = Partial<Record<keyof SolicitudActualizarCuenta, string>>
 
 export type FiltroRol = RolUsuario | 'TODOS'
+
+export type FiltroEstadoCuenta = 'TODOS' | 'ACTIVOS' | 'INACTIVOS'
+
+export interface ConteoEstadoCuentas {
+  activos: number
+  inactivos: number
+}
