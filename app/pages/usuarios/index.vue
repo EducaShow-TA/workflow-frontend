@@ -30,7 +30,7 @@ const VARIANTES_ROL: Record<RolUsuario, VarianteInsignia> = {
   APODERADO: 'neutro',
 }
 
-const { listarCuentas, cambiarEstadoCuenta } = useCuentasUsuario()
+const { listarCuentas } = useCuentasUsuario()
 const { puede } = usePermisosRol()
 const autenticacion = useAutenticacionStore()
 const ruta = useRoute()
@@ -40,8 +40,6 @@ const cuentas = ref<CuentaUsuario[]>([])
 const cargando = ref(true)
 const errorCarga = ref('')
 const mensajeExito = ref('')
-const errorEstado = ref('')
-const cuentaActualizando = ref<number | null>(null)
 
 async function cargarCuentas(): Promise<void> {
   cargando.value = true
@@ -138,23 +136,6 @@ function describirEstado(cuenta: CuentaUsuario): string {
   }
 
   return `Estado de ${cuenta.nombreCompleto}: ${cuenta.activo ? 'activa' : 'inactiva'}`
-}
-
-async function alternarEstado(cuenta: CuentaUsuario): Promise<void> {
-  const motivo = obtenerMotivoProteccion(cuenta, cuentas.value, autenticacion.usuario?.username ?? '')
-  if (!CAMBIO_ESTADO_DISPONIBLE || motivo || cuenta.activo === undefined || cuentaActualizando.value !== null) return
-
-  cuentaActualizando.value = cuenta.id
-  errorEstado.value = ''
-  try {
-    const actualizada = await cambiarEstadoCuenta(cuenta.id, !cuenta.activo)
-    const indice = cuentas.value.findIndex((existente) => existente.id === cuenta.id)
-    if (indice !== -1) cuentas.value[indice] = actualizada
-  } catch (error: unknown) {
-    errorEstado.value = obtenerMensajeError(error, 'No se pudo actualizar el estado de la cuenta.')
-  } finally {
-    cuentaActualizando.value = null
-  }
 }
 
 function irAPagina(pagina: number): void {
