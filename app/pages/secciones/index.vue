@@ -1,7 +1,22 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import type { ErroresSeccion, Seccion, SolicitudSeccion } from '~/types/seccion'
+import type { ErroresAperturaAnhio, PeriodoAcademico, SolicitudAperturaAnhio } from '~/types/periodoAcademico'
 import { obtenerMensajeError } from '~/composables/useDatosPrueba'
+import { formatearFecha, obtenerFechaHoyIso } from '~/composables/useFechas'
+import { usePeriodoMatricula } from '~/composables/usePeriodoMatricula'
+import {
+  convertirEnSecciones,
+  determinarAnhioEscolar,
+  obtenerAnhio,
+  obtenerAnhiosAbiertos,
+  obtenerEtiquetaEstadoAnhio,
+  obtenerSeccionesPendientes,
+  obtenerVarianteEstadoAnhio,
+  resumirAnhio,
+  validarAperturaAnhio,
+} from '~/composables/useAnhioEscolar'
+import { usePeriodosAcademicos } from '~/composables/usePeriodosAcademicos'
 import {
   GRADOS_SECUNDARIA,
   calcularPorcentajeOcupacion,
@@ -21,19 +36,40 @@ definePageMeta({
 })
 
 const { listarSecciones, registrarSeccion, actualizarVacantes } = useSecciones()
+const { listar: listarPeriodosAcademicos, abrirAnhio } = usePeriodosAcademicos()
+const { listarPeriodos } = usePeriodoMatricula()
+const ruta = useRoute()
+const enrutador = useRouter()
 
-const secciones = ref<Seccion[]>([])
+const fechaHoy = obtenerFechaHoyIso()
+
+const seccionesRegistradas = ref<Seccion[]>([])
+const periodosAcademicos = ref<PeriodoAcademico[]>([])
+const anhioSeleccionado = ref<number | null>(null)
 const cargando = ref(true)
 const errorCarga = ref('')
 const mensajeExito = ref('')
 const gradoFiltro = ref<number | ''>('')
+
+function leerAnhioDeRuta(): number | null {
+  const valor = Number(ruta.query.anhio)
+  return Number.isInteger(valor) && valor > 0 ? valor : null
+}
 
 async function cargarSecciones(): Promise<void> {
   cargando.value = true
   errorCarga.value = ''
 
   try {
-    secciones.value = await listarSecciones()
+    const [secciones, periodos, ventanas] = await Promise.all([
+      listarSecciones(),
+      listarPeriodosAcademicos(),
+      listarPeriodos(),
+    ])
+    seccionesRegistradas.value = secciones
+    periodosAcademicos.value = periodos
+    anhioSeleccionado.value ??=
+      leerAnhioDeRuta() ?? determinarAnhioEscolar(ventanas, obtenerAnhiosAbiertos(periodos), fechaHoy)
   } catch (error: unknown) {
     errorCarga.value = obtenerMensajeError(error, 'No se pudieron cargar las secciones.')
   } finally {
@@ -41,7 +77,46 @@ async function cargarSecciones(): Promise<void> {
   }
 }
 
-onMounted(cargarSecciones)
+onMounted(async () => {
+  await cargarSecciones()
+
+  if (ruta.query.abrir === '1') {
+    abrirApertura()
+  }
+})
+
+const anhioActual = computed(() => anhioSeleccionado.value ?? obtenerAnhio(fechaHoy))
+
+watch(anhioSeleccionado, (anhio) => {
+  if (anhio !== null && anhio !== leerAnhioDeRuta()) {
+    void enrutador.replace({ query: { anhio: String(anhio) } })
+  }
+})
+
+watch(
+  () => ruta.query.anhio,
+  () => {
+    const anhio = leerAnhioDeRuta()
+
+    if (anhio !== null) {
+      anhioSeleccionado.value = anhio
+    }
+  },
+)
+
+const anhiosDisponibles = computed(() => {
+  const anhios = new Set([...obtenerAnhiosAbiertos(periodosAcademicos.value), anhioActual.value])
+  return [...anhios].sort((primero, segundo) => segundo - primero)
+})
+
+function obtenerPeriodosDelAnhio(anhio: number): PeriodoAcademico[] {
+  return periodosAcademicos.value.filter((periodo) => obtenerAnhio(periodo.fechaInicio) === anhio)
+}
+
+const periodosDelAnhio = computed(() => obtenerPeriodosDelAnhio(anhioActual.value))
+const anhioAbierto = computed(() => periodosDelAnhio.value.length > 0)
+const resumenAnhio = computed(() => resumirAnhio(anhioActual.value, periodosDelAnhio.value, fechaHoy))
+const secciones = computed(() => convertirEnSecciones(periodosDelAnhio.value))
 
 const seccionesFiltradas = computed(() =>
   gradoFiltro.value === ''
@@ -172,7 +247,7 @@ function cambiarNombreSeccion(evento: Event): void {
 
 async function guardarSeccion(): Promise<void> {
   limpiarErroresSeccion()
-  Object.assign(erroresSeccion, validarSeccion(formularioSeccion, secciones.value))
+  Object.assign(erroresSeccion, validarSeccion(formularioSeccion, seccionesRegistradas.value))
 
   if (tieneErrores(erroresSeccion)) {
     return
@@ -191,16 +266,85 @@ async function guardarSeccion(): Promise<void> {
     guardandoSeccion.value = false
   }
 }
+
+// Apertura del año escolar: crea el periodo de clases de cada sección que aún no lo tiene en ese año.
+const aperturaAbierta = ref(false)
+const abriendo = ref(false)
+const errorApertura = ref('')
+const formularioApertura = reactive<SolicitudAperturaAnhio>({ anhio: 0, fechaInicio: '', fechaFin: '' })
+const erroresApertura = reactive<ErroresAperturaAnhio>({})
+
+function obtenerPendientes(anhio: number): Seccion[] {
+  return obtenerSeccionesPendientes(seccionesRegistradas.value, obtenerPeriodosDelAnhio(anhio))
+}
+
+const anhiosParaAbrir = computed(() => {
+  const anhioCalendario = obtenerAnhio(fechaHoy)
+  const candidatos = new Set([anhioCalendario, anhioCalendario + 1, anhioCalendario + 2, anhioActual.value])
+  return [...candidatos]
+    .filter((anhio) => obtenerPendientes(anhio).length > 0)
+    .sort((primero, segundo) => primero - segundo)
+})
+
+const seccionesPorCrear = computed(() => obtenerPendientes(formularioApertura.anhio))
+
+function abrirApertura(): void {
+  const anhio = anhiosParaAbrir.value.includes(anhioActual.value) ? anhioActual.value : anhiosParaAbrir.value[0]
+  formularioApertura.anhio = anhio ?? anhioActual.value
+  formularioApertura.fechaInicio = ''
+  formularioApertura.fechaFin = ''
+  erroresApertura.fechaInicio = undefined
+  erroresApertura.fechaFin = undefined
+  errorApertura.value = ''
+  aperturaAbierta.value = true
+}
+
+async function confirmarApertura(): Promise<void> {
+  errorApertura.value = ''
+  erroresApertura.fechaInicio = undefined
+  erroresApertura.fechaFin = undefined
+  Object.assign(erroresApertura, validarAperturaAnhio(formularioApertura))
+
+  if (tieneErrores(erroresApertura)) {
+    return
+  }
+
+  abriendo.value = true
+
+  try {
+    const creados = await abrirAnhio({ ...formularioApertura })
+    aperturaAbierta.value = false
+    anhioSeleccionado.value = formularioApertura.anhio
+    mensajeExito.value = `Año escolar ${formularioApertura.anhio} abierto: se ${creados.length === 1 ? 'creó 1 periodo' : `crearon ${creados.length} periodos`}.`
+    await cargarSecciones()
+  } catch (error: unknown) {
+    errorApertura.value = obtenerMensajeError(error, 'No se pudo abrir el año escolar.')
+  } finally {
+    abriendo.value = false
+  }
+}
 </script>
 
 <template>
   <main class="pagina-secciones">
     <EncabezadoPagina
       titulo="Vacantes por Grado y Sección"
-      descripcion="Configura la capacidad máxima de cada sección y revisa cuántas vacantes quedan disponibles."
+      :descripcion="`Configura la capacidad máxima de cada sección y revisa las vacantes del año escolar ${anhioActual}.`"
     >
       <template #acciones>
         <BotonAccion variante="secundario" destino="/matriculas/periodo">Periodo de matrícula</BotonAccion>
+        <BotonAccion
+          variante="secundario"
+          :deshabilitado="cargando || anhiosParaAbrir.length === 0"
+          :title="
+            anhiosParaAbrir.length === 0
+              ? 'Todas las secciones ya tienen su periodo en los años disponibles.'
+              : undefined
+          "
+          @click="abrirApertura"
+        >
+          Abrir año escolar
+        </BotonAccion>
         <BotonAccion @click="abrirRegistroSeccion">+ Agregar sección</BotonAccion>
       </template>
     </EncabezadoPagina>
@@ -209,6 +353,14 @@ async function guardarSeccion(): Promise<void> {
 
     <PanelEstadoCarga :cargando="cargando" :error="errorCarga" @reintentar="cargarSecciones">
       <section class="panel-filtros" aria-label="Filtros de secciones">
+        <div class="campo-filtro">
+          <label for="filtro-anhio">Año escolar</label>
+
+          <select id="filtro-anhio" v-model.number="anhioSeleccionado">
+            <option v-for="anhio in anhiosDisponibles" :key="anhio" :value="anhio">{{ anhio }}</option>
+          </select>
+        </div>
+
         <div class="campo-filtro">
           <label for="filtro-grado">Grado</label>
 
@@ -219,94 +371,124 @@ async function guardarSeccion(): Promise<void> {
             </option>
           </select>
         </div>
+
+        <p v-if="resumenAnhio" class="info-anhio">
+          Clases del <strong>{{ formatearFecha(resumenAnhio.fechaInicio) }}</strong> al
+          <strong>{{ formatearFecha(resumenAnhio.fechaFin) }}</strong>
+          <InsigniaEstado
+            :texto="obtenerEtiquetaEstadoAnhio(resumenAnhio.estado)"
+            :variante="obtenerVarianteEstadoAnhio(resumenAnhio.estado)"
+          />
+        </p>
       </section>
 
-      <section class="resumen" :aria-label="tituloResumen">
-        <h2 class="solo-lectores">{{ tituloResumen }}</h2>
+      <section v-if="!anhioAbierto" class="anhio-sin-abrir" aria-labelledby="titulo-anhio-sin-abrir">
+        <h2 id="titulo-anhio-sin-abrir">El año escolar {{ anhioActual }} todavía no está abierto</h2>
 
-        <div class="indicador">
-          <span>Capacidad máxima</span>
-          <strong>{{ resumen.capacidad }}</strong>
-        </div>
+        <template v-if="seccionesRegistradas.length > 0">
+          <p>
+            Ábrelo para crear el periodo de clases de cada sección. Después podrás registrar matrículas para
+            {{ anhioActual }} mientras el periodo de matrícula esté vigente.
+          </p>
+          <BotonAccion @click="abrirApertura">Abrir año escolar {{ anhioActual }}</BotonAccion>
+        </template>
 
-        <div class="indicador">
-          <span>Matriculados</span>
-          <strong>{{ resumen.matriculados }}</strong>
-        </div>
-
-        <div class="indicador destacado">
-          <span>Vacantes disponibles</span>
-          <strong>{{ resumen.vacantes }}</strong>
-        </div>
-
-        <div class="indicador" :class="{ alerta: resumen.seccionesLlenas > 0 }">
-          <span>Secciones sin vacantes</span>
-          <strong>{{ resumen.seccionesLlenas }}</strong>
-        </div>
+        <template v-else>
+          <p>Primero registra las secciones del colegio con «Agregar sección»; luego podrás abrir el año escolar.</p>
+          <BotonAccion @click="abrirRegistroSeccion">+ Agregar sección</BotonAccion>
+        </template>
       </section>
 
-      <section class="panel-tabla" aria-label="Vacantes por sección">
-        <div class="tabla-desplazable">
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">Grado</th>
-                <th scope="col">Sección</th>
-                <th scope="col">Capacidad máxima</th>
-                <th scope="col">Matriculados</th>
-                <th scope="col">Vacantes</th>
-                <th scope="col">Ocupación</th>
-                <th scope="col">Estado</th>
-                <th scope="col">Acciones</th>
-              </tr>
-            </thead>
+      <template v-else>
+        <section class="resumen" :aria-label="tituloResumen">
+          <h2 class="solo-lectores">{{ tituloResumen }}</h2>
 
-            <tbody>
-              <tr v-for="seccion in seccionesFiltradas" :key="seccion.id">
-                <td class="sin-salto">{{ obtenerNombreGrado(seccion.gradoNumero) }}</td>
-                <td class="dato-destacado">{{ seccion.nombre }}</td>
-                <td>{{ seccion.vacantesTotales }}</td>
-                <td>{{ seccion.cantidadMatriculados }}</td>
-                <td class="dato-destacado">{{ calcularVacantesDisponibles(seccion) }}</td>
-                <td>
-                  <div class="celda-ocupacion">
-                    <BarraOcupacion
-                      :porcentaje="calcularPorcentajeOcupacion(seccion)"
-                      :estado="obtenerEstadoCupos(calcularVacantesDisponibles(seccion))"
-                      :etiqueta="`Ocupación de ${describirSeccion(seccion)}`"
+          <div class="indicador">
+            <span>Capacidad máxima</span>
+            <strong>{{ resumen.capacidad }}</strong>
+          </div>
+
+          <div class="indicador">
+            <span>Matriculados</span>
+            <strong>{{ resumen.matriculados }}</strong>
+          </div>
+
+          <div class="indicador destacado">
+            <span>Vacantes disponibles</span>
+            <strong>{{ resumen.vacantes }}</strong>
+          </div>
+
+          <div class="indicador" :class="{ alerta: resumen.seccionesLlenas > 0 }">
+            <span>Secciones sin vacantes</span>
+            <strong>{{ resumen.seccionesLlenas }}</strong>
+          </div>
+        </section>
+
+        <section class="panel-tabla" aria-label="Vacantes por sección">
+          <div class="tabla-desplazable">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">Grado</th>
+                  <th scope="col">Sección</th>
+                  <th scope="col">Capacidad máxima</th>
+                  <th scope="col">Matriculados en {{ anhioActual }}</th>
+                  <th scope="col">Vacantes</th>
+                  <th scope="col">Ocupación</th>
+                  <th scope="col">Estado</th>
+                  <th scope="col">Acciones</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                <tr v-for="seccion in seccionesFiltradas" :key="seccion.id">
+                  <td class="sin-salto">{{ obtenerNombreGrado(seccion.gradoNumero) }}</td>
+                  <td class="dato-destacado">{{ seccion.nombre }}</td>
+                  <td>{{ seccion.vacantesTotales }}</td>
+                  <td>{{ seccion.cantidadMatriculados }}</td>
+                  <td class="dato-destacado">{{ calcularVacantesDisponibles(seccion) }}</td>
+                  <td>
+                    <div class="celda-ocupacion">
+                      <BarraOcupacion
+                        :porcentaje="calcularPorcentajeOcupacion(seccion)"
+                        :estado="obtenerEstadoCupos(calcularVacantesDisponibles(seccion))"
+                        :etiqueta="`Ocupación de ${describirSeccion(seccion)}`"
+                      />
+                      <span>{{ calcularPorcentajeOcupacion(seccion) }}%</span>
+                    </div>
+                  </td>
+                  <td>
+                    <InsigniaEstado
+                      :texto="obtenerEtiquetaEstadoCupos(obtenerEstadoCupos(calcularVacantesDisponibles(seccion)))"
+                      :variante="obtenerVarianteEstadoCupos(obtenerEstadoCupos(calcularVacantesDisponibles(seccion)))"
                     />
-                    <span>{{ calcularPorcentajeOcupacion(seccion) }}%</span>
-                  </div>
-                </td>
-                <td>
-                  <InsigniaEstado
-                    :texto="obtenerEtiquetaEstadoCupos(obtenerEstadoCupos(calcularVacantesDisponibles(seccion)))"
-                    :variante="obtenerVarianteEstadoCupos(obtenerEstadoCupos(calcularVacantesDisponibles(seccion)))"
-                  />
-                </td>
-                <td>
-                  <button
-                    type="button"
-                    class="boton-tabla"
-                    :aria-label="`Editar capacidad de ${describirSeccion(seccion)}`"
-                    @click="abrirEdicionCapacidad(seccion)"
-                  >
-                    Editar capacidad
-                  </button>
-                </td>
-              </tr>
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      class="boton-tabla"
+                      :aria-label="`Editar capacidad de ${describirSeccion(seccion)}`"
+                      @click="abrirEdicionCapacidad(seccion)"
+                    >
+                      Editar capacidad
+                    </button>
+                  </td>
+                </tr>
 
-              <tr v-if="seccionesFiltradas.length === 0">
-                <td colspan="8" class="sin-resultados">
-                  No hay secciones registradas para este grado. Agrégalas con «Agregar sección».
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+                <tr v-if="seccionesFiltradas.length === 0">
+                  <td colspan="8" class="sin-resultados">
+                    No hay secciones registradas para este grado. Agrégalas con «Agregar sección».
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-        <footer class="pie-tabla">Mostrando {{ seccionesFiltradas.length }} de {{ secciones.length }} secciones</footer>
-      </section>
+          <footer class="pie-tabla">
+            Mostrando {{ seccionesFiltradas.length }} de {{ secciones.length }} secciones
+          </footer>
+        </section>
+      </template>
     </PanelEstadoCarga>
 
     <VentanaModal
@@ -445,6 +627,86 @@ async function guardarSeccion(): Promise<void> {
         </BotonAccion>
       </template>
     </VentanaModal>
+
+    <VentanaModal
+      :abierta="aperturaAbierta"
+      titulo="Abrir año escolar"
+      descripcion="Crea el periodo de clases de cada sección para el año indicado."
+      :bloqueada="abriendo"
+      @cerrar="aperturaAbierta = false"
+    >
+      <form id="formulario-apertura" class="formulario" novalidate @submit.prevent="confirmarApertura">
+        <div class="campo">
+          <label for="anhio-apertura">Año escolar <span class="obligatorio">*</span></label>
+          <select id="anhio-apertura" v-model.number="formularioApertura.anhio" aria-describedby="ayuda-anhio-apertura">
+            <option v-for="anhio in anhiosParaAbrir" :key="anhio" :value="anhio">{{ anhio }}</option>
+          </select>
+          <small id="ayuda-anhio-apertura" class="ayuda">Solo se listan los años con secciones sin periodo.</small>
+        </div>
+
+        <div class="cuadricula-campos">
+          <div class="campo">
+            <label for="inicio-clases">Inicio de clases <span class="obligatorio">*</span></label>
+            <input
+              id="inicio-clases"
+              v-model="formularioApertura.fechaInicio"
+              type="date"
+              :aria-invalid="Boolean(erroresApertura.fechaInicio)"
+              :aria-describedby="erroresApertura.fechaInicio ? 'error-inicio-clases' : undefined"
+              @input="erroresApertura.fechaInicio = undefined"
+            />
+            <small v-if="erroresApertura.fechaInicio" id="error-inicio-clases" class="error">
+              {{ erroresApertura.fechaInicio }}
+            </small>
+          </div>
+
+          <div class="campo">
+            <label for="fin-clases">Fin de clases <span class="obligatorio">*</span></label>
+            <input
+              id="fin-clases"
+              v-model="formularioApertura.fechaFin"
+              type="date"
+              :min="formularioApertura.fechaInicio || undefined"
+              :aria-invalid="Boolean(erroresApertura.fechaFin)"
+              :aria-describedby="erroresApertura.fechaFin ? 'error-fin-clases' : undefined"
+              @input="erroresApertura.fechaFin = undefined"
+            />
+            <small v-if="erroresApertura.fechaFin" id="error-fin-clases" class="error">
+              {{ erroresApertura.fechaFin }}
+            </small>
+          </div>
+        </div>
+
+        <div class="lista-por-crear">
+          <strong>
+            Se
+            {{ seccionesPorCrear.length === 1 ? 'creará 1 periodo' : `crearán ${seccionesPorCrear.length} periodos` }}
+            para {{ formularioApertura.anhio }}
+          </strong>
+          <ul>
+            <li v-for="seccion in seccionesPorCrear" :key="seccion.id">
+              <span>{{ describirSeccion(seccion) }}</span>
+              <small>capacidad {{ seccion.vacantesTotales }}</small>
+            </li>
+          </ul>
+        </div>
+
+        <AvisoMensaje v-if="errorApertura" :mensaje="errorApertura" tipo="error" />
+      </form>
+
+      <template #pie>
+        <BotonAccion variante="secundario" :deshabilitado="abriendo" @click="aperturaAbierta = false"
+          >Cancelar</BotonAccion
+        >
+        <BotonAccion
+          tipo="submit"
+          form="formulario-apertura"
+          :deshabilitado="abriendo || seccionesPorCrear.length === 0"
+        >
+          {{ abriendo ? 'Abriendo...' : `Abrir año ${formularioApertura.anhio}` }}
+        </BotonAccion>
+      </template>
+    </VentanaModal>
   </main>
 </template>
 
@@ -459,6 +721,9 @@ async function guardarSeccion(): Promise<void> {
 
 .panel-filtros {
   display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px;
   padding: 16px;
   border: 1px solid #c3c6d7;
   border-radius: 12px;
@@ -468,7 +733,7 @@ async function guardarSeccion(): Promise<void> {
 .campo-filtro {
   display: flex;
   width: 100%;
-  max-width: 280px;
+  max-width: 240px;
   flex-direction: column;
   gap: 6px;
 }
@@ -721,5 +986,76 @@ td {
   table {
     min-width: 860px;
   }
+}
+.info-anhio {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: #f2f4f6;
+  color: #434655;
+  font-size: 13px;
+}
+
+.anhio-sin-abrir {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 40px 24px;
+  border: 1px dashed #c3c6d7;
+  border-radius: 12px;
+  background: white;
+  text-align: center;
+}
+
+.anhio-sin-abrir h2 {
+  margin: 0;
+  color: #191c1e;
+  font-size: 17px;
+}
+
+.anhio-sin-abrir p {
+  max-width: 560px;
+  margin: 0;
+  color: #434655;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.ayuda {
+  color: #737686;
+  font-size: 12px;
+}
+
+.lista-por-crear {
+  padding: 12px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f7f9fb;
+  font-size: 13px;
+}
+
+.lista-por-crear ul {
+  max-height: 180px;
+  margin: 8px 0 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.lista-por-crear li {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-top: 1px solid #e5e7eb;
+}
+
+.lista-por-crear small {
+  color: #737686;
 }
 </style>

@@ -10,6 +10,14 @@ const correoElectronico = ref('')
 const contrasenia = ref('')
 const mostrarContrasenia = ref(false)
 const mensajeInformativo = ref('')
+const avisoCorreoActualizado = ref('')
+
+const correoActualizado = autenticacion.tomarCorreoActualizado()
+
+if (correoActualizado) {
+  correoElectronico.value = correoActualizado
+  avisoCorreoActualizado.value = 'Tu correo se actualizó. Inicia sesión con el nuevo correo.'
+}
 
 const errores = reactive({
   correoElectronico: '',
@@ -71,6 +79,8 @@ function informarRecuperacion(): void {
 
       <p>Ingresa tus credenciales para acceder al portal.</p>
     </header>
+
+    <AvisoMensaje v-if="avisoCorreoActualizado" class="aviso-correo" :mensaje="avisoCorreoActualizado" tipo="exito" />
 
     <form class="formulario" novalidate @submit.prevent="procesarInicioSesion">
       <CampoFormulario
@@ -237,5 +247,8 @@ function informarRecuperacion(): void {
   .encabezado h1 {
     font-size: 28px;
   }
+}
+.aviso-correo {
+  margin-bottom: 20px;
 }
 </style>

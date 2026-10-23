@@ -5,6 +5,7 @@ import type { PeriodoAcademico } from '~/types/periodoAcademico'
 import { obtenerMensajeError } from '~/composables/useDatosPrueba'
 import { useEstudiantesMatriculables } from '~/composables/useEstudiantesMatriculables'
 import { useMatriculas } from '~/composables/useMatriculas'
+import { obtenerAnhio } from '~/composables/useAnhioEscolar'
 import { usePeriodoMatricula } from '~/composables/usePeriodoMatricula'
 import { usePeriodosAcademicos } from '~/composables/usePeriodosAcademicos'
 
@@ -26,6 +27,7 @@ const guardando = ref(false)
 const error = ref('')
 const aviso = ref('')
 
+const anhioMatricula = computed(() => (ventanaVigente.value ? obtenerAnhio(ventanaVigente.value.fechaLimite) : null))
 const periodoSeleccionado = computed(() => periodos.value.find((periodo) => periodo.periodoId === periodoId.value))
 const estudiantesDisponibles = computed(() => {
   if (!periodoSeleccionado.value) return []
@@ -97,7 +99,7 @@ async function cargarDatos(): Promise<void> {
 
     const [estudiantesCargados, periodosCargados] = await Promise.all([
       listar(),
-      listarPorAnhio(vigente.anhio),
+      listarPorAnhio(obtenerAnhio(vigente.fechaLimite)),
     ])
     estudiantes.value = estudiantesCargados
     periodos.value = periodosCargados
@@ -161,7 +163,7 @@ onMounted(cargarDatos)
         <h1>Crear Matrícula</h1>
         <p>Selecciona un estudiante y consulta la disponibilidad de vacantes.</p>
       </div>
-      <span class="etiqueta-demo">Año escolar {{ ventanaVigente?.anhio ?? '—' }}</span>
+      <span class="etiqueta-demo">Año escolar {{ anhioMatricula ?? '—' }}</span>
     </header>
 
     <section class="tarjeta" aria-labelledby="titulo-estudiante">
@@ -218,7 +220,7 @@ onMounted(cargarDatos)
         <div class="cuadricula-campos">
           <div class="campo">
             <label for="anhio-academico">Año Académico</label>
-            <input id="anhio-academico" :value="ventanaVigente?.anhio ?? ''" type="text" readonly aria-describedby="ayuda-anhio" />
+            <input id="anhio-academico" :value="anhioMatricula ?? ''" type="text" readonly aria-describedby="ayuda-anhio" />
             <small id="ayuda-anhio">Año de la ventana de matrícula vigente.</small>
           </div>
           <div class="campo">
