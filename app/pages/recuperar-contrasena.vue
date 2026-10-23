@@ -59,7 +59,7 @@ async function enviarInstrucciones(): Promise<void> {
   enviando.value = true
 
   try {
-    await solicitarRecuperacion({ username: correo.value.trim() })
+    await solicitarRecuperacion({ correo: correo.value.trim() })
     reenviado.value = enviado.value
     enviado.value = true
     iniciarEsperaReenvio()
