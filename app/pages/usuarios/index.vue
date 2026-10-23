@@ -30,7 +30,7 @@ const VARIANTES_ROL: Record<RolUsuario, VarianteInsignia> = {
   APODERADO: 'neutro',
 }
 
-const { listarCuentas } = useCuentasUsuario()
+const { listarCuentas, cambiarEstadoCuenta } = useCuentasUsuario()
 const { puede } = usePermisosRol()
 const autenticacion = useAutenticacionStore()
 const ruta = useRoute()
@@ -40,6 +40,8 @@ const cuentas = ref<CuentaUsuario[]>([])
 const cargando = ref(true)
 const errorCarga = ref('')
 const mensajeExito = ref('')
+const errorEstado = ref('')
+const cuentaActualizando = ref<number | null>(null)
 
 async function cargarCuentas(): Promise<void> {
   cargando.value = true
@@ -55,17 +57,26 @@ async function cargarCuentas(): Promise<void> {
 }
 
 onMounted(async () => {
+  let usernameEditado = ''
+
   if (typeof ruta.query.creado === 'string') {
     mensajeExito.value = `Se creó la cuenta ${ruta.query.creado}.`
   } else if (typeof ruta.query.editado === 'string') {
-    mensajeExito.value = `Se actualizaron los datos de ${ruta.query.editado}.`
+    usernameEditado = ruta.query.editado
   }
 
-  if (mensajeExito.value) {
+  if (typeof ruta.query.creado === 'string' || usernameEditado) {
     await enrutador.replace({ query: {} })
   }
 
   await cargarCuentas()
+
+  if (usernameEditado) {
+    const cuentaEditada = cuentas.value.find((cuenta) => cuenta.username === usernameEditado)
+    mensajeExito.value = cuentaEditada
+      ? `Se actualizaron los datos de ${cuentaEditada.nombreCompleto} (correo ${cuentaEditada.username}).`
+      : `Se actualizaron los datos de la cuenta ${usernameEditado}.`
+  }
 })
 
 const busqueda = ref('')
@@ -127,6 +138,23 @@ function describirEstado(cuenta: CuentaUsuario): string {
   }
 
   return `Estado de ${cuenta.nombreCompleto}: ${cuenta.activo ? 'activa' : 'inactiva'}`
+}
+
+async function alternarEstado(cuenta: CuentaUsuario): Promise<void> {
+  const motivo = obtenerMotivoProteccion(cuenta, cuentas.value, autenticacion.usuario?.username ?? '')
+  if (!CAMBIO_ESTADO_DISPONIBLE || motivo || cuenta.activo === undefined || cuentaActualizando.value !== null) return
+
+  cuentaActualizando.value = cuenta.id
+  errorEstado.value = ''
+  try {
+    const actualizada = await cambiarEstadoCuenta(cuenta.id, !cuenta.activo)
+    const indice = cuentas.value.findIndex((existente) => existente.id === cuenta.id)
+    if (indice !== -1) cuentas.value[indice] = actualizada
+  } catch (error: unknown) {
+    errorEstado.value = obtenerMensajeError(error, 'No se pudo actualizar el estado de la cuenta.')
+  } finally {
+    cuentaActualizando.value = null
+  }
 }
 
 function irAPagina(pagina: number): void {
