@@ -20,8 +20,8 @@ export const LONGITUD_MAXIMA_NOMBRE_PERSONA = 100
 export const LONGITUD_MINIMA_PASSWORD = 8
 export const CUENTAS_POR_PAGINA = 10
 
-export const EDICION_DISPONIBLE = false
-export const CAMBIO_ESTADO_DISPONIBLE = false
+export const EDICION_DISPONIBLE = true
+export const CAMBIO_ESTADO_DISPONIBLE = true
 export const CAMBIO_ROL_DISPONIBLE = false
 
 const FORMATO_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -267,10 +267,18 @@ export function useCuentasUsuario() {
     return solicitar<CuentaUsuario>(`${RUTA_CUENTAS}/${id}`, { metodo: 'PUT', cuerpo: solicitud })
   }
 
+  async function cambiarEstadoCuenta(id: number, activo: boolean): Promise<CuentaUsuario> {
+    return solicitar<CuentaUsuario>(`${RUTA_CUENTAS}/${id}/estado`, {
+      metodo: 'PATCH',
+      cuerpo: { activo },
+    })
+  }
+
   return {
     listarCuentas,
     obtenerCuenta,
     crearCuenta,
     actualizarCuenta,
+    cambiarEstadoCuenta,
   }
 }

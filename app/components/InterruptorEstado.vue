@@ -1,10 +1,18 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-const propiedades = defineProps<{
-  activo?: boolean
-  etiqueta: string
-  motivo: string
+const propiedades = withDefaults(
+  defineProps<{
+    activo?: boolean
+    etiqueta: string
+    motivo: string
+    deshabilitado?: boolean
+  }>(),
+  { deshabilitado: true },
+)
+
+const emitir = defineEmits<{
+  alternar: []
 }>()
 
 const estadoAccesible = computed(() => (propiedades.activo === undefined ? 'mixed' : propiedades.activo))
@@ -22,7 +30,9 @@ const posicion = computed(() =>
     :aria-checked="estadoAccesible"
     :aria-label="etiqueta"
     :title="motivo"
-    aria-disabled="true"
+    :aria-disabled="deshabilitado"
+    :disabled="deshabilitado"
+    @click="emitir('alternar')"
   >
     <span class="perilla">
       <svg width="10" height="10" viewBox="0 -960 960 960" fill="currentColor" aria-hidden="true">
@@ -44,6 +54,10 @@ const posicion = computed(() =>
   border: 0;
   border-radius: 999px;
   background: #e1e3ea;
+  cursor: pointer;
+}
+
+.interruptor-estado:disabled {
   cursor: not-allowed;
 }
 

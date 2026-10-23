@@ -147,7 +147,7 @@ async function cancelar(): Promise<void> {
     <PanelEstadoCarga :cargando="cargando" :error="errorCarga" @reintentar="cargarCuenta">
       <AvisoMensaje
         v-if="!EDICION_DISPONIBLE"
-        mensaje="Guardar cambios se habilitará cuando el backend implemente la edición de cuentas."
+        mensaje="La edición de cuentas todavía no está disponible."
         tipo="informacion"
       />
 
