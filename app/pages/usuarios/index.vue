@@ -150,6 +150,7 @@ function irAPagina(pagina: number): void {
       descripcion="Administra el acceso al sistema, el rol y los datos de cada usuario."
     >
       <template v-if="puede('USUARIO_CREAR')" #acciones>
+        <BotonAccion variante="secundario" destino="/usuarios/carga-masiva">Carga masiva (CSV)</BotonAccion>
         <BotonAccion destino="/usuarios/nuevo">+ Crear usuario</BotonAccion>
       </template>
     </EncabezadoPagina>

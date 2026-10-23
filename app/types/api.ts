@@ -13,6 +13,8 @@ export class ErrorSolicitudApi extends Error {
     mensaje: string,
     public readonly estado: number,
     public readonly ruta: string = '',
+    /** Cuerpo completo de la respuesta, para errores que traen más que un mensaje (por ejemplo, un 422 con resultados). */
+    public readonly datos: unknown = undefined,
   ) {
     super(mensaje)
     this.name = 'ErrorSolicitudApi'

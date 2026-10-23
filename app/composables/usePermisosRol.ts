@@ -122,7 +122,7 @@ export const PERMISOS: Permiso[] = [
     codigo: 'USUARIO_CREAR',
     modulo: 'Usuarios y permisos',
     nombre: 'Crear usuarios',
-    descripcion: 'Crear cuentas y asignarles un rol.',
+    descripcion: 'Crear cuentas y asignarles un rol, una por una o por carga masiva CSV.',
     sensible: false,
   },
   {
@@ -162,6 +162,7 @@ export const REGLAS_RUTA: ReglaRuta[] = [
   { prefijo: '/horarios/*/editar', permiso: 'HORARIO_GESTIONAR' },
   { prefijo: '/usuarios', permiso: 'USUARIO_VER' },
   { prefijo: '/usuarios/nuevo', permiso: 'USUARIO_CREAR' },
+  { prefijo: '/usuarios/carga-masiva', permiso: 'USUARIO_CREAR' },
   { prefijo: '/usuarios/*/editar', permiso: 'USUARIO_EDITAR' },
   { prefijo: '/roles-permisos', permiso: 'PERMISO_VER' },
 ]

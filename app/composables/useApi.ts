@@ -26,7 +26,7 @@ function convertirErrorApi(error: unknown): ErrorSolicitudApi {
         ? 'No fue posible conectar con el servidor.'
         : 'No se pudo completar la operación solicitada.'
 
-  return new ErrorSolicitudApi(mensaje, estado, typeof respuesta?.path === 'string' ? respuesta.path : '')
+  return new ErrorSolicitudApi(mensaje, estado, typeof respuesta?.path === 'string' ? respuesta.path : '', respuesta)
 }
 
 export function useApi() {
@@ -41,8 +41,10 @@ export function useApi() {
       throw new ErrorSolicitudApi('La ruta debe utilizar el prefijo /api/v1/.', 0, ruta)
     }
 
+    const esArchivo = opciones.cuerpo instanceof FormData
     const cabeceras: Record<string, string> = {}
-    if (opciones.cuerpo !== undefined) {
+    // Con FormData el navegador arma el Content-Type multipart con su separador.
+    if (opciones.cuerpo !== undefined && !esArchivo) {
       cabeceras['Content-Type'] = 'application/json'
     }
     if (autenticacion.token) {
@@ -52,7 +54,12 @@ export function useApi() {
     try {
       return await $fetch<T>(`${urlBase}${ruta}`, {
         method: opciones.metodo ?? 'GET',
-        body: opciones.cuerpo === undefined ? undefined : JSON.stringify(opciones.cuerpo),
+        body:
+          opciones.cuerpo === undefined
+            ? undefined
+            : esArchivo
+              ? (opciones.cuerpo as FormData)
+              : JSON.stringify(opciones.cuerpo),
         headers: cabeceras,
       })
     } catch (error: unknown) {
