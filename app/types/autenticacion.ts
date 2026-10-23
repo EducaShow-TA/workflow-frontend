@@ -21,3 +21,29 @@ export interface RespuestaInicioSesion {
   expiresIn: number
   usuario: UsuarioPerfil
 }
+
+/** Cuerpo de POST /api/v1/auth/forgot-password: el usuario es el correo de inicio de sesión. */
+export interface SolicitudRecuperacion {
+  username: string
+}
+
+/** Cuerpo de POST /api/v1/auth/reset-password. */
+export interface SolicitudRestablecimiento {
+  token: string
+  password: string
+}
+
+export interface RespuestaMensaje {
+  message: string
+}
+
+export interface FuerzaContrasena {
+  /** 0 = vacía; 1 a 4 = débil, media, buena, fuerte. */
+  nivel: 0 | 1 | 2 | 3 | 4
+  etiqueta: string
+}
+
+export interface ErroresRestablecimiento {
+  contrasena?: string
+  confirmacion?: string
+}
