@@ -1,0 +1,5 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Container">
+<path id="Icon" fill-rule="evenodd" clip-rule="evenodd" d="M10 0C4.477 0 0 4.477 0 10s4.477 10 10 10 10-4.477 10-10S15.523 0 10 0Zm0 2a8 8 0 1 1 0 16 8 8 0 0 1 0-16Zm-1 3v5.414l3.793 3.793 1.414-1.414L11 9.586V5H9Z" fill="#B3CCE1" fill-opacity="1"/>
+</g>
+</svg>

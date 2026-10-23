@@ -19,6 +19,7 @@ const enlaces: EnlaceMenu[] = [
   },
   { nombre: 'Grados/Secciones', icono: '/icons/menu-secciones.svg', destino: '/secciones' },
   { nombre: 'Competencias', icono: '/icons/menu-competencias.svg', destino: '/competencias' },
+  { nombre: 'Horarios', icono: '/icons/menu-horarios.svg', destino: '/horarios' },
   { nombre: 'Docentes', icono: '/icons/menu-docentes.svg' },
   { nombre: 'Clases', icono: '/icons/menu-clases.svg' },
   { nombre: 'Finanzas', icono: '/icons/menu-finanzas.svg' },
