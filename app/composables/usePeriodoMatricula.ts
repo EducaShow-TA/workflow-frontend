@@ -6,7 +6,6 @@ import type {
   SolicitudPeriodoMatricula,
 } from '~/types/periodoMatricula'
 import { useApi } from '~/composables/useApi'
-import { copiarDatos, crearErrorPrueba, esperarLatencia, usarDatosPrueba } from '~/composables/useDatosPrueba'
 import { esFechaIsoValida, formatearFecha, obtenerFechaHoyIso } from '~/composables/useFechas'
 import { obtenerPrimerError } from '~/composables/useValidacion'
 
@@ -119,101 +118,26 @@ export function validarPeriodoMatricula(
   return errores
 }
 
-// Datos de prueba: se usan solo si NUXT_PUBLIC_DATOS_PRUEBA incluye "periodos-matricula".
-let siguienteIdPrueba = 3
-
-const periodosPrueba: Omit<PeriodoMatricula, 'estado'>[] = [
-  { id: 1, fechaInicio: '2026-01-05', fechaLimite: '2026-02-27', tieneMatriculas: true },
-  { id: 2, fechaInicio: '2026-12-01', fechaLimite: '2027-02-26', tieneMatriculas: false },
-]
-
-function completarEstado(periodo: Omit<PeriodoMatricula, 'estado'>): PeriodoMatricula {
-  return {
-    ...periodo,
-    estado: calcularEstadoPeriodo(periodo.fechaInicio, periodo.fechaLimite, obtenerFechaHoyIso()),
-  }
-}
-
-function listarPeriodosPrueba(): PeriodoMatricula[] {
-  return copiarDatos(periodosPrueba)
-    .map(completarEstado)
-    .sort((primero, segundo) => segundo.fechaInicio.localeCompare(primero.fechaInicio))
-}
-
-function validarEnPrueba(solicitud: SolicitudPeriodoMatricula, idEnEdicion: number | null, ruta: string): void {
-  const periodos = listarPeriodosPrueba()
-  const errores = validarPeriodoMatricula(solicitud, periodos, idEnEdicion)
-  const primerError = obtenerPrimerError(errores)
-
-  if (primerError) {
-    throw crearErrorPrueba(primerError, buscarCruce(solicitud, periodos, idEnEdicion) ? 409 : 422, ruta)
-  }
-}
-
-function buscarIndicePrueba(id: number, ruta: string): number {
-  const indice = periodosPrueba.findIndex((periodo) => periodo.id === id)
-
-  if (indice === -1) {
-    throw crearErrorPrueba('No existe el periodo de matrícula', 404, ruta)
-  }
-
-  return indice
-}
-
 /** Acceso a los periodos de matricula (US-1.1). */
 export function usePeriodoMatricula() {
   const { solicitar } = useApi()
 
   async function listarPeriodos(): Promise<PeriodoMatricula[]> {
-    if (usarDatosPrueba('periodos-matricula')) {
-      await esperarLatencia()
-      return listarPeriodosPrueba()
-    }
-
     return solicitar<PeriodoMatricula[]>(RUTA_PERIODOS)
   }
 
   async function registrarPeriodo(solicitud: SolicitudPeriodoMatricula): Promise<PeriodoMatricula> {
-    if (usarDatosPrueba('periodos-matricula')) {
-      await esperarLatencia()
-      validarEnPrueba(solicitud, null, RUTA_PERIODOS)
-
-      const nuevo = { id: siguienteIdPrueba++, ...solicitud, tieneMatriculas: false }
-      periodosPrueba.push(nuevo)
-      return completarEstado(copiarDatos(nuevo))
-    }
-
     return solicitar<PeriodoMatricula>(RUTA_PERIODOS, { metodo: 'POST', cuerpo: solicitud })
   }
 
   async function actualizarPeriodo(id: number, solicitud: SolicitudPeriodoMatricula): Promise<PeriodoMatricula> {
     const ruta = `${RUTA_PERIODOS}/${id}`
 
-    if (usarDatosPrueba('periodos-matricula')) {
-      await esperarLatencia()
-      const indice = buscarIndicePrueba(id, ruta)
-      const motivo = obtenerMotivoNoEditable(completarEstado(periodosPrueba[indice]!))
-
-      if (motivo) {
-        throw crearErrorPrueba(motivo, 422, ruta)
-      }
-
-      validarEnPrueba(solicitud, id, ruta)
-      periodosPrueba[indice] = { ...periodosPrueba[indice]!, ...solicitud }
-      return completarEstado(copiarDatos(periodosPrueba[indice]!))
-    }
-
     return solicitar<PeriodoMatricula>(ruta, { metodo: 'PUT', cuerpo: solicitud })
   }
 
   async function desactivarPeriodo(id: number): Promise<void> {
     const ruta = `${RUTA_PERIODOS}/${id}`
-
-    if (usarDatosPrueba('periodos-matricula')) {
-      await esperarLatencia()
-      periodosPrueba.splice(buscarIndicePrueba(id, ruta), 1)
-      return
-    }
 
     await solicitar<unknown>(ruta, { metodo: 'DELETE' })
   }

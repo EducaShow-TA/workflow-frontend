@@ -2,7 +2,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import type { ErroresSeccion, Seccion, SolicitudSeccion } from '~/types/seccion'
 import type { ErroresAperturaAnhio, PeriodoAcademico, SolicitudAperturaAnhio } from '~/types/periodoAcademico'
-import { obtenerMensajeError } from '~/composables/useDatosPrueba'
+import { obtenerMensajeError } from '~/composables/useMensajesError'
 import { formatearFecha, obtenerFechaHoyIso } from '~/composables/useFechas'
 import { usePeriodoMatricula } from '~/composables/usePeriodoMatricula'
 import {

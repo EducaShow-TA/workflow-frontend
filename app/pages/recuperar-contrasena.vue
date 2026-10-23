@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref } from 'vue'
-import { obtenerMensajeError } from '~/composables/useDatosPrueba'
+import { obtenerMensajeError } from '~/composables/useMensajesError'
 import {
   MINUTOS_VIGENCIA_ENLACE,
   SEGUNDOS_ESPERA_REENVIO,

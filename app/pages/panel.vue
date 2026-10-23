@@ -1,21 +1,17 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import type { AccionRapidaPanel } from '~/types/panel'
-import { useResumenPanel } from '~/composables/useResumenPanel'
-import { useResumenFinanciero } from '~/composables/useResumenFinanciero'
 
 definePageMeta({
   middleware: 'autenticacion',
 })
 
-const { acciones, metricas } = useResumenPanel()
-const { estadoFinanciero, tendenciaPagos, escalaMaxima } = useResumenFinanciero()
-
-const mensajeReporte = ref('')
-
-function informarReporte(): void {
-  mensajeReporte.value = 'El reporte financiero completo estará disponible cuando se implemente el módulo de finanzas.'
-}
+const acciones = [
+  { id: 'registrar-estudiante', titulo: 'Registrar Estudiante', icono: '/icons/accion-estudiante.svg', colorFondo: '#004ac61a' },
+  { id: 'crear-matricula', titulo: 'Crear Matrícula', icono: '/icons/accion-matricula.svg', colorFondo: '#4059aa1a' },
+  { id: 'registrar-pago', titulo: 'Registrar Pago', icono: '/icons/accion-pago.svg', colorFondo: '#196fc01a' },
+  { id: 'gestionar-horarios', titulo: 'Gestionar Horarios', icono: '/icons/accion-horarios.svg', colorFondo: '#7376861a' },
+]
 
 const mensajeAccion = ref('')
 
@@ -37,21 +33,11 @@ async function seleccionarAccion(accion: AccionRapidaPanel): Promise<void> {
       {{ mensajeAccion }}
     </p>
 
-    <MetricasPanel :metricas="metricas" />
-
-    <section class="seccion-financiera" aria-label="Resumen financiero">
-      <EstadoFinanciero :resumen="estadoFinanciero" @ver-reporte="informarReporte" />
-
-      <TendenciaPagos :pagos="tendenciaPagos" :escala-maxima="escalaMaxima" />
+    <section class="estado-resumen" aria-label="Estado de los indicadores">
+      <h1>Resumen del colegio</h1>
+      <p>Los indicadores aparecerán aquí cuando el sistema cuente con datos reales para mostrarlos.</p>
     </section>
 
-    <p v-if="mensajeReporte" class="aviso-accion" role="status">
-      {{ mensajeReporte }}
-    </p>
-
-    <p class="nota-demostracion">
-      Indicadores de demostración basados en Figma. No representan datos reales del colegio.
-    </p>
   </main>
 </template>
 
@@ -74,22 +60,23 @@ async function seleccionarAccion(accion: AccionRapidaPanel): Promise<void> {
   font-size: 14px;
 }
 
-.nota-demostracion {
+.estado-resumen {
+  padding: 24px;
+  border: 1px solid #c3c6d7;
+  border-radius: 12px;
+  background: white;
+}
+
+.estado-resumen h1 {
+  margin: 0 0 8px;
+  color: #191c1e;
+  font-size: 20px;
+}
+
+.estado-resumen p {
   margin: 0;
-  color: var(--color-text-secondary);
-  font-size: 12px;
-}
-
-.seccion-financiera {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 2.05fr);
-  gap: 16px;
-}
-
-@media (max-width: 1100px) {
-  .seccion-financiera {
-    grid-template-columns: minmax(0, 1fr);
-  }
+  color: #434655;
+  font-size: 14px;
 }
 @media (max-width: 600px) {
   .pagina-panel {

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import type { ResultadoCargaMasiva, RevisionCsv } from '~/types/cargaMasiva'
-import { obtenerMensajeError } from '~/composables/useDatosPrueba'
+import { obtenerMensajeError } from '~/composables/useMensajesError'
 import {
   COLUMNAS_OBLIGATORIAS,
   COLUMNAS_OPCIONALES,

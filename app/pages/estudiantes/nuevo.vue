@@ -3,6 +3,8 @@ import { reactive, ref } from 'vue'
 import PasoApoderados from '~/components/PasoApoderados.vue'
 import PasoConfirmacion from '~/components/PasoConfirmacion.vue'
 import type { RegistroEstudiante } from '~/types/registroEstudiante'
+import { obtenerMensajeError } from '~/composables/useMensajesError'
+import { useApi } from '~/composables/useApi'
 import {
   formatearCelular,
   normalizarCelular,
@@ -20,11 +22,16 @@ const mensajeEstado = ref('')
 const pasoApoderados = ref<InstanceType<typeof PasoApoderados> | null>(null)
 
 const pasos = ['Datos Personales', 'Contacto', 'Apoderados', 'Confirmación']
+const { solicitar } = useApi()
+const enviando = ref(false)
 
 const formulario = reactive<RegistroEstudiante>({
+  username: '',
+  password: '',
   tipoDocumento: 'DNI',
   nombres: '',
-  apellidos: '',
+  apellidoPaterno: '',
+  apellidoMaterno: '',
   numeroDocumento: '',
   fechaNacimiento: '',
   genero: '',
@@ -35,7 +42,8 @@ const formulario = reactive<RegistroEstudiante>({
   apoderados: [
     {
       nombres: '',
-      apellidos: '',
+      apellidoPaterno: '',
+      apellidoMaterno: '',
       parentesco: '',
       tipoDocumento: 'DNI',
       numeroDocumento: '',
@@ -48,9 +56,12 @@ const formulario = reactive<RegistroEstudiante>({
 
 const errores = reactive({
   nombres: '',
-  apellidos: '',
+  apellidoPaterno: '',
+  apellidoMaterno: '',
   numeroDocumento: '',
   fechaNacimiento: '',
+  username: '',
+  password: '',
   correoElectronico: '',
   celular: '',
 })
@@ -89,14 +100,16 @@ function cambiarCelular(evento: Event): void {
 
 function normalizarDatosPersonales(): void {
   formulario.nombres = normalizarNombre(formulario.nombres)
-  formulario.apellidos = normalizarNombre(formulario.apellidos)
+  formulario.apellidoPaterno = normalizarNombre(formulario.apellidoPaterno)
+  formulario.apellidoMaterno = normalizarNombre(formulario.apellidoMaterno)
 }
 
 function validarDatosPersonales(): boolean {
   normalizarDatosPersonales()
 
   errores.nombres = ''
-  errores.apellidos = ''
+  errores.apellidoPaterno = ''
+  errores.apellidoMaterno = ''
   errores.numeroDocumento = ''
   errores.fechaNacimiento = ''
 
@@ -104,8 +117,11 @@ function validarDatosPersonales(): boolean {
     errores.nombres = 'Los nombres son obligatorios.'
   }
 
-  if (!formulario.apellidos) {
-    errores.apellidos = 'Los apellidos son obligatorios.'
+  if (!formulario.apellidoPaterno) {
+    errores.apellidoPaterno = 'El apellido paterno es obligatorio.'
+  }
+  if (!formulario.apellidoMaterno) {
+    errores.apellidoMaterno = 'El apellido materno es obligatorio.'
   }
 
   if (!formulario.numeroDocumento) {
@@ -122,10 +138,23 @@ function validarDatosPersonales(): boolean {
     errores.fechaNacimiento = 'La fecha no puede ser futura.'
   }
 
-  return !(errores.nombres || errores.apellidos || errores.numeroDocumento || errores.fechaNacimiento)
+  return !(errores.nombres || errores.apellidoPaterno || errores.apellidoMaterno || errores.numeroDocumento || errores.fechaNacimiento)
 }
 
 function validarContacto(): boolean {
+  errores.username = ''
+  errores.password = ''
+
+  if (!formulario.username.trim()) {
+    errores.username = 'El usuario es obligatorio.'
+  } else if (formulario.username.length > 50) {
+    errores.username = 'El usuario no debe superar 50 caracteres.'
+  }
+
+  if (formulario.password.length < 8 || formulario.password.length > 72) {
+    errores.password = 'La contraseña debe tener entre 8 y 72 caracteres.'
+  }
+
   formulario.correoElectronico = normalizarCorreo(formulario.correoElectronico)
 
   formulario.direccion = formulario.direccion.trim()
@@ -143,7 +172,7 @@ function validarContacto(): boolean {
     errores.celular = 'El celular debe tener 9 dígitos y comenzar en 9.'
   }
 
-  return !(errores.correoElectronico || errores.celular)
+  return !(errores.username || errores.password || errores.correoElectronico || errores.celular)
 }
 
 function siguientePaso(): void {
@@ -188,6 +217,49 @@ function editarPaso(paso: 1 | 2 | 3): void {
 async function cancelarRegistro(): Promise<void> {
   await navigateTo('/estudiantes')
 }
+
+async function registrarEstudiante(): Promise<void> {
+  if (enviando.value) return
+  enviando.value = true
+  mensajeEstado.value = ''
+  try {
+    await solicitar('/api/v1/estudiantes', {
+      metodo: 'POST',
+      cuerpo: {
+        username: formulario.username.trim(),
+        password: formulario.password,
+        tipoDocumento: formulario.tipoDocumento,
+        numeroDocumento: formulario.numeroDocumento,
+        nombres: formulario.nombres,
+        apellidoPaterno: formulario.apellidoPaterno,
+        apellidoMaterno: formulario.apellidoMaterno,
+        fechaNacimiento: formulario.fechaNacimiento,
+        genero: formulario.genero || null,
+        nacionalidad: formulario.nacionalidad || null,
+        direccion: formulario.direccion || null,
+        celular: formulario.celular || null,
+        correoElectronico: formulario.correoElectronico || null,
+        apoderados: formulario.apoderados.map((apoderado) => ({
+          tipoDocumento: apoderado.tipoDocumento,
+          numeroDocumento: apoderado.numeroDocumento,
+          nombres: apoderado.nombres,
+          apellidoPaterno: apoderado.apellidoPaterno,
+          apellidoMaterno: apoderado.apellidoMaterno,
+          celular: apoderado.celular,
+          correoElectronico: apoderado.correoElectronico || null,
+          parentesco: apoderado.parentesco === 'TUTOR' ? 'TUTOR_LEGAL' : apoderado.parentesco,
+          esPrincipal: apoderado.esPrincipal,
+        })),
+      },
+    })
+    mensajeEstado.value = 'Estudiante registrado correctamente.'
+    await navigateTo('/estudiantes')
+  } catch (error: unknown) {
+    mensajeEstado.value = obtenerMensajeError(error, 'No se pudo registrar al estudiante.')
+  } finally {
+    enviando.value = false
+  }
+}
 </script>
 
 <template>
@@ -199,9 +271,7 @@ async function cancelarRegistro(): Promise<void> {
         <p>Complete la información requerida para inscribir a un nuevo alumno en el sistema.</p>
       </div>
 
-      <button type="button" class="boton-importar" disabled title="Importación CSV pendiente de implementación">
-        Importar CSV
-      </button>
+      <span class="nota-csv">La carga de estudiantes se realiza desde Usuarios &gt; Carga masiva.</span>
     </header>
 
     <section class="tarjeta-registro" aria-label="Registro de estudiante">
@@ -245,22 +315,28 @@ async function cancelarRegistro(): Promise<void> {
           </div>
 
           <div class="campo">
-            <label for="apellidos"> Apellidos <span class="obligatorio">*</span> </label>
+            <label for="apellido-paterno"> Apellido paterno <span class="obligatorio">*</span> </label>
 
             <input
-              id="apellidos"
-              v-model="formulario.apellidos"
+              id="apellido-paterno"
+              v-model="formulario.apellidoPaterno"
               type="text"
-              placeholder="Ej. Pérez Gómez"
+              placeholder="Ej. Pérez"
               autocomplete="family-name"
-              :aria-invalid="Boolean(errores.apellidos)"
-              :aria-describedby="errores.apellidos ? 'error-apellidos' : undefined"
-              @input="errores.apellidos = ''"
+              :aria-invalid="Boolean(errores.apellidoPaterno)"
+              :aria-describedby="errores.apellidoPaterno ? 'error-apellido-paterno' : undefined"
+              @input="errores.apellidoPaterno = ''"
             />
 
-            <small v-if="errores.apellidos" id="error-apellidos" class="error">
-              {{ errores.apellidos }}
+            <small v-if="errores.apellidoPaterno" id="error-apellido-paterno" class="error">
+              {{ errores.apellidoPaterno }}
             </small>
+          </div>
+
+          <div class="campo">
+            <label for="apellido-materno"> Apellido materno <span class="obligatorio">*</span> </label>
+            <input id="apellido-materno" v-model="formulario.apellidoMaterno" type="text" placeholder="Ej. Díaz" autocomplete="additional-name" :aria-invalid="Boolean(errores.apellidoMaterno)" @input="errores.apellidoMaterno = ''" />
+            <small v-if="errores.apellidoMaterno" class="error">{{ errores.apellidoMaterno }}</small>
           </div>
 
           <div class="campo">
@@ -339,6 +415,16 @@ async function cancelarRegistro(): Promise<void> {
 
         <div v-else-if="pasoActual === 2" class="contenido-formulario">
           <div class="campo">
+            <label for="username">Usuario <span class="obligatorio">*</span></label>
+            <input id="username" v-model="formulario.username" type="text" autocomplete="username" required placeholder="alumno01" :aria-invalid="Boolean(errores.username)" />
+            <small v-if="errores.username" class="error">{{ errores.username }}</small>
+          </div>
+          <div class="campo">
+            <label for="password">Contraseña inicial <span class="obligatorio">*</span></label>
+            <input id="password" v-model="formulario.password" type="password" autocomplete="new-password" minlength="8" maxlength="72" required :aria-invalid="Boolean(errores.password)" />
+            <small v-if="errores.password" class="error">{{ errores.password }}</small>
+          </div>
+          <div class="campo">
             <label for="correo-contacto"> Correo electrónico (opcional) </label>
 
             <input
@@ -412,8 +498,8 @@ async function cancelarRegistro(): Promise<void> {
 
           <button v-if="pasoActual < 4" type="submit" class="boton-siguiente">Siguiente →</button>
 
-          <button v-else type="button" class="boton-siguiente" disabled title="Pendiente de integracion con el backend">
-            Registrar estudiante (pendiente)
+          <button v-else type="button" class="boton-siguiente" :disabled="enviando" @click="registrarEstudiante">
+            {{ enviando ? 'Registrando…' : 'Registrar estudiante' }}
           </button>
         </footer>
       </form>
@@ -423,9 +509,6 @@ async function cancelarRegistro(): Promise<void> {
       {{ mensajeEstado }}
     </p>
 
-    <p class="nota-registro">
-      Formulario en desarrollo. Los datos no se envían al servidor ni se guardan al recargar la página.
-    </p>
   </main>
 </template>
 
@@ -456,17 +539,12 @@ h1 {
   font-size: 14px;
 }
 
-.boton-importar {
-  min-width: 170px;
-  padding: 10px 18px;
-  border: 0;
-  border-radius: 8px;
-  background: #00569c;
-  color: white;
-  font-weight: 600;
-  opacity: 0.6;
-  cursor: not-allowed;
+.nota-csv {
+  color: #434655;
+  font-size: 13px;
 }
+
+
 
 .tarjeta-registro {
   overflow: hidden;

@@ -2,7 +2,8 @@ export type TipoDocumento = 'DNI' | 'PASAPORTE'
 
 export interface ApoderadoRegistro {
   nombres: string
-  apellidos: string
+  apellidoPaterno: string
+  apellidoMaterno: string
   parentesco: string
   tipoDocumento: TipoDocumento
   numeroDocumento: string
@@ -12,9 +13,12 @@ export interface ApoderadoRegistro {
 }
 
 export interface RegistroEstudiante {
+  username: string
+  password: string
   tipoDocumento: TipoDocumento
   nombres: string
-  apellidos: string
+  apellidoPaterno: string
+  apellidoMaterno: string
   numeroDocumento: string
   fechaNacimiento: string
   genero: string

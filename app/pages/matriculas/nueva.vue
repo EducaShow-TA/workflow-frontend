@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import type { EstudianteMatriculable, MatriculaApi } from '~/types/matricula'
 import type { PeriodoAcademico } from '~/types/periodoAcademico'
-import { obtenerMensajeError } from '~/composables/useDatosPrueba'
+import { obtenerMensajeError } from '~/composables/useMensajesError'
 import { useEstudiantesMatriculables } from '~/composables/useEstudiantesMatriculables'
 import { useMatriculas } from '~/composables/useMatriculas'
 import { obtenerAnhio } from '~/composables/useAnhioEscolar'
@@ -163,7 +163,7 @@ onMounted(cargarDatos)
         <h1>Crear Matrícula</h1>
         <p>Selecciona un estudiante y consulta la disponibilidad de vacantes.</p>
       </div>
-      <span class="etiqueta-demo">Año escolar {{ anhioMatricula ?? '—' }}</span>
+      <span class="etiqueta-anhio">Año escolar {{ anhioMatricula ?? '—' }}</span>
     </header>
 
     <section class="tarjeta" aria-labelledby="titulo-estudiante">
@@ -356,7 +356,7 @@ onMounted(cargarDatos)
   color: #434655;
   font-size: 14px;
 }
-.etiqueta-demo {
+.etiqueta-anhio {
   padding: 7px 12px;
   border-radius: 20px;
   background: #eef2ff;

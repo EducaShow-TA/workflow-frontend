@@ -80,13 +80,17 @@ function mostrarParentesco(valor: string): string {
 
       <dl class="cuadricula-datos">
         <div>
+          <dt>Usuario de acceso</dt>
+          <dd>{{ datos.username }}</dd>
+        </div>
+        <div>
           <dt>Nombres</dt>
           <dd>{{ datos.nombres }}</dd>
         </div>
 
         <div>
           <dt>Apellidos</dt>
-          <dd>{{ datos.apellidos }}</dd>
+          <dd>{{ datos.apellidoPaterno }} {{ datos.apellidoMaterno }}</dd>
         </div>
 
         <div>
@@ -158,7 +162,7 @@ function mostrarParentesco(valor: string): string {
         <dl class="cuadricula-datos">
           <div>
             <dt>Nombres y apellidos</dt>
-            <dd>{{ apoderado.nombres }} {{ apoderado.apellidos }}</dd>
+            <dd>{{ apoderado.nombres }} {{ apoderado.apellidoPaterno }} {{ apoderado.apellidoMaterno }}</dd>
           </div>
 
           <div>
@@ -188,11 +192,10 @@ function mostrarParentesco(valor: string): string {
     </section>
 
     <div class="aviso-pendiente" role="note">
-      <strong>Registro aún no disponible</strong>
+      <strong>Cuenta de acceso</strong>
 
       <p>
-        Esta pantalla permite revisar los datos ingresados. El guardado se habilitará después de integrar Spring Boot,
-        comprobar documentos duplicados y completar las validaciones de matrícula y vacantes correspondientes.
+        Se creará una cuenta para el estudiante con el usuario y la contraseña inicial indicados.
       </p>
     </div>
   </section>

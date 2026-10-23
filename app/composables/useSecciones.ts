@@ -1,5 +1,4 @@
 import { useApi } from '~/composables/useApi'
-import { copiarDatos, crearErrorPrueba, esperarLatencia, usarDatosPrueba } from '~/composables/useDatosPrueba'
 import { obtenerPrimerError } from '~/composables/useValidacion'
 import type { VarianteInsignia } from '~/types/interfaz'
 import type {
@@ -125,80 +124,21 @@ export function ordenarSecciones(secciones: Seccion[]): Seccion[] {
   )
 }
 
-// Datos de prueba: mismas secciones y cantidades que usa la pantalla de matricula, para que coincidan.
-let siguienteIdPrueba = 11
-
-const seccionesPrueba: Seccion[] = [
-  { id: 1, gradoNumero: 1, nombre: 'A', vacantesTotales: 30, cantidadMatriculados: 28 },
-  { id: 2, gradoNumero: 1, nombre: 'B', vacantesTotales: 30, cantidadMatriculados: 30 },
-  { id: 3, gradoNumero: 2, nombre: 'A', vacantesTotales: 30, cantidadMatriculados: 24 },
-  { id: 4, gradoNumero: 2, nombre: 'B', vacantesTotales: 30, cantidadMatriculados: 27 },
-  { id: 5, gradoNumero: 3, nombre: 'A', vacantesTotales: 30, cantidadMatriculados: 28 },
-  { id: 6, gradoNumero: 3, nombre: 'B', vacantesTotales: 30, cantidadMatriculados: 30 },
-  { id: 7, gradoNumero: 4, nombre: 'A', vacantesTotales: 30, cantidadMatriculados: 20 },
-  { id: 8, gradoNumero: 4, nombre: 'B', vacantesTotales: 30, cantidadMatriculados: 29 },
-  { id: 9, gradoNumero: 5, nombre: 'A', vacantesTotales: 30, cantidadMatriculados: 26 },
-  { id: 10, gradoNumero: 5, nombre: 'B', vacantesTotales: 30, cantidadMatriculados: 25 },
-]
-
 /** Acceso a las secciones y sus vacantes (US-1.7). */
 export function useSecciones() {
   const { solicitar } = useApi()
 
   async function listarSecciones(): Promise<Seccion[]> {
-    if (usarDatosPrueba('secciones')) {
-      await esperarLatencia()
-      return ordenarSecciones(copiarDatos(seccionesPrueba))
-    }
-
     return ordenarSecciones(await solicitar<Seccion[]>(RUTA_SECCIONES))
   }
 
   async function registrarSeccion(solicitud: SolicitudSeccion): Promise<Seccion> {
-    if (usarDatosPrueba('secciones')) {
-      await esperarLatencia()
-
-      const errores = validarSeccion(solicitud, seccionesPrueba)
-      const primerError = obtenerPrimerError(errores)
-
-      if (existeSeccion(solicitud, seccionesPrueba)) {
-        throw crearErrorPrueba(primerError, 409, RUTA_SECCIONES)
-      }
-
-      if (primerError) {
-        throw crearErrorPrueba(primerError, 422, RUTA_SECCIONES)
-      }
-
-      const nueva: Seccion = { id: siguienteIdPrueba++, ...solicitud, cantidadMatriculados: 0 }
-      seccionesPrueba.push(nueva)
-      return copiarDatos(nueva)
-    }
-
     return solicitar<Seccion>(RUTA_SECCIONES, { metodo: 'POST', cuerpo: solicitud })
   }
 
   /** Equivale a Seccion.actualizarVacantes(nuevasVacantes) (US-1.7, criterio 2). */
   async function actualizarVacantes(id: number, solicitud: SolicitudActualizarVacantes): Promise<Seccion> {
     const ruta = `${RUTA_SECCIONES}/${id}`
-
-    if (usarDatosPrueba('secciones')) {
-      await esperarLatencia()
-
-      const seccion = seccionesPrueba.find((actual) => actual.id === id)
-
-      if (!seccion) {
-        throw crearErrorPrueba('La sección no existe.', 404, ruta)
-      }
-
-      const error = validarNuevaCapacidad(solicitud.vacantesTotales, seccion.cantidadMatriculados)
-
-      if (error) {
-        throw crearErrorPrueba(error, 422, ruta)
-      }
-
-      seccion.vacantesTotales = solicitud.vacantesTotales
-      return copiarDatos(seccion)
-    }
 
     return solicitar<Seccion>(ruta, { metodo: 'PATCH', cuerpo: solicitud })
   }

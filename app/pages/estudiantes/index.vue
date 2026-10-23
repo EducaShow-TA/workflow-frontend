@@ -1,20 +1,34 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useListadoEstudiantes } from '~/composables/useListadoEstudiantes'
+import { obtenerMensajeError } from '~/composables/useMensajesError'
 
 definePageMeta({
   middleware: 'autenticacion',
 })
 
-const estudiantes = useListadoEstudiantes()
+const { listarEstudiantes } = useListadoEstudiantes()
+const estudiantes = ref<Awaited<ReturnType<typeof listarEstudiantes>>>([])
+const cargando = ref(true)
+const errorCarga = ref('')
 
 const busqueda = ref('')
 const gradoSeleccionado = ref('')
 const seccionSeleccionada = ref('')
 const mensajeInformativo = ref('')
 
-const grados = [...new Set(estudiantes.map((estudiante) => estudiante.grado))]
-const secciones = [...new Set(estudiantes.map((estudiante) => estudiante.seccion))]
+const grados = computed(() => [...new Set(estudiantes.value.map((estudiante) => estudiante.grado))])
+const secciones = computed(() => [...new Set(estudiantes.value.map((estudiante) => estudiante.seccion))])
+
+onMounted(async () => {
+  try {
+    estudiantes.value = await listarEstudiantes()
+  } catch (error: unknown) {
+    errorCarga.value = obtenerMensajeError(error, 'No se pudo cargar el listado de estudiantes.')
+  } finally {
+    cargando.value = false
+  }
+})
 
 function normalizarTexto(texto: string): string {
   return texto
@@ -26,7 +40,7 @@ function normalizarTexto(texto: string): string {
 const estudiantesFiltrados = computed(() => {
   const criterio = normalizarTexto(busqueda.value.trim())
 
-  return estudiantes.filter((estudiante) => {
+  return estudiantes.value.filter((estudiante) => {
     const nombreCompleto = `${estudiante.nombres} ${estudiante.apellidos}`
 
     const coincideBusqueda =
@@ -76,6 +90,8 @@ async function informarNuevoEstudiante(): Promise<void> {
     <p v-if="mensajeInformativo" class="aviso-informativo" role="status">
       {{ mensajeInformativo }}
     </p>
+
+    <p v-if="errorCarga" class="aviso-informativo error-carga" role="alert">{{ errorCarga }}</p>
 
     <section class="panel-filtros" aria-label="Filtros de estudiantes">
       <div class="campo-filtro campo-busqueda">
@@ -127,6 +143,7 @@ async function informarNuevoEstudiante(): Promise<void> {
           </thead>
 
           <tbody>
+            <tr v-if="cargando"><td colspan="7" class="sin-resultados">Cargando estudiantes…</td></tr>
             <tr v-for="estudiante in estudiantesFiltrados" :key="estudiante.codigo">
               <td class="codigo">
                 {{ estudiante.codigo }}
@@ -143,9 +160,7 @@ async function informarNuevoEstudiante(): Promise<void> {
                   <div class="datos-estudiante">
                     <strong> {{ estudiante.nombres }} {{ estudiante.apellidos }} </strong>
 
-                    <small>
-                      {{ estudiante.correoElectronico }}
-                    </small>
+                    <small>{{ estudiante.correoElectronico || 'Sin correo' }}</small>
                   </div>
                 </div>
               </td>
@@ -154,14 +169,10 @@ async function informarNuevoEstudiante(): Promise<void> {
               <td>{{ estudiante.grado }}</td>
               <td>{{ estudiante.seccion }}</td>
 
-              <td>
-                <span class="estado" :class="estudiante.estado === 'ACTIVO' ? 'activo' : 'inactivo'">
-                  {{ estudiante.estado === 'ACTIVO' ? 'Activo' : 'Inactivo' }}
-                </span>
-              </td>
+              <td><span class="estado">{{ estudiante.estado === 'REGISTRADO' ? 'Registrado' : '—' }}</span></td>
 
               <td>
-                <span class="accion-pendiente">Pendiente</span>
+                <span>—</span>
               </td>
             </tr>
 
@@ -173,7 +184,7 @@ async function informarNuevoEstudiante(): Promise<void> {
       </div>
 
       <footer class="pie-tabla">
-        Mostrando {{ estudiantesFiltrados.length }} de {{ estudiantes.length }} registros de demostración
+        {{ cargando ? 'Consultando el servidor…' : `Mostrando ${estudiantesFiltrados.length} de ${estudiantes.length} estudiantes` }}
       </footer>
     </section>
   </main>

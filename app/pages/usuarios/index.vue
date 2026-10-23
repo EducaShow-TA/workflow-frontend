@@ -15,7 +15,7 @@ import {
   useCuentasUsuario,
 } from '~/composables/useCuentasUsuario'
 import { ROLES, obtenerNombreRol, usePermisosRol } from '~/composables/usePermisosRol'
-import { obtenerMensajeError } from '~/composables/useDatosPrueba'
+import { obtenerMensajeError } from '~/composables/useMensajesError'
 import { useCambioEstadoCuenta } from '~/composables/useCambioEstadoCuenta'
 import { useAutenticacionStore } from '~/stores/autenticacion'
 
