@@ -6,6 +6,7 @@ import { ErrorSolicitudApi } from '~/types/api'
 interface ResultadoAutenticacion {
   exito: boolean
   mensaje: string
+  estado?: number
 }
 
 export const useAutenticacionStore = defineStore('autenticacion', () => {
@@ -26,8 +27,11 @@ export const useAutenticacionStore = defineStore('autenticacion', () => {
       usuario.value = respuesta.usuario
       return { exito: true, mensaje: '' }
     } catch (error: unknown) {
-      const mensaje = error instanceof ErrorSolicitudApi ? error.message : 'No se pudo iniciar sesión.'
-      return { exito: false, mensaje }
+      if (error instanceof ErrorSolicitudApi) {
+        return { exito: false, mensaje: error.message, estado: error.estado }
+      }
+
+      return { exito: false, mensaje: 'No se pudo iniciar sesión.' }
     }
   }
 
