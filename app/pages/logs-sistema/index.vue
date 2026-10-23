@@ -4,12 +4,14 @@ import type { FiltrosRegistroError, NivelLog, RegistroError } from '~/types/regi
 import {
   NIVELES_LOG,
   TAMANIO_PAGINA_REGISTROS,
+  describirContextoLog,
   describirUsuarioLog,
   formatearFechaHoraLog,
   obtenerEtiquetaNivel,
   useRegistrosError,
 } from '~/composables/useRegistrosError'
 import { obtenerMensajeError } from '~/composables/useDatosPrueba'
+import { obtenerNombreRol } from '~/composables/usePermisosRol'
 
 definePageMeta({
   middleware: 'autenticacion',
@@ -168,6 +170,10 @@ const datosDetalle = computed(() => {
     { etiqueta: 'Módulo', valor: registro.modulo ?? '—' },
     { etiqueta: 'Usuario', valor: describirUsuarioLog(registro) },
     {
+      etiqueta: 'Rol',
+      valor: registro.rolUsuario ? `${obtenerNombreRol(registro.rolUsuario)} (cuenta #${registro.idUsuario})` : '—',
+    },
+    {
       etiqueta: 'Endpoint',
       valor: registro.endpoint ? `${registro.metodoHttp ?? ''} ${registro.endpoint}`.trim() : '—',
     },
@@ -177,7 +183,10 @@ const datosDetalle = computed(() => {
 
 <template>
   <main class="pagina-logs">
-    <EncabezadoPagina titulo="Logs del Sistema" descripcion="Monitoreo de errores y eventos registrados por el servidor.">
+    <EncabezadoPagina
+      titulo="Logs del Sistema"
+      descripcion="Monitoreo de errores y eventos registrados por el servidor."
+    >
       <template #acciones>
         <BotonAccion variante="secundario" deshabilitado title="Exportación disponible próximamente">
           <svg class="icono-boton" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -201,7 +210,7 @@ const datosDetalle = computed(() => {
           id="buscar-log"
           v-model="filtros.texto"
           type="search"
-          placeholder="Buscar por mensaje, endpoint o ID de usuario..."
+          placeholder="Buscar por mensaje, código, endpoint, módulo o correo..."
           autocomplete="off"
         />
       </div>
@@ -250,7 +259,7 @@ const datosDetalle = computed(() => {
               <tr>
                 <th scope="col">Marca de tiempo</th>
                 <th scope="col">Nivel</th>
-                <th scope="col">Usuario / Contexto</th>
+                <th scope="col">Usuario / Rol y módulo</th>
                 <th scope="col">Acción / Endpoint</th>
                 <th scope="col">Mensaje</th>
               </tr>
@@ -279,8 +288,11 @@ const datosDetalle = computed(() => {
 
                 <td>
                   <div class="celda-doble">
-                    <strong>{{ describirUsuarioLog(registro) }}</strong>
-                    <small v-if="registro.modulo">{{ registro.modulo }}</small>
+                    <strong v-if="registro.usuario" class="correo">
+                      {{ registro.usuario.split('@')[0] }}<wbr />@{{ registro.usuario.split('@')[1] }}
+                    </strong>
+                    <strong v-else class="anonimo">{{ describirUsuarioLog(registro) }}</strong>
+                    <small v-if="describirContextoLog(registro)">{{ describirContextoLog(registro) }}</small>
                   </div>
                 </td>
 
@@ -299,7 +311,9 @@ const datosDetalle = computed(() => {
 
               <tr v-if="registros.length === 0">
                 <td colspan="5" class="sin-resultados">
-                  {{ hayFiltros ? 'No hay registros con los filtros seleccionados.' : 'Aún no hay errores registrados.' }}
+                  {{
+                    hayFiltros ? 'No hay registros con los filtros seleccionados.' : 'Aún no hay errores registrados.'
+                  }}
                 </td>
               </tr>
             </tbody>
@@ -600,6 +614,15 @@ td {
 
 .celda-doble strong {
   font-weight: 600;
+}
+
+.celda-doble strong.correo {
+  overflow-wrap: anywhere;
+}
+
+.celda-doble strong.anonimo {
+  color: #6b7280;
+  font-weight: 500;
 }
 
 .celda-doble small {

@@ -1,3 +1,5 @@
+import type { RolUsuario } from '~/types/autenticacion'
+
 // Tipos de US-5.5. Reflejan RegistroErrorResponseDTO y NivelLog del backend; los campos nulos no se envian.
 
 export type NivelLog = 'INFO' | 'ADVERTENCIA' | 'ERROR' | 'CRITICO'
@@ -9,6 +11,9 @@ export interface RegistroError {
   codigoError?: string
   modulo?: string
   idUsuario?: number
+  /** Correo de la cuenta que hizo la petición; no llega si fue anónima o la cuenta ya no existe. */
+  usuario?: string
+  rolUsuario?: RolUsuario
   metodoHttp?: string
   endpoint?: string
   codigoEstado?: number

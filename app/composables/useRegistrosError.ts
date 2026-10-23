@@ -1,4 +1,5 @@
 import { useApi } from '~/composables/useApi'
+import { obtenerNombreRol } from '~/composables/usePermisosRol'
 import { copiarDatos, crearErrorPrueba, esperarLatencia, usarDatosPrueba } from '~/composables/useDatosPrueba'
 import type { FiltrosRegistroError, NivelLog, PaginaRegistrosError, RegistroError } from '~/types/registroError'
 
@@ -22,8 +23,16 @@ export function formatearFechaHoraLog(fechaHora: string): string {
   return fechaHora.replace('T', ' ').slice(0, 23)
 }
 
-export function describirUsuarioLog(registro: Pick<RegistroError, 'idUsuario'>): string {
-  return registro.idUsuario ? `Usuario #${registro.idUsuario}` : 'Sistema'
+/** Correo de la cuenta; si ya no existe, su ID; sin usuario, la petición fue anónima (por ejemplo, un login fallido). */
+export function describirUsuarioLog(registro: Pick<RegistroError, 'idUsuario' | 'usuario'>): string {
+  if (registro.usuario) return registro.usuario
+  return registro.idUsuario ? `Cuenta #${registro.idUsuario} (ya no existe)` : 'Sin sesión'
+}
+
+export function describirContextoLog(registro: Pick<RegistroError, 'rolUsuario' | 'modulo'>): string {
+  return [registro.rolUsuario ? obtenerNombreRol(registro.rolUsuario) : '', registro.modulo ?? '']
+    .filter(Boolean)
+    .join(' · ')
 }
 
 function construirRuta(filtros: FiltrosRegistroError, pagina: number): string {
@@ -66,6 +75,8 @@ const PLANTILLAS_PRUEBA: Omit<RegistroError, 'id' | 'fechaHora'>[] = [
     codigoError: 'NEG_409',
     modulo: 'secciones',
     idUsuario: 1,
+    usuario: 'admin@educore.edu.pe',
+    rolUsuario: 'ADMINISTRADOR',
     metodoHttp: 'POST',
     endpoint: '/api/v1/secciones',
     codigoEstado: 409,
@@ -76,6 +87,8 @@ const PLANTILLAS_PRUEBA: Omit<RegistroError, 'id' | 'fechaHora'>[] = [
     codigoError: 'VAL_400',
     modulo: 'areas',
     idUsuario: 1,
+    usuario: 'admin@educore.edu.pe',
+    rolUsuario: 'ADMINISTRADOR',
     metodoHttp: 'POST',
     endpoint: '/api/v1/areas',
     codigoEstado: 400,
@@ -86,6 +99,8 @@ const PLANTILLAS_PRUEBA: Omit<RegistroError, 'id' | 'fechaHora'>[] = [
     codigoError: 'SIS_500',
     modulo: 'secciones',
     idUsuario: 1,
+    usuario: 'admin@educore.edu.pe',
+    rolUsuario: 'ADMINISTRADOR',
     metodoHttp: 'GET',
     endpoint: '/api/v1/secciones',
     codigoEstado: 500,
@@ -97,6 +112,8 @@ const PLANTILLAS_PRUEBA: Omit<RegistroError, 'id' | 'fechaHora'>[] = [
     codigoError: 'AUTH_403',
     modulo: 'cuentas-usuario',
     idUsuario: 7,
+    usuario: 'luis.torres@colegio.edu.pe',
+    rolUsuario: 'ALUMNO',
     metodoHttp: 'GET',
     endpoint: '/api/v1/cuentas-usuario',
     codigoEstado: 403,
@@ -107,6 +124,8 @@ const PLANTILLAS_PRUEBA: Omit<RegistroError, 'id' | 'fechaHora'>[] = [
     codigoError: 'RES_404',
     modulo: 'competencias',
     idUsuario: 1,
+    usuario: 'admin@educore.edu.pe',
+    rolUsuario: 'ADMINISTRADOR',
     metodoHttp: 'PUT',
     endpoint: '/api/v1/competencias/14',
     codigoEstado: 404,
@@ -125,6 +144,8 @@ const PLANTILLAS_PRUEBA: Omit<RegistroError, 'id' | 'fechaHora'>[] = [
     codigoError: 'NEG_422',
     modulo: 'secciones',
     idUsuario: 1,
+    usuario: 'admin@educore.edu.pe',
+    rolUsuario: 'ADMINISTRADOR',
     metodoHttp: 'PATCH',
     endpoint: '/api/v1/secciones/3',
     codigoEstado: 422,
@@ -161,7 +182,9 @@ function consultarPrueba(filtros: FiltrosRegistroError, pagina: number): PaginaR
       !texto ||
       normalizar(registro.mensaje ?? '').includes(texto) ||
       normalizar(registro.endpoint ?? '').includes(texto) ||
-      String(registro.idUsuario ?? '') === texto
+      normalizar(registro.codigoError ?? '').includes(texto) ||
+      normalizar(registro.modulo ?? '').includes(texto) ||
+      normalizar(registro.usuario ?? '').includes(texto)
     const coincideNivel = !filtros.nivel || registro.nivel === filtros.nivel
     const coincideFecha = !filtros.fecha || registro.fechaHora.startsWith(filtros.fecha)
 
