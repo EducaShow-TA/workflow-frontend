@@ -1,9 +1,19 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import type { PeriodoMatricula } from '~/types/periodoMatricula'
-import type { Seccion } from '~/types/seccion'
+import type { PeriodoAcademico } from '~/types/periodoAcademico'
 import { usePeriodoMatricula } from '~/composables/usePeriodoMatricula'
 import { useSecciones } from '~/composables/useSecciones'
+import {
+  convertirEnSecciones,
+  determinarAnhioEscolar,
+  obtenerAnhio,
+  obtenerAnhiosAbiertos,
+  obtenerEtiquetaEstadoAnhio,
+  obtenerVarianteEstadoAnhio,
+  resumirAnhio,
+} from '~/composables/useAnhioEscolar'
+import { usePeriodosAcademicos } from '~/composables/usePeriodosAcademicos'
 import {
   calcularResumenVacantes,
   describirDiasParaInicio,
@@ -19,11 +29,13 @@ definePageMeta({
 })
 
 const { listarPeriodos } = usePeriodoMatricula()
+const { listar: listarPeriodosAcademicos } = usePeriodosAcademicos()
 const { listarSecciones } = useSecciones()
 const { puede } = usePermisosRol()
 
 const periodos = ref<PeriodoMatricula[]>([])
-const secciones = ref<Seccion[]>([])
+const periodosAcademicos = ref<PeriodoAcademico[]>([])
+const cantidadSecciones = ref(0)
 const cargando = ref(true)
 const errorCarga = ref('')
 const fechaHoy = obtenerFechaHoyIso()
@@ -33,9 +45,14 @@ async function cargarResumen(): Promise<void> {
   errorCarga.value = ''
 
   try {
-    const [periodosCargados, seccionesCargadas] = await Promise.all([listarPeriodos(), listarSecciones()])
+    const [periodosCargados, periodosAcademicosCargados, seccionesCargadas] = await Promise.all([
+      listarPeriodos(),
+      listarPeriodosAcademicos(),
+      listarSecciones(),
+    ])
     periodos.value = periodosCargados
-    secciones.value = seccionesCargadas
+    periodosAcademicos.value = periodosAcademicosCargados
+    cantidadSecciones.value = seccionesCargadas.length
   } catch (error: unknown) {
     errorCarga.value = obtenerMensajeError(error, 'No se pudo cargar el resumen de matrícula.')
   } finally {
@@ -48,14 +65,30 @@ onMounted(cargarResumen)
 const situacion = computed(() => obtenerSituacionPeriodo(periodos.value))
 const periodoVigente = computed(() => situacion.value.vigente)
 const proximoPeriodo = computed(() => situacion.value.proximo)
-const resumen = computed(() => calcularResumenVacantes(secciones.value))
 
-const sinVacantes = computed(() => secciones.value.length > 0 && resumen.value.vacantes === 0)
-const puedeRegistrar = computed(() => periodoVigente.value !== null && !sinVacantes.value)
+const anhio = computed(() =>
+  determinarAnhioEscolar(periodos.value, obtenerAnhiosAbiertos(periodosAcademicos.value), fechaHoy),
+)
+const periodosDelAnhio = computed(() =>
+  periodosAcademicos.value.filter((periodo) => obtenerAnhio(periodo.fechaInicio) === anhio.value),
+)
+const secciones = computed(() => convertirEnSecciones(periodosDelAnhio.value))
+const resumenAnhio = computed(() => resumirAnhio(anhio.value, periodosDelAnhio.value, fechaHoy))
+const anhioAbierto = computed(() => secciones.value.length > 0)
+const resumen = computed(() => calcularResumenVacantes(secciones.value))
+const enlaceVacantes = computed(() => `/secciones?anhio=${anhio.value}`)
+const enlaceAbrirAnhio = computed(() => `/secciones?anhio=${anhio.value}&abrir=1`)
+
+const sinVacantes = computed(() => anhioAbierto.value && resumen.value.vacantes === 0)
+const puedeRegistrar = computed(() => periodoVigente.value !== null && anhioAbierto.value && !sinVacantes.value)
 
 const motivoBloqueo = computed(() => {
   if (!periodoVigente.value) {
     return 'Disponible cuando el periodo de matrícula esté vigente.'
+  }
+
+  if (!anhioAbierto.value) {
+    return `Abre el año escolar ${anhio.value} para registrar matrículas.`
   }
 
   return sinVacantes.value ? 'No quedan vacantes en ninguna sección.' : ''
@@ -69,10 +102,11 @@ const motivoBloqueo = computed(() => {
     <PanelEstadoCarga :cargando="cargando" :error="errorCarga" @reintentar="cargarResumen">
       <section v-if="periodoVigente" class="estado-periodo vigente" aria-labelledby="titulo-periodo">
         <div>
-          <h2 id="titulo-periodo">Periodo de matrícula {{ periodoVigente.anhio }}</h2>
+          <h2 id="titulo-periodo">Periodo de matrícula vigente</h2>
           <p>
-            Del {{ formatearFecha(periodoVigente.fechaInicio) }} al {{ formatearFecha(periodoVigente.fechaFin) }}.
-            {{ describirDiasRestantes(periodoVigente.fechaFin, fechaHoy) }}
+            Del {{ formatearFecha(periodoVigente.fechaInicio) }} al {{ formatearFecha(periodoVigente.fechaLimite) }}.
+            {{ describirDiasRestantes(periodoVigente.fechaLimite, fechaHoy) }} Las matrículas son para el año escolar
+            {{ anhio }}.
           </p>
         </div>
         <InsigniaEstado texto="Vigente" variante="exito" />
@@ -82,8 +116,8 @@ const motivoBloqueo = computed(() => {
         <div>
           <h2 id="titulo-periodo">No hay un periodo de matrícula vigente</h2>
           <p v-if="proximoPeriodo">
-            El periodo {{ proximoPeriodo.anhio }} va del {{ formatearFecha(proximoPeriodo.fechaInicio) }} al
-            {{ formatearFecha(proximoPeriodo.fechaFin) }}.
+            El próximo periodo va del {{ formatearFecha(proximoPeriodo.fechaInicio) }} al
+            {{ formatearFecha(proximoPeriodo.fechaLimite) }}.
             {{ describirDiasParaInicio(proximoPeriodo.fechaInicio, fechaHoy) }}
             Las matrículas solo se registran dentro del periodo.
           </p>
@@ -107,29 +141,53 @@ const motivoBloqueo = computed(() => {
 
         <article v-if="puede('PERIODO_CONFIGURAR')" class="tarjeta-accion" :class="{ destacada: !periodoVigente }">
           <h2>Periodo de matrícula</h2>
-          <p>Configura la fecha de inicio y la fecha límite del periodo de cada año escolar.</p>
+          <p>Configura la fecha de inicio y la fecha límite del periodo de matrícula.</p>
 
           <BotonAccion :variante="periodoVigente ? 'secundario' : 'primario'" destino="/matriculas/periodo">
             Configurar periodo
           </BotonAccion>
         </article>
 
-        <article v-if="puede('PERIODO_CONFIGURAR')" class="tarjeta-accion">
-          <h2>Año escolar por secciones</h2>
-          <p>Abre los periodos de clases y consulta las vacantes de cada grado y sección.</p>
-          <BotonAccion variante="secundario" destino="/matriculas/periodos-anuales">
-            Gestionar año escolar
-          </BotonAccion>
+        <article v-if="puede('SECCION_VER')" class="tarjeta-accion" :class="{ destacada: !resumenAnhio }">
+          <h2 class="titulo-anhio">
+            Año escolar {{ anhio }}
+            <InsigniaEstado
+              :texto="resumenAnhio ? obtenerEtiquetaEstadoAnhio(resumenAnhio.estado) : 'Sin abrir'"
+              :variante="resumenAnhio ? obtenerVarianteEstadoAnhio(resumenAnhio.estado) : 'neutro'"
+            />
+          </h2>
+
+          <template v-if="resumenAnhio">
+            <p>Revisa la capacidad y las vacantes de cada grado y sección.</p>
+            <small class="dato-anhio">
+              Clases del <strong>{{ formatearFecha(resumenAnhio.fechaInicio) }}</strong> al
+              <strong>{{ formatearFecha(resumenAnhio.fechaFin) }}</strong>
+            </small>
+            <BotonAccion variante="secundario" :destino="enlaceVacantes">Ver secciones de {{ anhio }}</BotonAccion>
+          </template>
+
+          <template v-else>
+            <p>Crea el periodo de clases de cada sección para poder matricular en {{ anhio }}.</p>
+            <small class="dato-anhio">
+              <strong>{{ cantidadSecciones }}</strong>
+              {{ cantidadSecciones === 1 ? 'sección por abrir' : 'secciones por abrir' }}
+            </small>
+            <BotonAccion :destino="enlaceAbrirAnhio">Abrir año escolar {{ anhio }}</BotonAccion>
+          </template>
         </article>
       </section>
 
       <section class="vacantes" aria-labelledby="titulo-vacantes">
         <header class="encabezado-vacantes">
-          <h2 id="titulo-vacantes">Vacantes del año escolar</h2>
-          <NuxtLink v-if="puede('SECCION_VER')" to="/secciones" class="enlace">Ver detalle por sección</NuxtLink>
+          <h2 id="titulo-vacantes">Vacantes del año escolar {{ anhio }}</h2>
+          <NuxtLink v-if="puede('SECCION_VER')" :to="enlaceVacantes" class="enlace">Ver detalle por sección</NuxtLink>
         </header>
 
-        <div class="indicadores">
+        <p v-if="!anhioAbierto" class="aviso-anhio">
+          Cuando abras el año escolar {{ anhio }}, aquí verás las vacantes de cada sección.
+        </p>
+
+        <div v-else class="indicadores">
           <div class="indicador">
             <span>Capacidad total</span>
             <strong>{{ resumen.capacidad }}</strong>
@@ -199,8 +257,24 @@ const motivoBloqueo = computed(() => {
 
 .acciones {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
+}
+
+.titulo-anhio {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.dato-anhio {
+  color: #434655;
+  font-size: 13px;
+}
+
+.dato-anhio strong {
+  color: #191c1e;
 }
 
 .tarjeta-accion {
@@ -309,7 +383,21 @@ const motivoBloqueo = computed(() => {
   background: #fef2f2;
 }
 
+.aviso-anhio {
+  margin: 0;
+  padding: 14px 20px;
+  border: 1px dashed #c3c6d7;
+  border-radius: 10px;
+  background: white;
+  color: #434655;
+  font-size: 14px;
+}
+
 @media (max-width: 960px) {
+  .acciones {
+    grid-template-columns: 1fr;
+  }
+
   .indicadores {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -323,10 +411,6 @@ const motivoBloqueo = computed(() => {
   .estado-periodo {
     align-items: flex-start;
     flex-direction: column;
-  }
-
-  .acciones {
-    grid-template-columns: 1fr;
   }
 
   .indicadores {
