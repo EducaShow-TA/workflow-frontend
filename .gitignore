@@ -13,6 +13,9 @@ node_modules
 coverage/
 .eslintcache
 
+# Nuxt no lee vite.config.*: la configuracion de Vite va en nuxt.config.ts (clave `vite`)
+vite.config.*
+
 # Logs
 logs
 *.log
