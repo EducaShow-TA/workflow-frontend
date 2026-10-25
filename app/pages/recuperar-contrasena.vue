@@ -14,7 +14,7 @@ definePageMeta({
 const ruta = useRoute()
 const { solicitarRecuperacion } = useRecuperacionContrasena()
 
-const correo = ref(typeof ruta.query.correo === 'string' ? ruta.query.correo : '')
+const correo = ref(typeof ruta.query.correo === 'string' && ruta.query.correo.includes('@') ? ruta.query.correo : '')
 const errorCorreo = ref('')
 const errorEnvio = ref('')
 const enviando = ref(false)
@@ -82,7 +82,7 @@ onBeforeUnmount(() => clearInterval(temporizador))
 <template>
   <section v-if="!enviado">
     <EncabezadoAcceso titulo="Recuperar contraseña" icono="llave">
-      Ingresa el correo con el que inicias sesión y te enviaremos un enlace para crear una nueva contraseña.
+      Ingresa el correo electrónico de contacto de tu cuenta y te enviaremos un enlace para crear una nueva contraseña.
     </EncabezadoAcceso>
 
     <form class="formulario" novalidate @submit.prevent="enviarInstrucciones">
@@ -92,7 +92,7 @@ onBeforeUnmount(() => clearInterval(temporizador))
         etiqueta="Correo electrónico"
         tipo="email"
         marcador="tu@correo.com"
-        autocompletado="username"
+        autocompletado="email"
         :error="errorCorreo"
       />
 

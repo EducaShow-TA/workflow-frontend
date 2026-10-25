@@ -4,6 +4,7 @@ import type { CuentaUsuario, ErroresCuenta, FormularioCuenta } from '~/types/cue
 import {
   LONGITUD_DNI,
   LONGITUD_MAXIMA_CORREO,
+  LONGITUD_MAXIMA_USUARIO,
   LONGITUD_MINIMA_PASSWORD,
   construirSolicitud,
   crearFormularioVacio,
@@ -165,20 +166,35 @@ async function cancelar(): Promise<void> {
             </div>
 
             <div class="campo ancho-completo">
-              <label for="correo">Correo electrónico <span class="obligatorio">*</span></label>
+              <label for="username">Usuario de acceso <span class="obligatorio">*</span></label>
               <input
-                id="correo"
+                id="username"
                 v-model="formulario.username"
-                type="email"
-                :maxlength="LONGITUD_MAXIMA_CORREO"
-                placeholder="nombre@colegio.edu.pe"
+                type="text"
+                :maxlength="LONGITUD_MAXIMA_USUARIO"
+                placeholder="ana.perez01"
                 autocomplete="off"
                 :aria-invalid="Boolean(errores.username)"
-                aria-describedby="ayuda-correo"
+                aria-describedby="ayuda-username"
                 @input="limpiarError('username')"
               />
               <small v-if="errores.username" class="error">{{ errores.username }}</small>
-              <small id="ayuda-correo" class="ayuda">Es el usuario con el que iniciará sesión.</small>
+              <small id="ayuda-username" class="ayuda">Puede ser diferente del correo de contacto.</small>
+            </div>
+
+            <div class="campo ancho-completo">
+              <label for="correo">Correo electrónico de contacto <span class="obligatorio">*</span></label>
+              <input
+                id="correo"
+                v-model="formulario.correo"
+                type="email"
+                :maxlength="LONGITUD_MAXIMA_CORREO"
+                placeholder="nombre@colegio.edu.pe"
+                autocomplete="email"
+                :aria-invalid="Boolean(errores.correo)"
+                @input="limpiarError('correo')"
+              />
+              <small v-if="errores.correo" class="error">{{ errores.correo }}</small>
             </div>
           </div>
         </section>

@@ -7,43 +7,40 @@ definePageMeta({
 
 const autenticacion = useAutenticacionStore()
 
-const correoElectronico = ref('')
+const identificador = ref('')
 const contrasenia = ref('')
 const mostrarContrasenia = ref(false)
 const mensajeInformativo = ref('')
 const credencialesInvalidas = ref(false)
-const avisoCorreoActualizado = ref('')
+const avisoUsuarioActualizado = ref('')
 
-const correoActualizado = autenticacion.tomarCorreoActualizado()
+const usuarioActualizado = autenticacion.tomarUsuarioActualizado()
 
-if (correoActualizado) {
-  correoElectronico.value = correoActualizado
-  avisoCorreoActualizado.value = 'Tu correo se actualizó. Inicia sesión con el nuevo correo.'
+if (usuarioActualizado) {
+  identificador.value = usuarioActualizado
+  avisoUsuarioActualizado.value = 'Tu usuario se actualizó. Inicia sesión con el nuevo usuario.'
 }
 
 const errores = reactive({
-  correoElectronico: '',
+  identificador: '',
   contrasenia: '',
 })
 
 function validarFormulario(): boolean {
-  const correo = correoElectronico.value.trim()
-  const formatoCorreo = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  const valor = identificador.value.trim()
 
-  errores.correoElectronico = ''
+  errores.identificador = ''
   errores.contrasenia = ''
 
-  if (!correo) {
-    errores.correoElectronico = 'El correo electrónico es obligatorio.'
-  } else if (!formatoCorreo.test(correo)) {
-    errores.correoElectronico = 'Ingresa un correo electrónico válido.'
+  if (!valor) {
+    errores.identificador = 'El usuario o correo es obligatorio.'
   }
 
   if (!contrasenia.value) {
     errores.contrasenia = 'La contraseña es obligatoria.'
   }
 
-  return !errores.correoElectronico && !errores.contrasenia
+  return !errores.identificador && !errores.contrasenia
 }
 
 async function procesarInicioSesion(): Promise<void> {
@@ -54,7 +51,7 @@ async function procesarInicioSesion(): Promise<void> {
     return
   }
 
-  const resultado = await autenticacion.iniciarSesion(correoElectronico.value.trim(), contrasenia.value)
+  const resultado = await autenticacion.iniciarSesion(identificador.value.trim(), contrasenia.value)
 
   if (!resultado.exito) {
     credencialesInvalidas.value = resultado.estado === 401
@@ -66,8 +63,8 @@ async function procesarInicioSesion(): Promise<void> {
 }
 
 function irARecuperacion(): void {
-  const correo = correoElectronico.value.trim()
-  void navigateTo({ path: '/recuperar-contrasena', query: correo ? { correo } : {} })
+  const correo = identificador.value.trim()
+  void navigateTo({ path: '/recuperar-contrasena', query: correo.includes('@') ? { correo } : {} })
 }
 </script>
 
@@ -85,17 +82,17 @@ function irARecuperacion(): void {
       <p>Ingresa tus credenciales para acceder al portal.</p>
     </header>
 
-    <AvisoMensaje v-if="avisoCorreoActualizado" class="aviso-correo" :mensaje="avisoCorreoActualizado" tipo="exito" />
+    <AvisoMensaje v-if="avisoUsuarioActualizado" class="aviso-correo" :mensaje="avisoUsuarioActualizado" tipo="exito" />
 
     <form class="formulario" novalidate @submit.prevent="procesarInicioSesion">
       <CampoFormulario
-        id="correo-electronico"
-        v-model:valor="correoElectronico"
-        etiqueta="Correo Electrónico"
-        tipo="email"
-        marcador="a@a.com"
+        id="identificador"
+        v-model:valor="identificador"
+        etiqueta="Usuario o correo electrónico"
+        tipo="text"
+        marcador="usuario o correo@colegio.edu.pe"
         autocompletado="username"
-        :error="errores.correoElectronico"
+        :error="errores.identificador"
       />
 
       <CampoFormulario
@@ -132,7 +129,7 @@ function irARecuperacion(): void {
       <BotonPrincipal tipo="submit"> Iniciar sesión </BotonPrincipal>
 
       <p v-if="credencialesInvalidas" class="mensaje-error-acceso" role="alert">
-        Correo o contraseña incorrectos. Después de {{ INTENTOS_ANTES_DE_BLOQUEO }} intentos fallidos la cuenta se
+        Usuario/correo o contraseña incorrectos. Después de {{ INTENTOS_ANTES_DE_BLOQUEO }} intentos fallidos la cuenta se
         bloquea por {{ MINUTOS_BLOQUEO }} minutos.
         <button type="button" class="enlace-recuperacion" @click="irARecuperacion">Restablece tu contraseña</button>
         si no la recuerdas.
