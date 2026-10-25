@@ -3,6 +3,7 @@ import type { RolUsuario } from '~/types/autenticacion'
 export interface CuentaUsuario {
   id: number
   username: string
+  correo: string | null
   rol: RolUsuario
   nombreCompleto: string
   dni: string
@@ -18,6 +19,7 @@ export interface SolicitudCrearCuenta {
   apellidoPaterno: string
   apellidoMaterno: string
   username: string
+  correo: string
   password: string
   rol: RolUsuario
 }
@@ -27,6 +29,7 @@ export interface SolicitudActualizarCuenta {
   apellidoPaterno: string
   apellidoMaterno: string
   username: string
+  correo: string
 }
 
 export interface FormularioCuenta extends Omit<SolicitudCrearCuenta, 'rol'> {

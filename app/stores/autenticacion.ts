@@ -17,9 +17,9 @@ export const useAutenticacionStore = defineStore('autenticacion', () => {
 
   const autenticado = computed(() => token.value !== null && usuario.value !== null)
 
-  async function iniciarSesion(correoElectronico: string, contrasenia: string): Promise<ResultadoAutenticacion> {
+  async function iniciarSesion(identificador: string, contrasenia: string): Promise<ResultadoAutenticacion> {
     const { solicitar } = useApi()
-    const cuerpo: SolicitudInicioSesion = { username: correoElectronico, password: contrasenia }
+    const cuerpo: SolicitudInicioSesion = { username: identificador, password: contrasenia }
 
     try {
       const respuesta = await solicitar<RespuestaInicioSesion>('/api/v1/auth/login', { metodo: 'POST', cuerpo })
@@ -40,18 +40,18 @@ export const useAutenticacionStore = defineStore('autenticacion', () => {
     usuario.value = null
   }
 
-  // El token identifica al usuario por su correo: si lo cambia, debe volver a iniciar sesión con el nuevo.
-  const correoActualizado = ref('')
+  // El token identifica la cuenta por username; al cambiarlo debe volver a iniciar sesión.
+  const usuarioActualizado = ref('')
 
-  function cerrarSesionPorCambioDeCorreo(nuevoCorreo: string): void {
+  function cerrarSesionPorCambioDeUsuario(nuevoUsuario: string): void {
     cerrarSesion()
-    correoActualizado.value = nuevoCorreo
+    usuarioActualizado.value = nuevoUsuario
   }
 
-  function tomarCorreoActualizado(): string {
-    const correo = correoActualizado.value
-    correoActualizado.value = ''
-    return correo
+  function tomarUsuarioActualizado(): string {
+    const username = usuarioActualizado.value
+    usuarioActualizado.value = ''
+    return username
   }
 
   return {
@@ -60,7 +60,7 @@ export const useAutenticacionStore = defineStore('autenticacion', () => {
     autenticado,
     iniciarSesion,
     cerrarSesion,
-    cerrarSesionPorCambioDeCorreo,
-    tomarCorreoActualizado,
+    cerrarSesionPorCambioDeUsuario,
+    tomarUsuarioActualizado,
   }
 })

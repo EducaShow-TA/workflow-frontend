@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import type { CuentaUsuario, ErroresEdicion, SolicitudActualizarCuenta } from '~/types/cuentaUsuario'
 import {
   LONGITUD_MAXIMA_CORREO,
+  LONGITUD_MAXIMA_USUARIO,
   MOTIVO_ROL_FIJO,
   construirSolicitudEdicion,
   crearFormularioEdicion,
@@ -39,6 +40,7 @@ const formulario = reactive<SolicitudActualizarCuenta>({
   apellidoPaterno: '',
   apellidoMaterno: '',
   username: '',
+  correo: '',
 })
 const errores = reactive<ErroresEdicion>({})
 const guardando = ref(false)
@@ -88,7 +90,7 @@ const ayudaEstado = computed(() => {
 })
 
 const mensajeEstado = ref('')
-const confirmandoCambioCorreo = ref(false)
+const confirmandoCambioUsuario = ref(false)
 
 const {
   cuentaPorDesactivar,
@@ -117,7 +119,7 @@ function limpiarError(campo: keyof SolicitudActualizarCuenta): void {
   errorGuardado.value = ''
 }
 
-const cambiaCorreoPropio = computed(
+const cambiaUsuarioPropio = computed(
   () =>
     esPropia.value &&
     cuenta.value !== null &&
@@ -136,8 +138,8 @@ async function guardar(): Promise<void> {
     return
   }
 
-  if (cambiaCorreoPropio.value) {
-    confirmandoCambioCorreo.value = true
+  if (cambiaUsuarioPropio.value) {
+    confirmandoCambioUsuario.value = true
     return
   }
 
@@ -151,13 +153,13 @@ async function enviarCambios(): Promise<void> {
 
   guardando.value = true
   errorGuardado.value = ''
-  const cerrarSesion = cambiaCorreoPropio.value
+  const cerrarSesion = cambiaUsuarioPropio.value
 
   try {
     const actualizada = await actualizarCuenta(cuenta.value.id, construirSolicitudEdicion(formulario))
 
     if (cerrarSesion) {
-      autenticacion.cerrarSesionPorCambioDeCorreo(actualizada.username)
+      autenticacion.cerrarSesionPorCambioDeUsuario(actualizada.username)
       await navigateTo('/login')
       return
     }
@@ -169,7 +171,7 @@ async function enviarCambios(): Promise<void> {
     await navigateTo({ path: '/usuarios', query: { editado: actualizada.username } })
   } catch (error: unknown) {
     errorGuardado.value = obtenerMensajeError(error, 'No se pudieron guardar los cambios.')
-    confirmandoCambioCorreo.value = false
+    confirmandoCambioUsuario.value = false
   } finally {
     guardando.value = false
   }
@@ -263,24 +265,29 @@ async function cancelar(): Promise<void> {
               </div>
 
               <div class="campo ancho-completo">
-                <label for="correo">Correo electrónico <span class="obligatorio">*</span></label>
+                <label for="username">Usuario de acceso <span class="obligatorio">*</span></label>
                 <input
-                  id="correo"
+                  id="username"
                   v-model="formulario.username"
-                  type="email"
-                  :maxlength="LONGITUD_MAXIMA_CORREO"
+                  type="text"
+                  :maxlength="LONGITUD_MAXIMA_USUARIO"
                   autocomplete="off"
                   :aria-invalid="Boolean(errores.username)"
-                  aria-describedby="ayuda-correo"
+                  aria-describedby="ayuda-username"
                   @input="limpiarError('username')"
                 />
                 <small v-if="errores.username" class="error">{{ errores.username }}</small>
-                <small v-if="esPropia" id="ayuda-correo" class="aviso-correo-propio">
-                  Es tu cuenta: si cambias el correo, se cerrará tu sesión y deberás ingresar con el nuevo.
+                <small v-if="esPropia" id="ayuda-username" class="aviso-correo-propio">
+                  Si cambias tu usuario de acceso, se cerrará tu sesión y tendrás que iniciar con el nuevo usuario.
                 </small>
-                <small v-else id="ayuda-correo" class="ayuda">
-                  Es el usuario con el que inicia sesión: si lo cambias, deberá ingresar con el nuevo correo.
+                <small v-else id="ayuda-username" class="ayuda">
+                  Es el identificador usado para iniciar sesión; puede ser distinto del correo.
                 </small>
+              </div>
+              <div class="campo ancho-completo">
+                <label for="correo">Correo electrónico de contacto <span class="obligatorio">*</span></label>
+                <input id="correo" v-model="formulario.correo" type="email" :maxlength="LONGITUD_MAXIMA_CORREO" autocomplete="email" :aria-invalid="Boolean(errores.correo)" @input="limpiarError('correo')" />
+                <small v-if="errores.correo" class="error">{{ errores.correo }}</small>
               </div>
             </div>
           </section>
@@ -329,13 +336,13 @@ async function cancelar(): Promise<void> {
     />
 
     <VentanaConfirmacion
-      :abierta="confirmandoCambioCorreo"
-      titulo="Cambiar tu correo"
-      :mensaje="`Tu nuevo correo será ${normalizarCorreo(formulario.username)}. Al guardar se cerrará tu sesión: ingresa de nuevo con el nuevo correo y tu misma contraseña.`"
+      :abierta="confirmandoCambioUsuario"
+      titulo="Cambiar tu usuario"
+      :mensaje="`Tu nuevo usuario será ${formulario.username.trim()}. Al guardar se cerrará tu sesión: inicia sesión nuevamente con el usuario nuevo y tu misma contraseña.`"
       texto-confirmar="Guardar y cerrar sesión"
       :procesando="guardando"
       @confirmar="enviarCambios"
-      @cancelar="confirmandoCambioCorreo = false"
+      @cancelar="confirmandoCambioUsuario = false"
     />
   </main>
 </template>

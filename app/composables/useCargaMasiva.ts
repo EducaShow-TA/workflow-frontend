@@ -14,7 +14,7 @@ const RUTA_CARGA = '/api/v1/cuentas-usuario/carga-masiva'
 
 // Reflejan LectorCsvUsuarios y la configuración multipart del backend.
 export const COLUMNAS_OBLIGATORIAS = ['rol', 'dni', 'nombres', 'apellido_paterno', 'apellido_materno', 'correo']
-export const COLUMNAS_OPCIONALES = ['telefono', 'fecha_nacimiento', 'dni_apoderado', 'parentesco']
+export const COLUMNAS_OPCIONALES = ['username', 'telefono', 'fecha_nacimiento', 'dni_apoderado', 'parentesco']
 export const ROLES_CARGA = ['DOCENTE', 'ALUMNO', 'APODERADO']
 export const MAXIMO_FILAS = 500
 export const MAXIMO_BYTES = 10 * 1024 * 1024
@@ -212,7 +212,7 @@ export function combinarFilas(resultado: ResultadoCargaMasiva, csv: CsvLeido | n
       fila: error.fila,
       rol: (original.rol ?? '').toUpperCase(),
       dni: original.dni ?? '',
-      username: original.correo ?? '',
+      username: original.username ?? original.correo ?? '',
       estado: 'RECHAZADA',
       motivos: [error],
     })

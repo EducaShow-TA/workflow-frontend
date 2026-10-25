@@ -22,9 +22,9 @@ export interface RespuestaInicioSesion {
   usuario: UsuarioPerfil
 }
 
-/** Cuerpo de POST /api/v1/auth/forgot-password: el usuario es el correo de inicio de sesión. */
+/** Cuerpo de POST /api/v1/auth/forgot-password. */
 export interface SolicitudRecuperacion {
-  username: string
+  correo: string
 }
 
 /** Cuerpo de POST /api/v1/auth/reset-password. */

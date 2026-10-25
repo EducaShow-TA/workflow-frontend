@@ -72,7 +72,7 @@ onMounted(async () => {
   if (usernameEditado) {
     const cuentaEditada = cuentas.value.find((cuenta) => cuenta.username === usernameEditado)
     mensajeExito.value = cuentaEditada
-      ? `Se actualizaron los datos de ${cuentaEditada.nombreCompleto} (correo ${cuentaEditada.username}).`
+      ? `Se actualizaron los datos de ${cuentaEditada.nombreCompleto} (usuario ${cuentaEditada.username}).`
       : `Se actualizaron los datos de la cuenta ${usernameEditado}.`
   }
 })
@@ -243,7 +243,8 @@ function irAPagina(pagina: number): void {
 
                     <span class="datos-usuario">
                       <strong>{{ cuenta.nombreCompleto }}</strong>
-                      <small>{{ cuenta.username }}</small>
+                      <small>Usuario: {{ cuenta.username }}</small>
+                      <small>Correo de contacto: {{ cuenta.correo || 'No registrado' }}</small>
                     </span>
                   </div>
                 </td>

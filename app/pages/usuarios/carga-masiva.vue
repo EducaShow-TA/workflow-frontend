@@ -331,6 +331,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', avisarAntesDeCe
               <th scope="col">Rol</th>
               <th scope="col">DNI</th>
               <th scope="col">Nombre</th>
+              <th scope="col">Usuario</th>
               <th scope="col">Correo</th>
               <th scope="col">Apoderado</th>
             </tr>
@@ -347,6 +348,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', avisarAntesDeCe
                     .join(' ') || '—'
                 }}
               </td>
+              <td>{{ fila.valores.username || 'Se usará el correo' }}</td>
               <td>
                 <InsigniaEstado v-if="!fila.valores.correo" texto="vacío" variante="advertencia" />
                 <template v-else>{{ fila.valores.correo }}</template>
@@ -450,7 +452,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', avisarAntesDeCe
                     <th scope="col">Fila</th>
                     <th scope="col">Rol</th>
                     <th scope="col">DNI</th>
-                    <th scope="col">Usuario (correo)</th>
+                    <th scope="col">Usuario</th>
                     <th scope="col">Contraseña temporal</th>
                   </tr>
                 </thead>

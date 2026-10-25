@@ -17,7 +17,8 @@ import { ROLES } from '~/composables/usePermisosRol'
 
 export const RUTA_CUENTAS = '/api/v1/cuentas-usuario'
 export const LONGITUD_DNI = 8
-export const LONGITUD_MAXIMA_CORREO = 50
+export const LONGITUD_MAXIMA_CORREO = 254
+export const LONGITUD_MAXIMA_USUARIO = 50
 export const LONGITUD_MAXIMA_NOMBRE_PERSONA = 100
 export const LONGITUD_MINIMA_PASSWORD = 8
 export const CUENTAS_POR_PAGINA = 10
@@ -33,6 +34,7 @@ export function crearFormularioVacio(): FormularioCuenta {
     apellidoPaterno: '',
     apellidoMaterno: '',
     username: '',
+    correo: '',
     password: '',
     confirmacionPassword: '',
     rol: '',
@@ -45,6 +47,7 @@ export function crearFormularioEdicion(cuenta: CuentaUsuario): SolicitudActualiz
     apellidoPaterno: cuenta.apellidoPaterno ?? '',
     apellidoMaterno: cuenta.apellidoMaterno ?? '',
     username: cuenta.username,
+    correo: cuenta.correo ?? '',
   }
 }
 
@@ -52,9 +55,14 @@ export function tieneNombreSeparado(cuenta: CuentaUsuario): boolean {
   return Boolean(cuenta.nombre && cuenta.apellidoPaterno && cuenta.apellidoMaterno)
 }
 
+export function existeUsuario(cuentas: CuentaUsuario[], username: string, idExcluido?: number): boolean {
+  const buscado = username.trim().toLocaleLowerCase()
+  return cuentas.some((cuenta) => cuenta.id !== idExcluido && cuenta.username.trim().toLocaleLowerCase() === buscado)
+}
+
 export function existeCorreo(cuentas: CuentaUsuario[], correo: string, idExcluido?: number): boolean {
   const buscado = normalizarCorreo(correo)
-  return cuentas.some((cuenta) => cuenta.id !== idExcluido && normalizarCorreo(cuenta.username) === buscado)
+  return cuentas.some((cuenta) => cuenta.id !== idExcluido && normalizarCorreo(cuenta.correo ?? '') === buscado)
 }
 
 export function existeDni(cuentas: CuentaUsuario[], dni: string): boolean {
@@ -72,6 +80,14 @@ function validarNombre(valor: string, etiqueta: string): string | undefined {
     return `${etiqueta} no debe superar los ${LONGITUD_MAXIMA_NOMBRE_PERSONA} caracteres.`
   }
 
+  return undefined
+}
+
+function validarUsuario(valor: string, cuentas: CuentaUsuario[], idExcluido?: number): string | undefined {
+  const username = valor.trim()
+  if (!username) return 'El usuario es obligatorio.'
+  if (username.length > LONGITUD_MAXIMA_USUARIO) return `El usuario no debe superar los ${LONGITUD_MAXIMA_USUARIO} caracteres.`
+  if (existeUsuario(cuentas, username, idExcluido)) return 'Ya existe ese usuario.'
   return undefined
 }
 
@@ -106,7 +122,8 @@ function validarDatosPersonales(
     nombre: validarNombre(formulario.nombre, 'El nombre'),
     apellidoPaterno: validarNombre(formulario.apellidoPaterno, 'El apellido paterno'),
     apellidoMaterno: validarNombre(formulario.apellidoMaterno, 'El apellido materno'),
-    username: validarCorreo(formulario.username, cuentas, idExcluido),
+    username: validarUsuario(formulario.username, cuentas, idExcluido),
+    correo: validarCorreo(formulario.correo, cuentas, idExcluido),
   }
 }
 
@@ -163,7 +180,8 @@ export function construirSolicitudEdicion(formulario: SolicitudActualizarCuenta)
     nombre: normalizarNombre(formulario.nombre),
     apellidoPaterno: normalizarNombre(formulario.apellidoPaterno),
     apellidoMaterno: normalizarNombre(formulario.apellidoMaterno),
-    username: normalizarCorreo(formulario.username),
+    username: formulario.username.trim(),
+    correo: normalizarCorreo(formulario.correo),
   }
 }
 
@@ -219,6 +237,7 @@ export function filtrarCuentas(
       !buscado ||
       normalizarParaBuscar(cuenta.nombreCompleto).includes(buscado) ||
       normalizarParaBuscar(cuenta.username).includes(buscado) ||
+      normalizarParaBuscar(cuenta.correo ?? '').includes(buscado) ||
       cuenta.dni.includes(buscado)
 
     return coincideRol && coincideEstado && coincideTexto
