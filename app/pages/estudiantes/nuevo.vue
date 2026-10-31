@@ -22,6 +22,7 @@ const mensajeEstado = ref('')
 const pasoApoderados = ref<InstanceType<typeof PasoApoderados> | null>(null)
 
 const pasos = ['Datos Personales', 'Contacto', 'Apoderados', 'Confirmación']
+const formatoUsuario = /^[A-Za-z0-9]+$/
 const { solicitar } = useApi()
 const enviando = ref(false)
 
@@ -149,6 +150,8 @@ function validarContacto(): boolean {
     errores.username = 'El usuario es obligatorio.'
   } else if (formulario.username.length > 50) {
     errores.username = 'El usuario no debe superar 50 caracteres.'
+  } else if (!formatoUsuario.test(formulario.username.trim())) {
+    errores.username = 'El usuario solo puede contener letras y números.'
   }
 
   if (formulario.password.length < 8 || formulario.password.length > 72) {
@@ -416,8 +419,9 @@ async function registrarEstudiante(): Promise<void> {
         <div v-else-if="pasoActual === 2" class="contenido-formulario">
           <div class="campo">
             <label for="username">Usuario <span class="obligatorio">*</span></label>
-            <input id="username" v-model="formulario.username" type="text" autocomplete="username" required placeholder="alumno01" :aria-invalid="Boolean(errores.username)" />
+            <input id="username" v-model="formulario.username" type="text" autocomplete="username" pattern="[A-Za-z0-9]+" maxlength="50" required placeholder="alumno01" :aria-invalid="Boolean(errores.username)" aria-describedby="ayuda-username" />
             <small v-if="errores.username" class="error">{{ errores.username }}</small>
+            <small id="ayuda-username" class="ayuda">Usa solo letras y números; el correo se registra en su campo aparte.</small>
           </div>
           <div class="campo">
             <label for="password">Contraseña inicial <span class="obligatorio">*</span></label>
