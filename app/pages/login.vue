@@ -54,7 +54,7 @@ async function procesarInicioSesion(): Promise<void> {
   const resultado = await autenticacion.iniciarSesion(identificador.value.trim(), contrasenia.value)
 
   if (!resultado.exito) {
-    credencialesInvalidas.value = resultado.estado === 401
+    credencialesInvalidas.value = resultado.estado === 401 && resultado.mensaje === 'Credenciales inválidas'
     mensajeInformativo.value = resultado.mensaje
     return
   }
@@ -135,7 +135,7 @@ function irARecuperacion(): void {
         si no la recuerdas.
       </p>
 
-      <p v-else-if="mensajeInformativo" class="mensaje-informativo" role="status">
+      <p v-else-if="mensajeInformativo" class="mensaje-informativo" role="alert">
         {{ mensajeInformativo }}
       </p>
     </form>
