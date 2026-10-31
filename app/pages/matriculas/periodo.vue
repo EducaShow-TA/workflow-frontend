@@ -326,6 +326,7 @@ async function confirmarDesactivacion(): Promise<void> {
               id="fecha-inicio"
               v-model="formulario.fechaInicio"
               type="date"
+              :min="fechaHoy"
               :aria-invalid="Boolean(errores.fechaInicio)"
               :aria-describedby="errores.fechaInicio ? 'error-fecha-inicio' : undefined"
               @input="errores.fechaInicio = undefined"

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import type { EstudianteMatriculable, MatriculaApi } from '~/types/matricula'
 import type { PeriodoAcademico } from '~/types/periodoAcademico'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
@@ -14,7 +14,7 @@ definePageMeta({ middleware: 'autenticacion' })
 const { listar } = useEstudiantesMatriculables()
 const { listarPorAnhio } = usePeriodosAcademicos()
 const { obtenerPeriodoVigente } = usePeriodoMatricula()
-const { registrar, confirmar } = useMatriculas()
+const { registrar, registrarMasivamente, confirmar, confirmarMasivamente } = useMatriculas()
 
 const estudiantes = ref<EstudianteMatriculable[]>([])
 const periodos = ref<PeriodoAcademico[]>([])
@@ -26,6 +26,8 @@ const cargando = ref(true)
 const guardando = ref(false)
 const error = ref('')
 const aviso = ref('')
+const seleccionPendientes = ref<number[]>([])
+const estudiantesSeleccionados = ref<number[]>([])
 
 const anhioMatricula = computed(() => (ventanaVigente.value ? obtenerAnhio(ventanaVigente.value.fechaLimite) : null))
 const periodoSeleccionado = computed(() => periodos.value.find((periodo) => periodo.periodoId === periodoId.value))
@@ -39,6 +41,11 @@ const estudiantesDisponibles = computed(() => {
     ),
   )
 })
+const pendientesDeConfirmacion = computed(() => {
+  if (!periodoSeleccionado.value) return []
+  return estudiantes.value.filter((e) => e.matriculas.some((m) =>
+    m.periodoId === periodoSeleccionado.value!.periodoId && m.estado === 'EN_REGISTRO'))
+})
 
 const estudianteSeleccionado = computed(() =>
   estudiantesDisponibles.value.find((estudiante) => estudiante.estudianteId === estudianteId.value),
@@ -50,6 +57,12 @@ const matriculados = computed(() => periodoSeleccionado.value?.matriculasActivas
 const ocupacion = computed(() =>
   capacidadMaxima.value > 0 ? Math.min(100, Math.round((matriculados.value / capacidadMaxima.value) * 100)) : 0,
 )
+
+watch(periodoId, () => {
+  seleccionPendientes.value = []
+  estudiantesSeleccionados.value = []
+})
+const maximoSeleccion = computed(() => Math.min(vacantesDisponibles.value, estudiantesDisponibles.value.length))
 
 const estadoCupos = computed(() => {
   if (!periodoSeleccionado.value) return 'sin-datos'
@@ -132,6 +145,24 @@ async function registrarMatricula(): Promise<void> {
   }
 }
 
+async function registrarSeleccion(): Promise<void> {
+  if (!periodoSeleccionado.value || estudiantesSeleccionados.value.length === 0) return
+  guardando.value = true
+  error.value = ''
+  aviso.value = ''
+  try {
+    const resultados = await registrarMasivamente(periodoSeleccionado.value.periodoId, estudiantesSeleccionados.value)
+    estudiantesSeleccionados.value = []
+    matriculaPendiente.value = null
+    await cargarDatos()
+    aviso.value = `Se registraron ${resultados.length} matrículas en la sección seleccionada; quedan pendientes de confirmación.`
+  } catch (fallo: unknown) {
+    error.value = obtenerMensajeError(fallo, 'No se pudieron registrar las matrículas seleccionadas.')
+  } finally {
+    guardando.value = false
+  }
+}
+
 async function confirmarMatricula(): Promise<void> {
   if (!matriculaPendiente.value) return
 
@@ -144,6 +175,22 @@ async function confirmarMatricula(): Promise<void> {
     aviso.value = `Matrícula confirmada correctamente (N.° ${resultado.matriculaId}).`
   } catch (fallo: unknown) {
     error.value = obtenerMensajeError(fallo, 'La matrícula quedó registrada, pero no se pudo confirmar.')
+  } finally {
+    guardando.value = false
+  }
+}
+
+async function confirmarSeleccion(): Promise<void> {
+  if (!periodoSeleccionado.value || seleccionPendientes.value.length === 0) return
+  guardando.value = true
+  error.value = ''
+  try {
+    const resultados = await confirmarMasivamente(periodoSeleccionado.value.periodoId, seleccionPendientes.value)
+    seleccionPendientes.value = []
+    await cargarDatos()
+    aviso.value = `Se confirmaron ${resultados.length} matrículas.`
+  } catch (fallo: unknown) {
+    error.value = obtenerMensajeError(fallo, 'No se pudieron confirmar las matrículas seleccionadas.')
   } finally {
     guardando.value = false
   }
@@ -208,6 +255,24 @@ onMounted(cargarDatos)
         <p v-else class="aviso-neutral" role="status">
           {{ estudiantes.length ? 'Todos los estudiantes ya tienen matrícula en este periodo.' : 'No hay estudiantes registrados. Registra un estudiante antes de continuar.' }}
         </p>
+        <div v-if="estudiantesDisponibles.length && periodoSeleccionado" class="lista-seleccion-estudiantes">
+          <div class="encabezado-seleccion">
+            <strong>Selección múltiple</strong>
+            <span>{{ estudiantesSeleccionados.length }} seleccionados · {{ vacantesDisponibles }} vacantes</span>
+          </div>
+          <label v-for="estudiante in estudiantesDisponibles" :key="estudiante.estudianteId" class="seleccion-pendiente">
+            <input
+              v-model="estudiantesSeleccionados"
+              type="checkbox"
+              :value="estudiante.estudianteId"
+              :disabled="!estudiantesSeleccionados.includes(estudiante.estudianteId) && estudiantesSeleccionados.length >= maximoSeleccion"
+            />
+            {{ nombreCompleto(estudiante) }} — DNI {{ estudiante.dni }}
+          </label>
+          <button type="button" class="boton-confirmar" :disabled="guardando || !estudiantesSeleccionados.length" @click="registrarSeleccion">
+            {{ guardando ? 'Registrando...' : `Registrar seleccionados (${estudiantesSeleccionados.length})` }}
+          </button>
+        </div>
       </div>
     </section>
 
@@ -291,6 +356,18 @@ onMounted(cargarDatos)
     <PanelEstadoCarga v-if="cargando" :cargando="true" texto-carga="Cargando estudiantes y vacantes..." />
     <AvisoMensaje v-if="error" :mensaje="error" tipo="error" />
     <AvisoMensaje v-if="aviso" :mensaje="aviso" tipo="exito" />
+    <section v-if="pendientesDeConfirmacion.length" class="tarjeta" aria-labelledby="titulo-pendientes">
+      <div class="encabezado-tarjeta"><h2 id="titulo-pendientes">Matrículas pendientes de confirmación</h2></div>
+      <div class="contenido-tarjeta">
+        <label v-for="estudiante in pendientesDeConfirmacion" :key="estudiante.estudianteId" class="seleccion-pendiente">
+          <input v-model="seleccionPendientes" type="checkbox" :value="estudiante.estudianteId" />
+          {{ nombreCompleto(estudiante) }} — DNI {{ estudiante.dni }}
+        </label>
+        <button type="button" class="boton-confirmar" :disabled="guardando || !seleccionPendientes.length" @click="confirmarSeleccion">
+          {{ guardando ? 'Confirmando...' : `Confirmar seleccionadas (${seleccionPendientes.length})` }}
+        </button>
+      </div>
+    </section>
     <AvisoMensaje
       v-if="!cargando && !ventanaVigente"
       mensaje="No hay un periodo de matrícula vigente. Configura uno antes de registrar matrículas."
@@ -335,6 +412,23 @@ onMounted(cargarDatos)
   margin: 0 auto;
   padding: 32px;
 }
+.seleccion-pendiente {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+}
+.lista-seleccion-estudiantes {
+  display: grid;
+  gap: 4px;
+  max-height: 320px;
+  overflow: auto;
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px solid #c3c6d7;
+  border-radius: 10px;
+}
+.encabezado-seleccion { display: flex; justify-content: space-between; gap: 12px; }
 .encabezado-pagina,
 .nombre-estudiante,
 .encabezado-vacantes,

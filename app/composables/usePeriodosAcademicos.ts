@@ -19,5 +19,9 @@ export function usePeriodosAcademicos() {
     return solicitar<PeriodoAcademico[]>(`${RUTA_PERIODOS}/anhio`, { metodo: 'POST', cuerpo: solicitud })
   }
 
-  return { listar, listarPorAnhio, abrirAnhio }
+  function actualizarAnhio(solicitud: SolicitudAperturaAnhio): Promise<PeriodoAcademico[]> {
+    return solicitar<PeriodoAcademico[]>(`${RUTA_PERIODOS}/anhio`, { metodo: 'PUT', cuerpo: solicitud })
+  }
+
+  return { listar, listarPorAnhio, abrirAnhio, actualizarAnhio }
 }

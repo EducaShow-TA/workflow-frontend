@@ -99,6 +99,8 @@ export function validarPeriodoMatricula(
 
   if (!esFechaIsoValida(solicitud.fechaInicio)) {
     errores.fechaInicio = 'La fecha de inicio es obligatoria.'
+  } else if (solicitud.fechaInicio < obtenerFechaHoyIso()) {
+    errores.fechaInicio = 'La fecha de inicio no puede ser anterior a hoy.'
   }
 
   if (!esFechaIsoValida(solicitud.fechaLimite)) {

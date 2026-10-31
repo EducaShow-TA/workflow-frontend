@@ -36,7 +36,7 @@ definePageMeta({
 })
 
 const { listarSecciones, registrarSeccion, actualizarVacantes } = useSecciones()
-const { listar: listarPeriodosAcademicos, abrirAnhio } = usePeriodosAcademicos()
+const { listar: listarPeriodosAcademicos, abrirAnhio, actualizarAnhio } = usePeriodosAcademicos()
 const { listarPeriodos } = usePeriodoMatricula()
 const ruta = useRoute()
 const enrutador = useRouter()
@@ -269,6 +269,7 @@ async function guardarSeccion(): Promise<void> {
 
 // Apertura del año escolar: crea el periodo de clases de cada sección que aún no lo tiene en ese año.
 const aperturaAbierta = ref(false)
+const editandoAnhio = ref(false)
 const abriendo = ref(false)
 const errorApertura = ref('')
 const formularioApertura = reactive<SolicitudAperturaAnhio>({ anhio: 0, fechaInicio: '', fechaFin: '' })
@@ -289,6 +290,7 @@ const anhiosParaAbrir = computed(() => {
 const seccionesPorCrear = computed(() => obtenerPendientes(formularioApertura.anhio))
 
 function abrirApertura(): void {
+  editandoAnhio.value = false
   const anhio = anhiosParaAbrir.value.includes(anhioActual.value) ? anhioActual.value : anhiosParaAbrir.value[0]
   formularioApertura.anhio = anhio ?? anhioActual.value
   formularioApertura.fechaInicio = ''
@@ -296,6 +298,18 @@ function abrirApertura(): void {
   erroresApertura.fechaInicio = undefined
   erroresApertura.fechaFin = undefined
   errorApertura.value = ''
+  aperturaAbierta.value = true
+}
+
+function editarPeriodoAnhio(): void {
+  if (!resumenAnhio.value) return
+  formularioApertura.anhio = anhioActual.value
+  formularioApertura.fechaInicio = resumenAnhio.value.fechaInicio
+  formularioApertura.fechaFin = resumenAnhio.value.fechaFin
+  erroresApertura.fechaInicio = undefined
+  erroresApertura.fechaFin = undefined
+  errorApertura.value = ''
+  editandoAnhio.value = true
   aperturaAbierta.value = true
 }
 
@@ -312,10 +326,14 @@ async function confirmarApertura(): Promise<void> {
   abriendo.value = true
 
   try {
-    const creados = await abrirAnhio({ ...formularioApertura })
+    const creados = editandoAnhio.value
+      ? await actualizarAnhio({ ...formularioApertura })
+      : await abrirAnhio({ ...formularioApertura })
     aperturaAbierta.value = false
     anhioSeleccionado.value = formularioApertura.anhio
-    mensajeExito.value = `Año escolar ${formularioApertura.anhio} abierto: se ${creados.length === 1 ? 'creó 1 periodo' : `crearon ${creados.length} periodos`}.`
+    mensajeExito.value = editandoAnhio.value
+      ? `Periodo del año escolar ${formularioApertura.anhio} actualizado en ${creados.length} secciones.`
+      : `Año escolar ${formularioApertura.anhio} abierto: se ${creados.length === 1 ? 'creó 1 periodo' : `crearon ${creados.length} periodos`}.`
     await cargarSecciones()
   } catch (error: unknown) {
     errorApertura.value = obtenerMensajeError(error, 'No se pudo abrir el año escolar.')
@@ -345,6 +363,7 @@ async function confirmarApertura(): Promise<void> {
         >
           Abrir año escolar
         </BotonAccion>
+        <BotonAccion v-if="anhioAbierto" variante="secundario" @click="editarPeriodoAnhio">Editar periodo del año</BotonAccion>
         <BotonAccion @click="abrirRegistroSeccion">+ Agregar sección</BotonAccion>
       </template>
     </EncabezadoPagina>
@@ -630,15 +649,15 @@ async function confirmarApertura(): Promise<void> {
 
     <VentanaModal
       :abierta="aperturaAbierta"
-      titulo="Abrir año escolar"
-      descripcion="Crea el periodo de clases de cada sección para el año indicado."
+      :titulo="editandoAnhio ? 'Editar periodo del año escolar' : 'Abrir año escolar'"
+      :descripcion="editandoAnhio ? 'Actualiza las fechas de clases de todas las secciones del año.' : 'Crea el periodo de clases de cada sección para el año indicado.'"
       :bloqueada="abriendo"
       @cerrar="aperturaAbierta = false"
     >
       <form id="formulario-apertura" class="formulario" novalidate @submit.prevent="confirmarApertura">
         <div class="campo">
           <label for="anhio-apertura">Año escolar <span class="obligatorio">*</span></label>
-          <select id="anhio-apertura" v-model.number="formularioApertura.anhio" aria-describedby="ayuda-anhio-apertura">
+          <select id="anhio-apertura" v-model.number="formularioApertura.anhio" :disabled="editandoAnhio" aria-describedby="ayuda-anhio-apertura">
             <option v-for="anhio in anhiosParaAbrir" :key="anhio" :value="anhio">{{ anhio }}</option>
           </select>
           <small id="ayuda-anhio-apertura" class="ayuda">Solo se listan los años con secciones sin periodo.</small>
@@ -677,7 +696,7 @@ async function confirmarApertura(): Promise<void> {
           </div>
         </div>
 
-        <div class="lista-por-crear">
+        <div v-if="!editandoAnhio" class="lista-por-crear">
           <strong>
             Se
             {{ seccionesPorCrear.length === 1 ? 'creará 1 periodo' : `crearán ${seccionesPorCrear.length} periodos` }}
@@ -703,7 +722,7 @@ async function confirmarApertura(): Promise<void> {
           form="formulario-apertura"
           :deshabilitado="abriendo || seccionesPorCrear.length === 0"
         >
-          {{ abriendo ? 'Abriendo...' : `Abrir año ${formularioApertura.anhio}` }}
+          {{ abriendo ? 'Guardando...' : editandoAnhio ? `Guardar cambios de ${formularioApertura.anhio}` : `Abrir año ${formularioApertura.anhio}` }}
         </BotonAccion>
       </template>
     </VentanaModal>
