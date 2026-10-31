@@ -107,6 +107,8 @@ export function validarPeriodoMatricula(
     errores.fechaLimite = 'La fecha límite es obligatoria.'
   } else if (!errores.fechaInicio && solicitud.fechaLimite <= solicitud.fechaInicio) {
     errores.fechaLimite = 'La fecha límite debe ser posterior a la fecha de inicio.'
+  } else if (!errores.fechaInicio && Number(solicitud.fechaInicio.slice(0, 4)) < Number(solicitud.fechaLimite.slice(0, 4)) - 1) {
+    errores.fechaInicio = 'El inicio no puede ser más de un año calendario anterior al año escolar de la fecha límite.'
   }
 
   if (!errores.fechaInicio && !errores.fechaLimite) {
