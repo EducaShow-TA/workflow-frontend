@@ -26,6 +26,7 @@ export const CUENTAS_POR_PAGINA = 10
 export const MOTIVO_ROL_FIJO = 'El rol se define al crear la cuenta y no se modifica.'
 
 const FORMATO_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const FORMATO_USUARIO = /^[A-Za-z0-9]+$/
 
 export function crearFormularioVacio(): FormularioCuenta {
   return {
@@ -87,6 +88,7 @@ function validarUsuario(valor: string, cuentas: CuentaUsuario[], idExcluido?: nu
   const username = valor.trim()
   if (!username) return 'El usuario es obligatorio.'
   if (username.length > LONGITUD_MAXIMA_USUARIO) return `El usuario no debe superar los ${LONGITUD_MAXIMA_USUARIO} caracteres.`
+  if (!FORMATO_USUARIO.test(username)) return 'El usuario solo puede contener letras y números.'
   if (existeUsuario(cuentas, username, idExcluido)) return 'Ya existe ese usuario.'
   return undefined
 }

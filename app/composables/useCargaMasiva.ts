@@ -18,6 +18,7 @@ export const COLUMNAS_OPCIONALES = ['username', 'telefono', 'fecha_nacimiento', 
 export const ROLES_CARGA = ['DOCENTE', 'ALUMNO', 'APODERADO']
 export const MAXIMO_FILAS = 500
 export const MAXIMO_BYTES = 10 * 1024 * 1024
+const FORMATO_USUARIO = /^[A-Za-z0-9]+$/
 
 /** Igual que el backend: si la cabecera tiene más ";" que ",", ese es el separador (CSV de Excel en español). */
 export function detectarSeparador(texto: string): ',' | ';' {
@@ -123,6 +124,7 @@ export function revisarCsv(nombreArchivo: string, tamano: number, texto: string)
   let filasIncompletas = 0
   let rolesInvalidos = 0
   let alumnosSinApoderado = 0
+  let usernamesInvalidos = 0
 
   for (const { valores } of csv.filas) {
     const rol = (valores.rol ?? '').toUpperCase()
@@ -137,6 +139,9 @@ export function revisarCsv(nombreArchivo: string, tamano: number, texto: string)
     if (rol === 'ALUMNO' && (!valores.dni_apoderado || !valores.parentesco)) {
       alumnosSinApoderado++
     }
+    if (valores.username?.trim() && !FORMATO_USUARIO.test(valores.username.trim())) {
+      usernamesInvalidos++
+    }
   }
 
   if (filasIncompletas > 0) {
@@ -150,6 +155,11 @@ export function revisarCsv(nombreArchivo: string, tamano: number, texto: string)
   if (alumnosSinApoderado > 0) {
     advertencias.push(
       `${plural(alumnosSinApoderado, 'alumno no tiene', 'alumnos no tienen')} dni_apoderado o parentesco.`,
+    )
+  }
+  if (usernamesInvalidos > 0) {
+    advertencias.push(
+      `${plural(usernamesInvalidos, 'fila tiene', 'filas tienen')} username inválido; usa solo letras y números.`,
     )
   }
 
@@ -212,7 +222,8 @@ export function combinarFilas(resultado: ResultadoCargaMasiva, csv: CsvLeido | n
       fila: error.fila,
       rol: (original.rol ?? '').toUpperCase(),
       dni: original.dni ?? '',
-      username: original.username ?? original.correo ?? '',
+      username:
+        original.username ?? `usuario${(original.dni ?? '').replace(/[^A-Za-z0-9]/g, '')}`,
       estado: 'RECHAZADA',
       motivos: [error],
     })

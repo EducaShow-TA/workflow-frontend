@@ -171,15 +171,16 @@ async function cancelar(): Promise<void> {
                 id="username"
                 v-model="formulario.username"
                 type="text"
+                pattern="[A-Za-z0-9]+"
                 :maxlength="LONGITUD_MAXIMA_USUARIO"
-                placeholder="ana.perez01"
+                placeholder="anaperez01"
                 autocomplete="off"
                 :aria-invalid="Boolean(errores.username)"
                 aria-describedby="ayuda-username"
                 @input="limpiarError('username')"
               />
               <small v-if="errores.username" class="error">{{ errores.username }}</small>
-              <small id="ayuda-username" class="ayuda">Puede ser diferente del correo de contacto.</small>
+              <small id="ayuda-username" class="ayuda">Usa solo letras y números; puede ser distinto del correo de contacto.</small>
             </div>
 
             <div class="campo ancho-completo">

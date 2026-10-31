@@ -270,6 +270,7 @@ async function cancelar(): Promise<void> {
                   id="username"
                   v-model="formulario.username"
                   type="text"
+                  pattern="[A-Za-z0-9]+"
                   :maxlength="LONGITUD_MAXIMA_USUARIO"
                   autocomplete="off"
                   :aria-invalid="Boolean(errores.username)"
@@ -281,7 +282,7 @@ async function cancelar(): Promise<void> {
                   Si cambias tu usuario de acceso, se cerrará tu sesión y tendrás que iniciar con el nuevo usuario.
                 </small>
                 <small v-else id="ayuda-username" class="ayuda">
-                  Es el identificador usado para iniciar sesión; puede ser distinto del correo.
+                  Es el identificador usado para iniciar sesión; solo admite letras y números y puede ser distinto del correo.
                 </small>
               </div>
               <div class="campo ancho-completo">

@@ -348,7 +348,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', avisarAntesDeCe
                     .join(' ') || '—'
                 }}
               </td>
-              <td>{{ fila.valores.username || 'Se usará el correo' }}</td>
+              <td>{{ fila.valores.username || `usuario + ${fila.valores.dni ?? 'documento'}` }}</td>
               <td>
                 <InsigniaEstado v-if="!fila.valores.correo" texto="vacío" variante="advertencia" />
                 <template v-else>{{ fila.valores.correo }}</template>
