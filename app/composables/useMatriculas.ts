@@ -14,11 +14,25 @@ export function useMatriculas() {
     })
   }
 
+  function registrarMasivamente(periodoId: number, estudianteIds: number[]): Promise<MatriculaApi[]> {
+    return solicitar<MatriculaApi[]>(`${RUTA_PERIODOS}/${periodoId}/matriculas/masivo`, {
+      metodo: 'POST',
+      cuerpo: { estudianteIds },
+    })
+  }
+
   function confirmar(periodoId: number, estudianteId: number): Promise<MatriculaApi> {
     return solicitar<MatriculaApi>(`${RUTA_PERIODOS}/${periodoId}/matriculas/${estudianteId}/confirmar`, {
       metodo: 'PATCH',
     })
   }
 
-  return { registrar, confirmar }
+  function confirmarMasivamente(periodoId: number, estudianteIds: number[]): Promise<MatriculaApi[]> {
+    return solicitar<MatriculaApi[]>(`${RUTA_PERIODOS}/${periodoId}/matriculas/confirmar-masivo`, {
+      metodo: 'PATCH',
+      cuerpo: { estudianteIds },
+    })
+  }
+
+  return { registrar, registrarMasivamente, confirmar, confirmarMasivamente }
 }
