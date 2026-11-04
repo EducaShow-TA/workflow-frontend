@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { buscarCruce, calcularEstadoPeriodo, estaPeriodoVigente, validarPeriodoMatricula } from './usePeriodoMatricula'
 import type { PeriodoMatricula } from '~/types/periodoMatricula'
 
@@ -11,6 +11,17 @@ const periodoExistente: PeriodoMatricula = {
 }
 
 describe('lógica de períodos de matrícula', () => {
+  // La validación rechaza inicios anteriores a hoy: se fija "hoy" antes de periodoExistente
+  // para que las fechas literales de 2026 sigan siendo futuras sin importar cuándo corra la prueba.
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 9, 20, 12, 0, 0))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('calcula los estados pendiente, vigente y vencido respetando los límites inclusivos', () => {
     expect(calcularEstadoPeriodo('2026-10-22', '2026-10-31', '2026-10-21')).toBe('PENDIENTE')
     expect(calcularEstadoPeriodo('2026-10-22', '2026-10-31', '2026-10-22')).toBe('VIGENTE')
