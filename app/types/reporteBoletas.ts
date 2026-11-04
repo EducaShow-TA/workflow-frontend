@@ -1,3 +1,5 @@
+import type { PaginaRespuesta } from '~/types/paginacion'
+
 export type EstadoBoletaCobranza = 'PENDIENTE' | 'EN_MORA'
 
 export interface FiltrosReporteBoletas {
@@ -26,7 +28,7 @@ export interface BoletaReporte {
 }
 
 export interface ReporteBoletas {
-  boletas: BoletaReporte[]
+  pagina: PaginaRespuesta<BoletaReporte>
   montoPendiente: number
   familiasMorosas: number
 }

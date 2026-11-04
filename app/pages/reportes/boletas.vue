@@ -44,11 +44,10 @@ const secciones = computed(() =>
 )
 const errorFechas = computed(() => validarFechasReporte(filtros))
 const cambiosSinAplicar = computed(() => JSON.stringify(filtros) !== JSON.stringify(filtrosAplicados.value))
-const boletas = computed(() => reporte.value?.boletas ?? [])
-const totalPaginas = computed(() => Math.max(1, Math.ceil(boletas.value.length / tamanioPagina)))
-const boletasVisibles = computed(() =>
-  boletas.value.slice((pagina.value - 1) * tamanioPagina, pagina.value * tamanioPagina),
-)
+const boletas = computed(() => reporte.value?.pagina.content ?? [])
+const totalPaginas = computed(() => Math.max(1, reporte.value?.pagina.totalPages ?? 0))
+const totalBoletas = computed(() => reporte.value?.pagina.totalElements ?? 0)
+const boletasVisibles = boletas
 const resumenFiltros = computed(() => {
   const aplicados = filtrosAplicados.value
   const grado = grados.value.find((opcion) => String(opcion.id) === aplicados.gradoId)
@@ -79,7 +78,7 @@ watch(
 watch(
   filtros,
   () => {
-    void generarReporte()
+    void generarReporte(1)
   },
   { deep: true },
 )
@@ -99,7 +98,7 @@ async function cargarCatalogo(): Promise<void> {
   }
 }
 
-async function generarReporte(): Promise<void> {
+async function generarReporte(numero = pagina.value): Promise<void> {
   const solicitud = ++ultimaSolicitud
   reporte.value = null
   errorConsulta.value = ''
@@ -112,11 +111,15 @@ async function generarReporte(): Promise<void> {
   errorConsulta.value = ''
   reporte.value = null
   try {
-    const resultado = await consultar(seleccion)
+    const resultado = await consultar(seleccion, numero - 1, tamanioPagina)
     if (solicitud !== ultimaSolicitud) return
+    if (resultado.pagina.totalPages > 0 && numero > resultado.pagina.totalPages) {
+      await generarReporte(resultado.pagina.totalPages)
+      return
+    }
     reporte.value = resultado
     filtrosAplicados.value = seleccion
-    pagina.value = 1
+    pagina.value = resultado.pagina.number + 1
     ultimaConsulta.value = new Intl.DateTimeFormat('es-PE', { dateStyle: 'short', timeStyle: 'short' }).format(
       new Date(),
     )
@@ -131,7 +134,7 @@ async function generarReporte(): Promise<void> {
 function limpiarFiltros(): void {
   const yaEstanLimpios = JSON.stringify(filtros) === JSON.stringify(crearFiltrosReporte())
   Object.assign(filtros, crearFiltrosReporte())
-  if (yaEstanLimpios) void generarReporte()
+  if (yaEstanLimpios) void generarReporte(1)
 }
 
 onMounted(async () => {
@@ -156,7 +159,7 @@ onMounted(async () => {
           Reintentar carga
         </button>
       </div>
-      <form @submit.prevent="generarReporte">
+      <form @submit.prevent="generarReporte()">
         <fieldset class="filtros">
           <label
             >Grado
@@ -218,7 +221,7 @@ onMounted(async () => {
     <p v-if="cargando" class="aviso" role="status">Consultando las boletas del colegio…</p>
     <div v-else-if="errorConsulta" class="aviso aviso-error" role="alert">
       {{ errorConsulta }}
-      <button type="button" class="enlace" @click="generarReporte">Reintentar consulta</button>
+      <button type="button" class="enlace" @click="generarReporte()">Reintentar consulta</button>
     </div>
 
     <template v-if="reporte && !cargando && !cambiosSinAplicar">
@@ -238,7 +241,7 @@ onMounted(async () => {
         </article>
         <article class="tarjeta">
           <p>Boletas por cobrar</p>
-          <strong>{{ boletas.length }}</strong
+          <strong>{{ totalBoletas }}</strong
           ><small>Según los filtros aplicados.</small>
         </article>
       </div>
@@ -301,10 +304,21 @@ onMounted(async () => {
             </table>
           </div>
           <nav class="paginacion" aria-label="Páginas del reporte">
-            <span>{{ boletas.length }} boletas · Página {{ pagina }} de {{ totalPaginas }}</span>
+            <span>{{ totalBoletas }} boletas · Página {{ pagina }} de {{ totalPaginas }}</span>
             <div class="acciones">
-              <button type="button" class="boton secundario" :disabled="pagina === 1" @click="pagina--">Anterior</button
-              ><button type="button" class="boton secundario" :disabled="pagina === totalPaginas" @click="pagina++">
+              <button
+                type="button"
+                class="boton secundario"
+                :disabled="pagina === 1"
+                @click="generarReporte(pagina - 1)"
+              >
+                Anterior</button
+              ><button
+                type="button"
+                class="boton secundario"
+                :disabled="pagina === totalPaginas"
+                @click="generarReporte(pagina + 1)"
+              >
                 Siguiente
               </button>
             </div>

@@ -21,6 +21,13 @@ const DESCRIPCIONES_ROL: Record<RolUsuario, string> = {
 
 export const PERMISOS: Permiso[] = [
   {
+    codigo: 'BOLETA_GESTIONAR',
+    modulo: 'Finanzas',
+    nombre: 'Gestionar boletas',
+    descripcion: 'Consultar boletas y comprobantes y registrar pagos aprobados.',
+    sensible: true,
+  },
+  {
     codigo: 'REPORTE_COBRANZA_VER',
     modulo: 'Reportes',
     nombre: 'Ver reporte de cobranza',
@@ -156,6 +163,7 @@ export const PERMISOS_POR_ROL: Record<RolUsuario, string[]> = {
 }
 
 export const REGLAS_RUTA: ReglaRuta[] = [
+  { prefijo: '/finanzas', permiso: 'BOLETA_GESTIONAR' },
   { prefijo: '/reportes/boletas', permiso: 'REPORTE_COBRANZA_VER' },
   { prefijo: '/panel', permiso: 'PANEL_VER' },
   { prefijo: '/estudiantes', permiso: 'ESTUDIANTE_VER' },
