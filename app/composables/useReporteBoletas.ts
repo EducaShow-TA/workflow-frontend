@@ -1,6 +1,6 @@
 import { useApi } from '~/composables/useApi'
 import { esFechaIsoValida } from '~/composables/useFechas'
-import type { EstadoBoletaCobranza, FiltrosReporteBoletas, ReporteBoletas } from '~/types/reporteBoletas'
+import type { FiltrosReporteBoletas, ReporteBoletas } from '~/types/reporteBoletas'
 
 export function crearFiltrosReporte(): FiltrosReporteBoletas {
   return { gradoId: '', seccionId: '', estado: '', vencimientoDesde: '', vencimientoHasta: '' }
@@ -17,41 +17,22 @@ export function validarFechasReporte(filtros: FiltrosReporteBoletas): string {
   return ''
 }
 
-export function construirRutaReporte(filtros: FiltrosReporteBoletas, estado: EstadoBoletaCobranza): string {
-  const parametros = new URLSearchParams({ estado })
-  for (const campo of ['gradoId', 'seccionId', 'vencimientoDesde', 'vencimientoHasta'] as const) {
+/** Una sola consulta devuelve la página y los totales calculados en la base de datos. */
+export function construirRutaReporte(filtros: FiltrosReporteBoletas, page = 0, size = 20): string {
+  const parametros = new URLSearchParams({ page: String(page), size: String(size) })
+  for (const campo of ['gradoId', 'seccionId', 'estado', 'vencimientoDesde', 'vencimientoHasta'] as const) {
     if (filtros[campo]) parametros.set(campo, filtros[campo])
   }
-  return `/api/v1/reportes/boletas-pension?${parametros.toString()}`
+  return `/api/v1/reportes/boletas-pension/pagina?${parametros.toString()}`
 }
 
-/** Combina estados disjuntos. Suma en céntimos para no introducir decimales binarios en el total. */
-export function combinarReportes(reportes: ReporteBoletas[]): ReporteBoletas {
-  return {
-    boletas: reportes
-      .flatMap((reporte) => reporte.boletas)
-      .sort(
-        (primera, segunda) =>
-          primera.fechaVencimiento.localeCompare(segunda.fechaVencimiento) || primera.id - segunda.id,
-      ),
-    montoPendiente: reportes.reduce((total, reporte) => total + Math.round(reporte.montoPendiente * 100), 0) / 100,
-    // Solo EN_MORA aporta familias; el backend las cuenta una sola vez por apoderado.
-    familiasMorosas: reportes.reduce((total, reporte) => total + reporte.familiasMorosas, 0),
-  }
-}
-
-/** Reporte administrativo US-1.10. No incluye boletas pagadas ni genera o modifica deuda. */
 export function useReporteBoletas() {
   const { solicitar } = useApi()
 
-  async function consultar(filtros: FiltrosReporteBoletas): Promise<ReporteBoletas> {
+  async function consultar(filtros: FiltrosReporteBoletas, page = 0, size = 20): Promise<ReporteBoletas> {
     const error = validarFechasReporte(filtros)
     if (error) throw new Error(error)
-    const estados: EstadoBoletaCobranza[] = filtros.estado ? [filtros.estado] : ['PENDIENTE', 'EN_MORA']
-    const reportes = await Promise.all(
-      estados.map((estado) => solicitar<ReporteBoletas>(construirRutaReporte(filtros, estado))),
-    )
-    return combinarReportes(reportes)
+    return solicitar<ReporteBoletas>(construirRutaReporte(filtros, page, size))
   }
 
   return { consultar }

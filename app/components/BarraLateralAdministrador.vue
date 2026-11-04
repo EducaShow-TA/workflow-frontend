@@ -22,7 +22,7 @@ const enlaces: EnlaceMenu[] = [
   { nombre: 'Horarios', icono: '/icons/menu-horarios.svg', destino: '/horarios' },
   { nombre: 'Docentes', icono: '/icons/menu-docentes.svg' },
   { nombre: 'Clases', icono: '/icons/menu-clases.svg' },
-  { nombre: 'Finanzas', icono: '/icons/menu-finanzas.svg' },
+  { nombre: 'Finanzas', icono: '/icons/menu-finanzas.svg', destino: '/finanzas' },
   { nombre: 'Reportes', icono: '/icons/menu-reportes.svg', destino: '/reportes/boletas' },
   { nombre: 'Usuarios', icono: '/icons/menu-usuarios.svg', destino: '/usuarios' },
   { nombre: 'Roles/Permisos', icono: '/icons/menu-roles.svg', destino: '/roles-permisos' },
