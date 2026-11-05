@@ -7,7 +7,6 @@ import type {
 } from '~/types/periodoMatricula'
 import { useApi } from '~/composables/useApi'
 import { esFechaIsoValida, formatearFecha, obtenerFechaHoyIso } from '~/composables/useFechas'
-import { obtenerPrimerError } from '~/composables/useValidacion'
 
 const RUTA_PERIODOS = '/api/v1/periodos-matricula'
 
