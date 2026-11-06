@@ -139,7 +139,13 @@ function validarDatosPersonales(): boolean {
     errores.fechaNacimiento = 'La fecha no puede ser futura.'
   }
 
-  return !(errores.nombres || errores.apellidoPaterno || errores.apellidoMaterno || errores.numeroDocumento || errores.fechaNacimiento)
+  return !(
+    errores.nombres ||
+    errores.apellidoPaterno ||
+    errores.apellidoMaterno ||
+    errores.numeroDocumento ||
+    errores.fechaNacimiento
+  )
 }
 
 function validarContacto(): boolean {
@@ -338,7 +344,15 @@ async function registrarEstudiante(): Promise<void> {
 
           <div class="campo">
             <label for="apellido-materno"> Apellido materno <span class="obligatorio">*</span> </label>
-            <input id="apellido-materno" v-model="formulario.apellidoMaterno" type="text" placeholder="Ej. Díaz" autocomplete="additional-name" :aria-invalid="Boolean(errores.apellidoMaterno)" @input="errores.apellidoMaterno = ''" />
+            <input
+              id="apellido-materno"
+              v-model="formulario.apellidoMaterno"
+              type="text"
+              placeholder="Ej. Díaz"
+              autocomplete="additional-name"
+              :aria-invalid="Boolean(errores.apellidoMaterno)"
+              @input="errores.apellidoMaterno = ''"
+            />
             <small v-if="errores.apellidoMaterno" class="error">{{ errores.apellidoMaterno }}</small>
           </div>
 
@@ -419,13 +433,35 @@ async function registrarEstudiante(): Promise<void> {
         <div v-else-if="pasoActual === 2" class="contenido-formulario">
           <div class="campo">
             <label for="username">Usuario <span class="obligatorio">*</span></label>
-            <input id="username" v-model="formulario.username" type="text" autocomplete="username" pattern="[A-Za-z0-9]+" maxlength="50" required placeholder="alumno01" :aria-invalid="Boolean(errores.username)" aria-describedby="ayuda-username" />
+            <input
+              id="username"
+              v-model="formulario.username"
+              type="text"
+              autocomplete="username"
+              pattern="[A-Za-z0-9]+"
+              maxlength="50"
+              required
+              placeholder="alumno01"
+              :aria-invalid="Boolean(errores.username)"
+              aria-describedby="ayuda-username"
+            />
             <small v-if="errores.username" class="error">{{ errores.username }}</small>
-            <small id="ayuda-username" class="ayuda">Usa solo letras y números; el correo se registra en su campo aparte.</small>
+            <small id="ayuda-username" class="ayuda"
+              >Usa solo letras y números; el correo se registra en su campo aparte.</small
+            >
           </div>
           <div class="campo">
             <label for="password">Contraseña inicial <span class="obligatorio">*</span></label>
-            <input id="password" v-model="formulario.password" type="password" autocomplete="new-password" minlength="8" maxlength="72" required :aria-invalid="Boolean(errores.password)" />
+            <input
+              id="password"
+              v-model="formulario.password"
+              type="password"
+              autocomplete="new-password"
+              minlength="8"
+              maxlength="72"
+              required
+              :aria-invalid="Boolean(errores.password)"
+            />
             <small v-if="errores.password" class="error">{{ errores.password }}</small>
           </div>
           <div class="campo">
@@ -512,7 +548,6 @@ async function registrarEstudiante(): Promise<void> {
     <p v-if="mensajeEstado" class="mensaje-estado" role="status">
       {{ mensajeEstado }}
     </p>
-
   </main>
 </template>
 
@@ -547,8 +582,6 @@ h1 {
   color: #434655;
   font-size: 13px;
 }
-
-
 
 .tarjeta-registro {
   overflow: hidden;

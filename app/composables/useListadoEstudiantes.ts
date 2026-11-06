@@ -37,9 +37,7 @@ export function useListadoEstudiantes() {
       paginasTotales = respuesta.totalPages
       estudiantes.push(
         ...respuesta.content.map((estudiante) => {
-          const matricula = estudiante.matriculas
-            .filter((item) => item.estado !== 'RETIRADA')
-            .at(-1)
+          const matricula = estudiante.matriculas.filter((item) => item.estado !== 'RETIRADA').at(-1)
           const periodo = matricula ? periodosPorId.get(matricula.periodoId) : undefined
           const ordinales: Record<number, string> = { 1: '1ro', 2: '2do', 3: '3ro', 4: '4to', 5: '5to' }
 
@@ -49,7 +47,9 @@ export function useListadoEstudiantes() {
             apellidos: `${estudiante.apellidoPaterno} ${estudiante.apellidoMaterno}`.trim(),
             correoElectronico: estudiante.correo ?? '',
             numeroDocumento: estudiante.dni,
-            grado: periodo ? `${ordinales[periodo.numeroGrado] ?? periodo.numeroGrado} ${periodo.nivelEducativo}` : 'Sin asignar',
+            grado: periodo
+              ? `${ordinales[periodo.numeroGrado] ?? periodo.numeroGrado} ${periodo.nivelEducativo}`
+              : 'Sin asignar',
             seccion: periodo?.seccion ?? '—',
             estado: 'REGISTRADO' as const,
           }

@@ -7,10 +7,20 @@ definePageMeta({
 })
 
 const acciones = [
-  { id: 'registrar-estudiante', titulo: 'Registrar Estudiante', icono: '/icons/accion-estudiante.svg', colorFondo: '#004ac61a' },
+  {
+    id: 'registrar-estudiante',
+    titulo: 'Registrar Estudiante',
+    icono: '/icons/accion-estudiante.svg',
+    colorFondo: '#004ac61a',
+  },
   { id: 'crear-matricula', titulo: 'Crear Matrícula', icono: '/icons/accion-matricula.svg', colorFondo: '#4059aa1a' },
   { id: 'registrar-pago', titulo: 'Registrar Pago', icono: '/icons/accion-pago.svg', colorFondo: '#196fc01a' },
-  { id: 'gestionar-horarios', titulo: 'Gestionar Horarios', icono: '/icons/accion-horarios.svg', colorFondo: '#7376861a' },
+  {
+    id: 'gestionar-horarios',
+    titulo: 'Gestionar Horarios',
+    icono: '/icons/accion-horarios.svg',
+    colorFondo: '#7376861a',
+  },
 ]
 
 const mensajeAccion = ref('')
@@ -37,7 +47,6 @@ async function seleccionarAccion(accion: AccionRapidaPanel): Promise<void> {
       <h1>Resumen del colegio</h1>
       <p>Los indicadores aparecerán aquí cuando el sistema cuente con datos reales para mostrarlos.</p>
     </section>
-
   </main>
 </template>
 

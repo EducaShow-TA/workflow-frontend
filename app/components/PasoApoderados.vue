@@ -10,10 +10,17 @@ import {
   normalizarNombre,
 } from '~/composables/useMascarasFormulario'
 
-type CampoEditable = 'nombres' | 'apellidoPaterno' | 'apellidoMaterno' | 'numeroDocumento' | 'celular' | 'correoElectronico'
+type CampoEditable =
+  'nombres' | 'apellidoPaterno' | 'apellidoMaterno' | 'numeroDocumento' | 'celular' | 'correoElectronico'
 
 type ErroresApoderado = Record<
-  'nombres' | 'apellidoPaterno' | 'apellidoMaterno' | 'parentesco' | 'numeroDocumento' | 'celular' | 'correoElectronico',
+  | 'nombres'
+  | 'apellidoPaterno'
+  | 'apellidoMaterno'
+  | 'parentesco'
+  | 'numeroDocumento'
+  | 'celular'
+  | 'correoElectronico',
   string
 >
 
@@ -259,7 +266,14 @@ defineExpose({
 
         <div class="campo">
           <label :for="`apellido-materno-apoderado-${indice}`">Apellido materno *</label>
-          <input :id="`apellido-materno-apoderado-${indice}`" :value="apoderado.apellidoMaterno" type="text" placeholder="Ej. Mamani" autocomplete="off" @input="cambiarCampo($event, indice, 'apellidoMaterno')" />
+          <input
+            :id="`apellido-materno-apoderado-${indice}`"
+            :value="apoderado.apellidoMaterno"
+            type="text"
+            placeholder="Ej. Mamani"
+            autocomplete="off"
+            @input="cambiarCampo($event, indice, 'apellidoMaterno')"
+          />
           <small v-if="errores[indice]?.apellidoMaterno" class="error">{{ errores[indice]?.apellidoMaterno }}</small>
         </div>
 
