@@ -121,17 +121,51 @@ export function obtenerSeccionesPendientes(secciones: Seccion[], periodosDelAnhi
   return secciones.filter((seccion) => !conPeriodo.has(seccion.id))
 }
 
-export function validarAperturaAnhio(solicitud: SolicitudAperturaAnhio): ErroresAperturaAnhio {
+export interface LimitesFechasAnhio {
+  minimoInicio: string
+  minimoFin: string
+  maximo: string
+}
+
+/** Rangos válidos del calendario: sin fechas pasadas y dentro del año escolar. */
+export function calcularLimitesFechasAnhio(anhio: number, fechaInicio: string, fechaHoy: string): LimitesFechasAnhio {
+  const primerDia = `${anhio}-01-01`
+  const minimoInicio = fechaHoy > primerDia ? fechaHoy : primerDia
+
+  return {
+    minimoInicio,
+    minimoFin: esFechaIsoValida(fechaInicio) && fechaInicio > minimoInicio ? fechaInicio : minimoInicio,
+    maximo: `${anhio}-12-31`,
+  }
+}
+
+/**
+ * Reglas de las fechas de clases (observación del JP: no pasadas y coherentes con el año escolar).
+ * Si el año ya está en curso, su inicio no se cambia y solo se valida el fin.
+ */
+export function validarAperturaAnhio(
+  solicitud: SolicitudAperturaAnhio,
+  fechaHoy: string,
+  inicioBloqueado = false,
+): ErroresAperturaAnhio {
   const errores: ErroresAperturaAnhio = {}
 
-  if (!esFechaIsoValida(solicitud.fechaInicio)) {
-    errores.fechaInicio = 'La fecha de inicio de clases es obligatoria.'
-  } else if (obtenerAnhio(solicitud.fechaInicio) !== solicitud.anhio) {
-    errores.fechaInicio = `Las clases deben empezar en ${solicitud.anhio}.`
+  if (!inicioBloqueado) {
+    if (!esFechaIsoValida(solicitud.fechaInicio)) {
+      errores.fechaInicio = 'La fecha de inicio de clases es obligatoria.'
+    } else if (obtenerAnhio(solicitud.fechaInicio) !== solicitud.anhio) {
+      errores.fechaInicio = `Las clases deben empezar en ${solicitud.anhio}.`
+    } else if (solicitud.fechaInicio < fechaHoy) {
+      errores.fechaInicio = 'El inicio de clases no puede ser una fecha pasada.'
+    }
   }
 
   if (!esFechaIsoValida(solicitud.fechaFin)) {
     errores.fechaFin = 'La fecha de fin de clases es obligatoria.'
+  } else if (obtenerAnhio(solicitud.fechaFin) !== solicitud.anhio) {
+    errores.fechaFin = `Las clases deben terminar en ${solicitud.anhio}.`
+  } else if (solicitud.fechaFin < fechaHoy) {
+    errores.fechaFin = 'El fin de clases no puede ser una fecha pasada.'
   } else if (!errores.fechaInicio && solicitud.fechaFin <= solicitud.fechaInicio) {
     errores.fechaFin = 'El fin de clases debe ser posterior al inicio.'
   }
