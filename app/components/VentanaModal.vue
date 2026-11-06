@@ -8,10 +8,13 @@ const propiedades = withDefaults(
     descripcion?: string
     /** Mientras se guarda no se permite cerrar, para no perder la respuesta del servidor. */
     bloqueada?: boolean
+    /** "amplia" para contenidos de dos columnas, como un formulario con vista previa. */
+    ancho?: 'normal' | 'amplia'
   }>(),
   {
     descripcion: '',
     bloqueada: false,
+    ancho: 'normal',
   },
 )
 
@@ -95,6 +98,7 @@ onBeforeUnmount(() => {
       <section
         ref="ventana"
         class="ventana-modal"
+        :class="{ amplia: ancho === 'amplia' }"
         role="dialog"
         aria-modal="true"
         :aria-labelledby="idTitulo"
@@ -154,6 +158,10 @@ onBeforeUnmount(() => {
   border-radius: 12px;
   background: white;
   box-shadow: 0 20px 40px rgb(0 0 0 / 18%);
+}
+
+.ventana-modal.amplia {
+  max-width: 820px;
 }
 
 .encabezado-modal {

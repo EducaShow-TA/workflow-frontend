@@ -1,5 +1,6 @@
 import { useApi } from '~/composables/useApi'
 import type { MatriculaApi } from '~/types/matricula'
+import type { SolicitudCompromisoPago } from '~/types/compromisoPago'
 
 const RUTA_PERIODOS = '/api/v1/periodos'
 
@@ -21,16 +22,26 @@ export function useMatriculas() {
     })
   }
 
-  function confirmar(periodoId: number, estudianteId: number): Promise<MatriculaApi> {
+  /** Al confirmar, el back crea el compromiso de pago con estos términos y la primera boleta (US-1.3). */
+  function confirmar(
+    periodoId: number,
+    estudianteId: number,
+    compromiso: SolicitudCompromisoPago,
+  ): Promise<MatriculaApi> {
     return solicitar<MatriculaApi>(`${RUTA_PERIODOS}/${periodoId}/matriculas/${estudianteId}/confirmar`, {
       metodo: 'PATCH',
+      cuerpo: compromiso,
     })
   }
 
-  function confirmarMasivamente(periodoId: number, estudianteIds: number[]): Promise<MatriculaApi[]> {
+  function confirmarMasivamente(
+    periodoId: number,
+    estudianteIds: number[],
+    compromiso: SolicitudCompromisoPago,
+  ): Promise<MatriculaApi[]> {
     return solicitar<MatriculaApi[]>(`${RUTA_PERIODOS}/${periodoId}/matriculas/confirmar-masivo`, {
       metodo: 'PATCH',
-      cuerpo: { estudianteIds },
+      cuerpo: { estudianteIds, compromiso },
     })
   }
 
