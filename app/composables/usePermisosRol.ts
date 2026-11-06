@@ -198,6 +198,7 @@ export const REGLAS_RUTA: ReglaRuta[] = [
   { prefijo: '/horarios', permiso: 'HORARIO_VER' },
   { prefijo: '/horarios/nueva', permiso: 'HORARIO_GESTIONAR' },
   { prefijo: '/horarios/*/editar', permiso: 'HORARIO_GESTIONAR' },
+  { prefijo: '/horario-secciones', permiso: 'HORARIO_GESTIONAR' },
   { prefijo: '/usuarios', permiso: 'USUARIO_VER' },
   { prefijo: '/usuarios/nuevo', permiso: 'USUARIO_CREAR' },
   { prefijo: '/usuarios/carga-masiva', permiso: 'USUARIO_CREAR' },

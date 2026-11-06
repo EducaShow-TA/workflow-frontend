@@ -13,6 +13,7 @@ const nombrePagina = computed(() => {
   if (ruta.path.startsWith('/tareas')) return 'Tareas'
   if (ruta.path.startsWith('/calificaciones')) return 'Calificaciones'
   if (ruta.path.startsWith('/horarios')) return 'Horarios'
+  if (ruta.path.startsWith('/horario-secciones')) return 'Horario por sección'
   if (ruta.path.startsWith('/usuarios')) return 'Usuarios'
   if (ruta.path.startsWith('/roles-permisos')) return 'Roles y permisos'
   if (ruta.path.startsWith('/logs-sistema')) return 'Logs del sistema'
