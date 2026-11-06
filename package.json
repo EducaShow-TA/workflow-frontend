@@ -9,6 +9,10 @@
     "preview": "nuxt preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "nuxi typecheck",
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
