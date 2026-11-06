@@ -160,6 +160,13 @@ export const PERMISOS: Permiso[] = [
     descripcion: 'Consultar qué puede hacer cada rol.',
     sensible: false,
   },
+  {
+    codigo: 'SESION_GESTIONAR',
+    modulo: 'Asistencia',
+    nombre: 'Gestionar sesiones de clase',
+    descripcion: 'Programar sesiones de clase, asignarles un docente y registrar su asistencia fuera de la ventana.',
+    sensible: false,
+  },
 ]
 
 export const PERMISOS_POR_ROL: Record<RolUsuario, string[]> = {
@@ -189,9 +196,15 @@ export const REGLAS_RUTA: ReglaRuta[] = [
   { prefijo: '/usuarios/carga-masiva', permiso: 'USUARIO_CREAR' },
   { prefijo: '/usuarios/*/editar', permiso: 'USUARIO_EDITAR' },
   { prefijo: '/roles-permisos', permiso: 'PERMISO_VER' },
+  { prefijo: '/sesiones-clase', permiso: 'SESION_GESTIONAR' },
 ]
 
 export const RUTAS_LIBRES = ['/', '/login', '/acceso-denegado']
+
+/** Pantalla de inicio de cada rol. */
+export function obtenerRutaInicio(rol: RolUsuario): string {
+  return rol === 'DOCENTE' ? '/docente' : '/panel'
+}
 
 export function obtenerNombreRol(rol: RolUsuario): string {
   return NOMBRES_ROL[rol]

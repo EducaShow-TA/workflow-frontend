@@ -11,7 +11,7 @@ const enlaces = [
 ]
 
 function activo(destino: string): boolean {
-  return ruta.path === destino
+  return destino === '/docente' ? ruta.path === destino : ruta.path.startsWith(destino)
 }
 </script>
 

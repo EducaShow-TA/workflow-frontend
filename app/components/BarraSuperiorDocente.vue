@@ -13,7 +13,12 @@ const titulos: Record<string, string> = {
   '/docente/marcaje': 'Mi marcaje',
   '/docente/horario': 'Mi horario',
 }
-const titulo = computed(() => titulos[ruta.path] ?? 'Portal docente')
+const titulo = computed(
+  () =>
+    titulos[ruta.path] ??
+    (ruta.path.startsWith('/docente/asistencia/') ? titulos['/docente/asistencia'] : undefined) ??
+    'Portal docente',
+)
 const iniciales = computed(() => {
   const palabras = (autenticacion.usuario?.nombreCompleto ?? 'Docente').trim().split(/\s+/)
   return palabras
