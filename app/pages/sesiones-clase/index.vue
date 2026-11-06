@@ -404,6 +404,7 @@ onMounted(() => {
 }
 
 .tabla-desplazable {
+  position: relative;
   overflow-x: auto;
 }
 

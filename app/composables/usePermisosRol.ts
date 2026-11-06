@@ -161,6 +161,13 @@ export const PERMISOS: Permiso[] = [
     sensible: false,
   },
   {
+    codigo: 'ASISTENCIA_DOCENTE_GESTIONAR',
+    modulo: 'Asistencia',
+    nombre: 'Gestionar asistencia docente',
+    descripcion: 'Consultar los marcajes de los docentes y registrarlos o ajustarlos indicando un motivo.',
+    sensible: true,
+  },
+  {
     codigo: 'SESION_GESTIONAR',
     modulo: 'Asistencia',
     nombre: 'Gestionar sesiones de clase',
@@ -197,6 +204,7 @@ export const REGLAS_RUTA: ReglaRuta[] = [
   { prefijo: '/usuarios/*/editar', permiso: 'USUARIO_EDITAR' },
   { prefijo: '/roles-permisos', permiso: 'PERMISO_VER' },
   { prefijo: '/sesiones-clase', permiso: 'SESION_GESTIONAR' },
+  { prefijo: '/asistencia-docentes', permiso: 'ASISTENCIA_DOCENTE_GESTIONAR' },
 ]
 
 export const RUTAS_LIBRES = ['/', '/login', '/acceso-denegado']

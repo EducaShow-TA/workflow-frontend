@@ -27,6 +27,14 @@ const moneda = new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PE
 const paginas = ref(1)
 const totalBoletas = ref(0)
 const visibles = computed(() => boletas.value)
+const boletaManualAbierta = ref(false)
+const avisoBoletaManual = ref('')
+
+async function alGenerarBoletaManual(boleta: BoletaPension): Promise<void> {
+  boletaManualAbierta.value = false
+  avisoBoletaManual.value = `Se generó la boleta #${boleta.id} de ${boleta.estudiante} para ${boleta.mesCobro} (manual).`
+  await Promise.all([cargarCatalogos(), consultar()])
+}
 
 async function cargarCatalogos(): Promise<void> {
   cargandoCatalogos.value = true
@@ -89,11 +97,27 @@ onMounted(async () => {
 
 <template>
   <main class="pagina-finanzas">
-    <header>
-      <p class="ruta">Finanzas / Pensiones</p>
-      <h1>Boletas de pensiones</h1>
-      <p>Consulta las boletas generadas y registra pagos aprobados para actualizar su estado.</p>
+    <header class="encabezado-finanzas">
+      <div>
+        <p class="ruta">Finanzas / Pensiones</p>
+        <h1>Boletas de pensiones</h1>
+        <p>Consulta las boletas generadas y registra pagos aprobados para actualizar su estado.</p>
+      </div>
+      <button type="button" class="boton primario" @click="boletaManualAbierta = true">+ Generar boleta manual</button>
     </header>
+    <AvisoMensaje
+      v-if="avisoBoletaManual"
+      :mensaje="avisoBoletaManual"
+      tipo="exito"
+      cerrable
+      @cerrar="avisoBoletaManual = ''"
+    />
+    <ModalBoletaManual
+      :abierta="boletaManualAbierta"
+      :estudiantes="estudiantes"
+      @cerrar="boletaManualAbierta = false"
+      @generada="alGenerarBoletaManual"
+    />
     <section class="tarjeta" aria-labelledby="filtros-boletas">
       <h2 id="filtros-boletas">Consultar boletas</h2>
       <p class="ayuda">
@@ -185,7 +209,9 @@ onMounted(async () => {
             </thead>
             <tbody>
               <tr v-for="boleta in visibles" :key="boleta.id">
-                <td>#{{ boleta.id }}</td>
+                <td>
+                  #{{ boleta.id }}<small>{{ boleta.mecanismoGeneracion === 'MANUAL' ? 'Manual' : 'Automática' }}</small>
+                </td>
                 <td>
                   {{ boleta.estudiante }}<small>{{ boleta.apoderado }}</small>
                 </td>
@@ -235,6 +261,13 @@ onMounted(async () => {
 }
 header {
   margin-bottom: 24px;
+}
+.encabezado-finanzas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
 }
 h1 {
   font-size: 28px;
