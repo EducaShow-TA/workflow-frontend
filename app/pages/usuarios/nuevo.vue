@@ -180,7 +180,9 @@ async function cancelar(): Promise<void> {
                 @input="limpiarError('username')"
               />
               <small v-if="errores.username" class="error">{{ errores.username }}</small>
-              <small id="ayuda-username" class="ayuda">Usa solo letras y números; puede ser distinto del correo de contacto.</small>
+              <small id="ayuda-username" class="ayuda"
+                >Usa solo letras y números; puede ser distinto del correo de contacto.</small
+              >
             </div>
 
             <div class="campo ancho-completo">

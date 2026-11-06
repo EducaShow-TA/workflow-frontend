@@ -36,30 +36,41 @@ const estudiantesSeleccionados = ref<number[]>([])
 
 const anhioMatricula = computed(() => (ventanaVigente.value ? obtenerAnhio(ventanaVigente.value.fechaLimite) : null))
 const grados = computed(() => [...new Set(periodos.value.map((periodo) => periodo.numeroGrado))].sort((a, b) => a - b))
-const periodosDelGrado = computed(() => periodos.value.filter((periodo) => periodo.numeroGrado === gradoSeleccionado.value))
-const periodoSeleccionado = computed(() => periodosDelGrado.value.find((periodo) => periodo.periodoId === periodoId.value))
+const periodosDelGrado = computed(() =>
+  periodos.value.filter((periodo) => periodo.numeroGrado === gradoSeleccionado.value),
+)
+const periodoSeleccionado = computed(() =>
+  periodosDelGrado.value.find((periodo) => periodo.periodoId === periodoId.value),
+)
 const idsPeriodosDelAnhio = computed(() => new Set(periodos.value.map((periodo) => periodo.periodoId)))
 // Un estudiante con matrícula activa en cualquier sección del año ya no está disponible: el back no impide dos secciones.
 const estudiantesDisponibles = computed(() => {
   if (!periodoSeleccionado.value) return []
 
-  return estudiantes.value.filter((estudiante) =>
-    !estudiante.matriculas.some(
-      (matricula) => idsPeriodosDelAnhio.value.has(matricula.periodoId) && matricula.estado !== 'RETIRADA',
-    ),
+  return estudiantes.value.filter(
+    (estudiante) =>
+      !estudiante.matriculas.some(
+        (matricula) => idsPeriodosDelAnhio.value.has(matricula.periodoId) && matricula.estado !== 'RETIRADA',
+      ),
   )
 })
 const pendientesDeConfirmacion = computed(() => {
   if (!periodoSeleccionado.value) return []
-  return estudiantes.value.filter((e) => e.matriculas.some((m) =>
-    m.periodoId === periodoSeleccionado.value!.periodoId && m.estado === 'EN_REGISTRO'))
+  return estudiantes.value.filter((e) =>
+    e.matriculas.some((m) => m.periodoId === periodoSeleccionado.value!.periodoId && m.estado === 'EN_REGISTRO'),
+  )
 })
-const todosPendientesSeleccionados = computed(() => pendientesDeConfirmacion.value.length > 0 &&
-  pendientesDeConfirmacion.value.every((estudiante) => seleccionPendientes.value.includes(estudiante.estudianteId)))
+const todosPendientesSeleccionados = computed(
+  () =>
+    pendientesDeConfirmacion.value.length > 0 &&
+    pendientesDeConfirmacion.value.every((estudiante) => seleccionPendientes.value.includes(estudiante.estudianteId)),
+)
 
-const estudiantesAgregados = computed(() => estudiantesSeleccionados.value
-  .map((id) => estudiantesDisponibles.value.find((estudiante) => estudiante.estudianteId === id))
-  .filter((estudiante): estudiante is EstudianteMatriculable => Boolean(estudiante)))
+const estudiantesAgregados = computed(() =>
+  estudiantesSeleccionados.value
+    .map((id) => estudiantesDisponibles.value.find((estudiante) => estudiante.estudianteId === id))
+    .filter((estudiante): estudiante is EstudianteMatriculable => Boolean(estudiante)),
+)
 const resultadosBusqueda = computed(() => {
   const termino = busquedaEstudiante.value.trim().toLocaleLowerCase()
   if (termino.length < 2) return []
@@ -83,12 +94,15 @@ watch(periodoId, () => {
   avisoSeleccion.value = ''
 })
 watch(gradoSeleccionado, () => {
-  const siguientePeriodo = periodosDelGrado.value.find((periodo) => periodo.vacantesDisponibles > 0) ?? periodosDelGrado.value[0]
+  const siguientePeriodo =
+    periodosDelGrado.value.find((periodo) => periodo.vacantesDisponibles > 0) ?? periodosDelGrado.value[0]
   periodoId.value = siguientePeriodo?.periodoId ?? null
 })
 const maximoSeleccion = computed(() => Math.min(vacantesDisponibles.value, estudiantesDisponibles.value.length))
 const disponiblesSinAgregar = computed(() =>
-  estudiantesDisponibles.value.filter((estudiante) => !estudiantesSeleccionados.value.includes(estudiante.estudianteId)),
+  estudiantesDisponibles.value.filter(
+    (estudiante) => !estudiantesSeleccionados.value.includes(estudiante.estudianteId),
+  ),
 )
 const seccionCorta = computed(() =>
   periodoSeleccionado.value ? `${periodoSeleccionado.value.numeroGrado}.° ${periodoSeleccionado.value.seccion}` : '',
@@ -191,7 +205,9 @@ async function cargarDatos(): Promise<void> {
       ? 1
       : Math.min(...periodosCargados.map((periodo) => periodo.numeroGrado))
     const periodosPrimerGrado = periodosCargados.filter((periodo) => periodo.numeroGrado === gradoSeleccionado.value)
-    periodoId.value = (periodosPrimerGrado.find((periodo) => periodo.vacantesDisponibles > 0) ?? periodosPrimerGrado[0])?.periodoId ?? null
+    periodoId.value =
+      (periodosPrimerGrado.find((periodo) => periodo.vacantesDisponibles > 0) ?? periodosPrimerGrado[0])?.periodoId ??
+      null
   } catch (fallo: unknown) {
     error.value = obtenerMensajeError(fallo, 'No se pudieron cargar estudiantes y vacantes.')
   } finally {
@@ -200,7 +216,12 @@ async function cargarDatos(): Promise<void> {
 }
 
 async function registrarSeleccion(): Promise<void> {
-  if (!periodoSeleccionado.value || estudiantesSeleccionados.value.length === 0 || estudiantesSeleccionados.value.length > vacantesDisponibles.value) return
+  if (
+    !periodoSeleccionado.value ||
+    estudiantesSeleccionados.value.length === 0 ||
+    estudiantesSeleccionados.value.length > vacantesDisponibles.value
+  )
+    return
   guardando.value = true
   error.value = ''
   aviso.value = ''
@@ -230,7 +251,11 @@ async function confirmarSeleccion(compromiso: SolicitudCompromisoPago): Promise<
   error.value = ''
   errorCompromiso.value = ''
   try {
-    const resultados = await confirmarMasivamente(periodoSeleccionado.value.periodoId, seleccionPendientes.value, compromiso)
+    const resultados = await confirmarMasivamente(
+      periodoSeleccionado.value.periodoId,
+      seleccionPendientes.value,
+      compromiso,
+    )
     modalCompromisoAbierto.value = false
     seleccionPendientes.value = []
     await cargarDatos()
@@ -276,15 +301,19 @@ onMounted(cargarDatos)
         <div class="cuadricula-campos">
           <div class="campo">
             <label for="anhio-academico">Año Académico</label>
-            <input id="anhio-academico" :value="anhioMatricula ?? ''" type="text" readonly aria-describedby="ayuda-anhio" />
+            <input
+              id="anhio-academico"
+              :value="anhioMatricula ?? ''"
+              type="text"
+              readonly
+              aria-describedby="ayuda-anhio"
+            />
             <small id="ayuda-anhio">Año de la ventana de matrícula vigente.</small>
           </div>
           <div class="campo">
             <label for="grado-matricula">Grado</label>
             <select id="grado-matricula" v-model.number="gradoSeleccionado">
-              <option v-for="grado in grados" :key="grado" :value="grado">
-                {{ grado }}.° de secundaria
-              </option>
+              <option v-for="grado in grados" :key="grado" :value="grado">{{ grado }}.° de secundaria</option>
             </select>
           </div>
           <div class="campo">
@@ -313,7 +342,9 @@ onMounted(cargarDatos)
             <strong>{{ matriculados }}</strong> de {{ capacidadMaxima }} matriculados ·
             <strong>{{ vacantesDisponibles }}</strong> vacantes
           </p>
-          <p v-if="estadoCupos !== 'disponible'" class="mensaje-disponibilidad" :class="estadoCupos">{{ mensajeCupos }}</p>
+          <p v-if="estadoCupos !== 'disponible'" class="mensaje-disponibilidad" :class="estadoCupos">
+            {{ mensajeCupos }}
+          </p>
         </div>
       </div>
     </section>
@@ -333,41 +364,74 @@ onMounted(cargarDatos)
             <span>{{ estudiantesSeleccionados.length }} seleccionados · {{ vacantesDisponibles }} vacantes</span>
           </div>
           <div class="fila-busqueda">
-            <input id="buscar-estudiante" v-model="busquedaEstudiante" type="search" autocomplete="off" placeholder="Escribe al menos 2 caracteres" />
+            <input
+              id="buscar-estudiante"
+              v-model="busquedaEstudiante"
+              type="search"
+              autocomplete="off"
+              placeholder="Escribe al menos 2 caracteres"
+            />
             <button
               type="button"
               class="boton-agregar-todos"
-              :disabled="guardando || !disponiblesSinAgregar.length || estudiantesSeleccionados.length >= maximoSeleccion"
+              :disabled="
+                guardando || !disponiblesSinAgregar.length || estudiantesSeleccionados.length >= maximoSeleccion
+              "
               @click="agregarTodosDisponibles"
             >
               + Agregar todos los disponibles ({{ disponiblesSinAgregar.length }})
             </button>
           </div>
-          <NuxtLink to="/estudiantes/nuevo" class="enlace-registro">¿No lo encuentras? Registrar nuevo estudiante →</NuxtLink>
+          <NuxtLink to="/estudiantes/nuevo" class="enlace-registro"
+            >¿No lo encuentras? Registrar nuevo estudiante →</NuxtLink
+          >
           <AvisoMensaje v-if="avisoSeleccion" :mensaje="avisoSeleccion" tipo="advertencia" />
           <p v-if="vacantesDisponibles === 0" class="aviso-neutral">La sección no tiene vacantes disponibles.</p>
           <ul v-else-if="resultadosBusqueda.length" class="resultados-busqueda">
             <li v-for="estudiante in resultadosBusqueda" :key="estudiante.estudianteId">
               <span>{{ nombreCompleto(estudiante) }} — DNI {{ estudiante.dni }}</span>
-              <button type="button" class="boton-agregar" :disabled="estudiantesSeleccionados.length >= maximoSeleccion" @click="agregarEstudiante(estudiante)">Agregar</button>
+              <button
+                type="button"
+                class="boton-agregar"
+                :disabled="estudiantesSeleccionados.length >= maximoSeleccion"
+                @click="agregarEstudiante(estudiante)"
+              >
+                Agregar
+              </button>
             </li>
           </ul>
-          <p v-else-if="busquedaEstudiante.trim().length >= 2" class="aviso-neutral">No hay estudiantes disponibles que coincidan con la búsqueda.</p>
+          <p v-else-if="busquedaEstudiante.trim().length >= 2" class="aviso-neutral">
+            No hay estudiantes disponibles que coincidan con la búsqueda.
+          </p>
           <p v-else class="aviso-neutral">Escribe un nombre o DNI para buscar entre los estudiantes disponibles.</p>
 
           <div class="lista-seleccion-estudiantes">
             <div class="encabezado-lista">
               <strong>Estudiantes seleccionados</strong>
-              <button v-if="estudiantesAgregados.length" type="button" class="boton-quitar" @click="quitarTodos">Quitar todos</button>
+              <button v-if="estudiantesAgregados.length" type="button" class="boton-quitar" @click="quitarTodos">
+                Quitar todos
+              </button>
             </div>
             <p v-if="!estudiantesAgregados.length" class="aviso-neutral">Aún no agregaste estudiantes.</p>
             <ul v-else>
               <li v-for="estudiante in estudiantesAgregados" :key="estudiante.estudianteId">
                 <span>{{ nombreCompleto(estudiante) }} — DNI {{ estudiante.dni }}</span>
-                <button type="button" class="boton-quitar" :aria-label="`Quitar a ${nombreCompleto(estudiante)}`" @click="quitarEstudiante(estudiante.estudianteId)">Quitar</button>
+                <button
+                  type="button"
+                  class="boton-quitar"
+                  :aria-label="`Quitar a ${nombreCompleto(estudiante)}`"
+                  @click="quitarEstudiante(estudiante.estudianteId)"
+                >
+                  Quitar
+                </button>
               </li>
             </ul>
-            <button type="button" class="boton-confirmar" :disabled="guardando || !estudiantesSeleccionados.length" @click="registrarSeleccion">
+            <button
+              type="button"
+              class="boton-confirmar"
+              :disabled="guardando || !estudiantesSeleccionados.length"
+              @click="registrarSeleccion"
+            >
               {{ guardando ? 'Registrando...' : `Registrar seleccionados (${estudiantesSeleccionados.length})` }}
             </button>
           </div>
@@ -385,19 +449,31 @@ onMounted(cargarDatos)
     <section v-if="pendientesDeConfirmacion.length" class="tarjeta" aria-labelledby="titulo-pendientes">
       <div class="encabezado-tarjeta">
         <h2 id="titulo-pendientes">
-          <span class="numero-paso" aria-hidden="true">3</span>Pendientes de confirmación en {{ seccionCorta || 'la sección' }}
+          <span class="numero-paso" aria-hidden="true">3</span>Pendientes de confirmación en
+          {{ seccionCorta || 'la sección' }}
         </h2>
       </div>
       <div class="contenido-tarjeta">
-        <p class="ayuda-pendientes">Al confirmar se definen los términos del compromiso de pago y se emite la primera boleta.</p>
+        <p class="ayuda-pendientes">
+          Al confirmar se definen los términos del compromiso de pago y se emite la primera boleta.
+        </p>
         <button type="button" class="boton-agregar" :disabled="guardando" @click="alternarSeleccionPendientes">
           {{ todosPendientesSeleccionados ? 'Quitar selección' : 'Seleccionar todos' }}
         </button>
-        <label v-for="estudiante in pendientesDeConfirmacion" :key="estudiante.estudianteId" class="seleccion-pendiente">
+        <label
+          v-for="estudiante in pendientesDeConfirmacion"
+          :key="estudiante.estudianteId"
+          class="seleccion-pendiente"
+        >
           <input v-model="seleccionPendientes" type="checkbox" :value="estudiante.estudianteId" />
           {{ nombreCompleto(estudiante) }} — DNI {{ estudiante.dni }}
         </label>
-        <button type="button" class="boton-confirmar" :disabled="guardando || !seleccionPendientes.length" @click="abrirCompromiso">
+        <button
+          type="button"
+          class="boton-confirmar"
+          :disabled="guardando || !seleccionPendientes.length"
+          @click="abrirCompromiso"
+        >
           Confirmar seleccionadas ({{ seleccionPendientes.length }})…
         </button>
       </div>
@@ -413,7 +489,9 @@ onMounted(cargarDatos)
       tipo="advertencia"
     />
 
-    <div class="acciones-matricula"><button type="button" class="boton-cancelar" @click="cancelar">Cancelar</button></div>
+    <div class="acciones-matricula">
+      <button type="button" class="boton-cancelar" @click="cancelar">Cancelar</button>
+    </div>
 
     <ModalCompromisoPago
       v-if="anhioMatricula"
@@ -454,8 +532,16 @@ onMounted(cargarDatos)
   border-radius: 10px;
 }
 .encabezado-seleccion,
-.encabezado-lista { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.fila-busqueda { display: flex; gap: 12px; }
+.encabezado-lista {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.fila-busqueda {
+  display: flex;
+  gap: 12px;
+}
 .fila-busqueda input {
   min-width: 0;
   min-height: 44px;
@@ -467,8 +553,14 @@ onMounted(cargarDatos)
   color: #191c1e;
   font-size: 14px;
 }
-.fila-busqueda input:focus-visible { outline: 2px solid #004ac6; outline-offset: 2px; }
-.lista-seleccion-estudiantes ul { max-height: 320px; overflow: auto; }
+.fila-busqueda input:focus-visible {
+  outline: 2px solid #004ac6;
+  outline-offset: 2px;
+}
+.lista-seleccion-estudiantes ul {
+  max-height: 320px;
+  overflow: auto;
+}
 .boton-agregar-todos {
   flex-shrink: 0;
   padding: 0 14px;
@@ -481,19 +573,65 @@ onMounted(cargarDatos)
   font-weight: 600;
   cursor: pointer;
 }
-.boton-agregar-todos:disabled { border-color: #c3c6d7; color: #7a7d8a; cursor: not-allowed; }
-.aviso-exito { display: grid; gap: 8px; }
-.enlace-finanzas { justify-self: start; color: #004ac6; font-size: 14px; font-weight: 600; text-decoration: none; }
-.enlace-finanzas:hover { text-decoration: underline; }
-.ayuda-pendientes { margin: 0 0 8px; color: #434655; font-size: 14px; }
-.selector-estudiantes { display: grid; gap: 10px; margin-top: 20px; }
+.boton-agregar-todos:disabled {
+  border-color: #c3c6d7;
+  color: #7a7d8a;
+  cursor: not-allowed;
+}
+.aviso-exito {
+  display: grid;
+  gap: 8px;
+}
+.enlace-finanzas {
+  justify-self: start;
+  color: #004ac6;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.enlace-finanzas:hover {
+  text-decoration: underline;
+}
+.ayuda-pendientes {
+  margin: 0 0 8px;
+  color: #434655;
+  font-size: 14px;
+}
+.selector-estudiantes {
+  display: grid;
+  gap: 10px;
+  margin-top: 20px;
+}
 .resultados-busqueda,
-.lista-seleccion-estudiantes ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.lista-seleccion-estudiantes ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
 .resultados-busqueda li,
-.lista-seleccion-estudiantes li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid #e2e5ef; }
+.lista-seleccion-estudiantes li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid #e2e5ef;
+}
 .boton-agregar,
-.boton-quitar { border: 0; background: transparent; color: #004ac6; font: inherit; font-weight: 600; cursor: pointer; }
-.boton-agregar:disabled { color: #7a7d8a; cursor: not-allowed; }
+.boton-quitar {
+  border: 0;
+  background: transparent;
+  color: #004ac6;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.boton-agregar:disabled {
+  color: #7a7d8a;
+  cursor: not-allowed;
+}
 .encabezado-pagina,
 .nombre-estudiante,
 .acciones-matricula {

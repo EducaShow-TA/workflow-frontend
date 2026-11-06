@@ -282,12 +282,21 @@ async function cancelar(): Promise<void> {
                   Si cambias tu usuario de acceso, se cerrará tu sesión y tendrás que iniciar con el nuevo usuario.
                 </small>
                 <small v-else id="ayuda-username" class="ayuda">
-                  Es el identificador usado para iniciar sesión; solo admite letras y números y puede ser distinto del correo.
+                  Es el identificador usado para iniciar sesión; solo admite letras y números y puede ser distinto del
+                  correo.
                 </small>
               </div>
               <div class="campo ancho-completo">
                 <label for="correo">Correo electrónico de contacto <span class="obligatorio">*</span></label>
-                <input id="correo" v-model="formulario.correo" type="email" :maxlength="LONGITUD_MAXIMA_CORREO" autocomplete="email" :aria-invalid="Boolean(errores.correo)" @input="limpiarError('correo')" />
+                <input
+                  id="correo"
+                  v-model="formulario.correo"
+                  type="email"
+                  :maxlength="LONGITUD_MAXIMA_CORREO"
+                  autocomplete="email"
+                  :aria-invalid="Boolean(errores.correo)"
+                  @input="limpiarError('correo')"
+                />
                 <small v-if="errores.correo" class="error">{{ errores.correo }}</small>
               </div>
             </div>

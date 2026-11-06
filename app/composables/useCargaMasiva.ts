@@ -222,8 +222,7 @@ export function combinarFilas(resultado: ResultadoCargaMasiva, csv: CsvLeido | n
       fila: error.fila,
       rol: (original.rol ?? '').toUpperCase(),
       dni: original.dni ?? '',
-      username:
-        original.username ?? `usuario${(original.dni ?? '').replace(/[^A-Za-z0-9]/g, '')}`,
+      username: original.username ?? `usuario${(original.dni ?? '').replace(/[^A-Za-z0-9]/g, '')}`,
       estado: 'RECHAZADA',
       motivos: [error],
     })

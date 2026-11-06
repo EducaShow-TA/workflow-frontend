@@ -27,6 +27,10 @@ jobs:
           node-version: '22'
           cache: npm
 
+      # Node 22 trae npm 10, que no acepta el package-lock.json generado con npm 11 (ver .npmrc).
+      - name: Instalar npm 11
+        run: npm install -g npm@11.16.0
+
       - name: Instalar dependencias
         run: npm ci
 

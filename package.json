@@ -2,6 +2,9 @@
   "name": "colegio-frontend",
   "type": "module",
   "private": true,
+  "engines": {
+    "npm": ">=11"
+  },
   "scripts": {
     "build": "nuxt build",
     "dev": "nuxt dev",
@@ -9,6 +12,10 @@
     "preview": "nuxt preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "nuxi typecheck",
     "postinstall": "nuxt prepare"
   },
   "dependencies": {

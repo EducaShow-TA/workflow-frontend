@@ -58,8 +58,14 @@ describe('lógica de períodos de matrícula', () => {
   it('rechaza inicios pasados y ventanas cuyo inicio queda más de un año antes del año destino', () => {
     const ayer = new Date()
     ayer.setDate(ayer.getDate() - 1)
-    const isoAyer = [ayer.getFullYear(), String(ayer.getMonth() + 1).padStart(2, '0'), String(ayer.getDate()).padStart(2, '0')].join('-')
-    expect(validarPeriodoMatricula({ fechaInicio: isoAyer, fechaLimite: `${ayer.getFullYear() + 1}-01-10` })).toHaveProperty('fechaInicio')
+    const isoAyer = [
+      ayer.getFullYear(),
+      String(ayer.getMonth() + 1).padStart(2, '0'),
+      String(ayer.getDate()).padStart(2, '0'),
+    ].join('-')
+    expect(
+      validarPeriodoMatricula({ fechaInicio: isoAyer, fechaLimite: `${ayer.getFullYear() + 1}-01-10` }),
+    ).toHaveProperty('fechaInicio')
 
     const anhio = new Date().getFullYear()
     expect(

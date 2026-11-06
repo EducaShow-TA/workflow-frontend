@@ -87,7 +87,8 @@ function validarNombre(valor: string, etiqueta: string): string | undefined {
 function validarUsuario(valor: string, cuentas: CuentaUsuario[], idExcluido?: number): string | undefined {
   const username = valor.trim()
   if (!username) return 'El usuario es obligatorio.'
-  if (username.length > LONGITUD_MAXIMA_USUARIO) return `El usuario no debe superar los ${LONGITUD_MAXIMA_USUARIO} caracteres.`
+  if (username.length > LONGITUD_MAXIMA_USUARIO)
+    return `El usuario no debe superar los ${LONGITUD_MAXIMA_USUARIO} caracteres.`
   if (!FORMATO_USUARIO.test(username)) return 'El usuario solo puede contener letras y números.'
   if (existeUsuario(cuentas, username, idExcluido)) return 'Ya existe ese usuario.'
   return undefined

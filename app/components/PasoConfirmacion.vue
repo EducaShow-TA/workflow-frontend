@@ -194,9 +194,7 @@ function mostrarParentesco(valor: string): string {
     <div class="aviso-pendiente" role="note">
       <strong>Cuenta de acceso</strong>
 
-      <p>
-        Se creará una cuenta para el estudiante con el usuario y la contraseña inicial indicados.
-      </p>
+      <p>Se creará una cuenta para el estudiante con el usuario y la contraseña inicial indicados.</p>
     </div>
   </section>
 </template>

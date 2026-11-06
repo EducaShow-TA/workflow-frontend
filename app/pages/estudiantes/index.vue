@@ -143,7 +143,9 @@ async function informarNuevoEstudiante(): Promise<void> {
           </thead>
 
           <tbody>
-            <tr v-if="cargando"><td colspan="7" class="sin-resultados">Cargando estudiantes…</td></tr>
+            <tr v-if="cargando">
+              <td colspan="7" class="sin-resultados">Cargando estudiantes…</td>
+            </tr>
             <tr v-for="estudiante in estudiantesFiltrados" :key="estudiante.codigo">
               <td class="codigo">
                 {{ estudiante.codigo }}
@@ -169,7 +171,9 @@ async function informarNuevoEstudiante(): Promise<void> {
               <td>{{ estudiante.grado }}</td>
               <td>{{ estudiante.seccion }}</td>
 
-              <td><span class="estado">{{ estudiante.estado === 'REGISTRADO' ? 'Registrado' : '—' }}</span></td>
+              <td>
+                <span class="estado">{{ estudiante.estado === 'REGISTRADO' ? 'Registrado' : '—' }}</span>
+              </td>
 
               <td>
                 <span>—</span>
@@ -184,7 +188,11 @@ async function informarNuevoEstudiante(): Promise<void> {
       </div>
 
       <footer class="pie-tabla">
-        {{ cargando ? 'Consultando el servidor…' : `Mostrando ${estudiantesFiltrados.length} de ${estudiantes.length} estudiantes` }}
+        {{
+          cargando
+            ? 'Consultando el servidor…'
+            : `Mostrando ${estudiantesFiltrados.length} de ${estudiantes.length} estudiantes`
+        }}
       </footer>
     </section>
   </main>
