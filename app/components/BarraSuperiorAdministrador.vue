@@ -10,6 +10,8 @@ const nombrePagina = computed(() => {
   if (ruta.path.startsWith('/matriculas')) return 'Matrícula'
   if (ruta.path.startsWith('/secciones')) return 'Grados y secciones'
   if (ruta.path.startsWith('/competencias')) return 'Competencias'
+  if (ruta.path.startsWith('/tareas')) return 'Tareas'
+  if (ruta.path.startsWith('/calificaciones')) return 'Calificaciones'
   if (ruta.path.startsWith('/horarios')) return 'Horarios'
   if (ruta.path.startsWith('/usuarios')) return 'Usuarios'
   if (ruta.path.startsWith('/roles-permisos')) return 'Roles y permisos'

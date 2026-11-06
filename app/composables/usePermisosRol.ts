@@ -21,6 +21,13 @@ const DESCRIPCIONES_ROL: Record<RolUsuario, string> = {
 
 export const PERMISOS: Permiso[] = [
   {
+    codigo: 'PORTAL_DOCENTE_VER',
+    modulo: 'Portal docente',
+    nombre: 'Acceder al portal docente',
+    descripcion: 'Consultar el portal de trabajo del docente y sus módulos académicos.',
+    sensible: false,
+  },
+  {
     codigo: 'BOLETA_GESTIONAR',
     modulo: 'Finanzas',
     nombre: 'Gestionar boletas',
@@ -157,12 +164,13 @@ export const PERMISOS: Permiso[] = [
 
 export const PERMISOS_POR_ROL: Record<RolUsuario, string[]> = {
   ADMINISTRADOR: PERMISOS.map((permiso) => permiso.codigo),
-  DOCENTE: [],
+  DOCENTE: ['PORTAL_DOCENTE_VER'],
   ALUMNO: [],
   APODERADO: [],
 }
 
 export const REGLAS_RUTA: ReglaRuta[] = [
+  { prefijo: '/docente', permiso: 'PORTAL_DOCENTE_VER' },
   { prefijo: '/finanzas', permiso: 'BOLETA_GESTIONAR' },
   { prefijo: '/reportes/boletas', permiso: 'REPORTE_COBRANZA_VER' },
   { prefijo: '/panel', permiso: 'PANEL_VER' },

@@ -1,5 +1,4 @@
 import { useApi } from '~/composables/useApi'
-import { obtenerPrimerError } from '~/composables/useValidacion'
 import type { VarianteInsignia } from '~/types/interfaz'
 import type {
   ErroresSeccion,

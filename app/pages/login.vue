@@ -59,7 +59,7 @@ async function procesarInicioSesion(): Promise<void> {
     return
   }
 
-  await navigateTo('/panel')
+  await navigateTo(autenticacion.usuario?.rol === 'DOCENTE' ? '/docente' : '/panel')
 }
 
 function irARecuperacion(): void {
@@ -129,8 +129,8 @@ function irARecuperacion(): void {
       <BotonPrincipal tipo="submit"> Iniciar sesión </BotonPrincipal>
 
       <p v-if="credencialesInvalidas" class="mensaje-error-acceso" role="alert">
-        Usuario/correo o contraseña incorrectos. Después de {{ INTENTOS_ANTES_DE_BLOQUEO }} intentos fallidos la cuenta se
-        bloquea por {{ MINUTOS_BLOQUEO }} minutos.
+        Usuario/correo o contraseña incorrectos. Después de {{ INTENTOS_ANTES_DE_BLOQUEO }} intentos fallidos la cuenta
+        se bloquea por {{ MINUTOS_BLOQUEO }} minutos.
         <button type="button" class="enlace-recuperacion" @click="irARecuperacion">Restablece tu contraseña</button>
         si no la recuerdas.
       </p>
