@@ -10,8 +10,10 @@ import { useAutenticacionStore } from '~/stores/autenticacion'
 definePageMeta({ layout: 'docente', middleware: 'autenticacion' })
 
 const CLAVE_RECORDADA = 'educashow.docente.calificaciones'
+const CLAVE_UMBRAL = 'educashow.docente.umbral-riesgo'
+const UMBRALES = [1, 2, 3, 4, 5]
 
-type FiltroNota = NotaCualitativa | 'SIN_NOTA' | ''
+type FiltroNota = NotaCualitativa | 'SIN_NOTA' | 'RIESGO' | ''
 
 const autenticacion = useAutenticacionStore()
 const { listar: listarClases, listarAlumnos } = useMisClases()
@@ -26,6 +28,7 @@ const alumnos = ref<AlumnoClase[]>([])
 const notasPorCompetencia = ref<Record<string, Calificacion[]>>({})
 const busqueda = ref('')
 const filtroNota = ref<FiltroNota>('')
+const umbralRiesgo = ref(2)
 const cargando = ref(true)
 const cargandoClase = ref(false)
 const error = ref('')
@@ -60,12 +63,33 @@ const conteo = computed(() => {
   return resultado
 })
 
+const notasCPorMatricula = computed(() => {
+  const conteoC = new Map<number, number>()
+  for (const lista of Object.values(notasPorCompetencia.value)) {
+    for (const nota of lista) {
+      if (nota.nota === 'C') conteoC.set(nota.matriculaId, (conteoC.get(nota.matriculaId) ?? 0) + 1)
+    }
+  }
+  return conteoC
+})
+const enRiesgo = computed(
+  () =>
+    new Set(
+      alumnos.value
+        .filter((alumno) => (notasCPorMatricula.value.get(alumno.matriculaId) ?? 0) >= umbralRiesgo.value)
+        .map((alumno) => alumno.matriculaId),
+    ),
+)
+
 const alumnosFiltrados = computed(() => {
   const texto = normalizar(busqueda.value)
   return alumnos.value.filter((alumno) => {
     const nota = notaPorMatricula.value.get(alumno.matriculaId)
-    if (filtroNota.value === 'SIN_NOTA' && nota) return false
-    if (filtroNota.value && filtroNota.value !== 'SIN_NOTA' && nota?.nota !== filtroNota.value) return false
+    if (filtroNota.value === 'RIESGO') {
+      if (!enRiesgo.value.has(alumno.matriculaId)) return false
+    } else if (filtroNota.value === 'SIN_NOTA') {
+      if (nota) return false
+    } else if (filtroNota.value && nota?.nota !== filtroNota.value) return false
     return !texto || normalizar(alumno.nombreCompleto).includes(texto) || alumno.dni.includes(texto)
   })
 })
@@ -161,6 +185,22 @@ async function cargarClase(): Promise<void> {
   }
 }
 
+function cambiarUmbral(valor: number): void {
+  umbralRiesgo.value = valor
+  if (!enRiesgo.value.size && filtroNota.value === 'RIESGO') filtroNota.value = ''
+  try {
+    localStorage.setItem(CLAVE_UMBRAL, String(valor))
+  } catch {
+    /* el navegador puede bloquear el almacenamiento */
+  }
+}
+
+function textoFiltro(valor: FiltroNota): string {
+  if (valor === 'SIN_NOTA') return 'Sin nota'
+  if (valor === 'RIESGO') return 'En riesgo'
+  return valor
+}
+
 function alternarFiltro(valor: FiltroNota): void {
   filtroNota.value = filtroNota.value === valor ? '' : valor
 }
@@ -212,6 +252,12 @@ onMounted(async () => {
   try {
     clases.value = await listarClases()
     const recordada = leerRecordada()
+    try {
+      const guardado = Number(localStorage.getItem(CLAVE_UMBRAL))
+      if (UMBRALES.includes(guardado)) umbralRiesgo.value = guardado
+    } catch {
+      /* el navegador puede bloquear el almacenamiento */
+    }
     const inicial = clases.value.find((item) => claveClase(item) === recordada.clase) ?? clases.value[0]
     if (inicial) await elegirClase(claveClase(inicial), recordada.competencia)
   } catch (fallo: unknown) {
@@ -324,6 +370,41 @@ onMounted(async () => {
           <p v-if="cargandoClase" class="docente-texto-secundario" role="status">Cargando alumnos y notas…</p>
 
           <template v-else>
+            <div :class="['riesgo', { 'riesgo--sin': !enRiesgo.size }]" role="region" aria-label="Riesgo académico">
+              <div class="riesgo__texto">
+                <strong>
+                  {{
+                    enRiesgo.size
+                      ? `${enRiesgo.size} ${enRiesgo.size === 1 ? 'alumno en riesgo académico' : 'alumnos en riesgo académico'}`
+                      : 'Ningún alumno en riesgo académico'
+                  }}
+                </strong>
+                <span>
+                  Acumulan {{ umbralRiesgo }} o más notas C en las competencias de {{ clase.areaNombre }}. Solo
+                  considera notas; no cuenta tardanzas ni inasistencias.
+                </span>
+              </div>
+              <div class="riesgo__acciones">
+                <label for="umbral-riesgo">Umbral de notas C</label>
+                <select
+                  id="umbral-riesgo"
+                  :value="umbralRiesgo"
+                  @change="cambiarUmbral(Number(($event.target as HTMLSelectElement).value))"
+                >
+                  <option v-for="valor in UMBRALES" :key="valor" :value="valor">{{ valor }} o más</option>
+                </select>
+                <button
+                  type="button"
+                  class="docente-boton docente-boton--secundario"
+                  :aria-pressed="filtroNota === 'RIESGO'"
+                  :disabled="!enRiesgo.size"
+                  @click="alternarFiltro('RIESGO')"
+                >
+                  {{ filtroNota === 'RIESGO' ? 'Ver a todos' : 'Ver solo en riesgo' }}
+                </button>
+              </div>
+            </div>
+
             <p id="ayuda-filtro" class="ayuda-filtro">
               Toca una nota para ver solo esos alumnos; tócala de nuevo para ver a todos.
             </p>
@@ -357,9 +438,7 @@ onMounted(async () => {
               </label>
               <span class="docente-texto-secundario">
                 {{ alumnosFiltrados.length }} de {{ alumnos.length }} alumnos
-                <template v-if="filtroNota"
-                  >· filtro {{ filtroNota === 'SIN_NOTA' ? 'Sin nota' : filtroNota }}</template
-                >
+                <template v-if="filtroNota">· filtro {{ textoFiltro(filtroNota) }}</template>
                 <button v-if="filtroNota" type="button" class="enlace" @click="filtroNota = ''">Quitar filtro</button>
               </span>
             </div>
@@ -384,11 +463,18 @@ onMounted(async () => {
                       {{ alumnos.length ? 'Ningún alumno coincide con el filtro.' : 'La sección no tiene alumnos.' }}
                     </td>
                   </tr>
-                  <tr v-for="alumno in alumnosFiltrados" :key="alumno.matriculaId">
+                  <tr
+                    v-for="alumno in alumnosFiltrados"
+                    :key="alumno.matriculaId"
+                    :class="{ 'fila-riesgo': enRiesgo.has(alumno.matriculaId) }"
+                  >
                     <td class="numero">{{ alumnos.indexOf(alumno) + 1 }}</td>
                     <td>
                       <strong class="nombre">{{ alumno.nombreCompleto }}</strong>
                       <small class="dni">DNI {{ alumno.dni }}</small>
+                      <span v-if="enRiesgo.has(alumno.matriculaId)" class="marca-riesgo">
+                        En riesgo · {{ notasCPorMatricula.get(alumno.matriculaId) }} C
+                      </span>
                     </td>
                     <template v-if="notaPorMatricula.get(alumno.matriculaId)">
                       <td>
@@ -645,6 +731,95 @@ onMounted(async () => {
 
 .kpi--C {
   border-left-color: #b91c1c;
+}
+
+.riesgo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border: 1px solid #fecaca;
+  border-left: 4px solid #b91c1c;
+  border-radius: 10px;
+  background: #fef2f2;
+}
+
+.riesgo--sin {
+  border-color: #e2e8f0;
+  border-left-color: #94a3b8;
+  background: #f8fafc;
+}
+
+.riesgo__texto {
+  display: flex;
+  min-width: 240px;
+  flex: 1 1 320px;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.riesgo__texto strong {
+  color: #7f1d1d;
+  font-size: 15px;
+}
+
+.riesgo--sin .riesgo__texto strong {
+  color: #334155;
+}
+
+.riesgo__texto span {
+  color: #475569;
+  font-size: 12px;
+}
+
+.riesgo__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.riesgo__acciones label {
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.riesgo__acciones select {
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+  font-size: 13px;
+}
+
+.riesgo__acciones .docente-boton[aria-pressed='true'] {
+  border-color: #b91c1c;
+  color: #b91c1c;
+}
+
+.fila-riesgo td {
+  background: #fff7f7;
+}
+
+.fila-riesgo td:first-child {
+  box-shadow: inset 3px 0 0 #b91c1c;
+}
+
+.marca-riesgo {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #fee2e2;
+  color: #991b1b;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .kpi--SIN {
