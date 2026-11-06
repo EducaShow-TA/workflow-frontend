@@ -14,6 +14,7 @@ import {
   obtenerSeccionesPendientes,
   obtenerVarianteEstadoAnhio,
   resumirAnhio,
+  calcularLimitesFechasAnhio,
   validarAperturaAnhio,
 } from '~/composables/useAnhioEscolar'
 import { usePeriodosAcademicos } from '~/composables/usePeriodosAcademicos'
@@ -288,6 +289,11 @@ const anhiosParaAbrir = computed(() => {
 })
 
 const seccionesPorCrear = computed(() => obtenerPendientes(formularioApertura.anhio))
+const anhioFinalizado = computed(() => resumenAnhio.value?.estado === 'FINALIZADO')
+const inicioBloqueado = computed(() => editandoAnhio.value && resumenAnhio.value?.estado === 'EN_CURSO')
+const limitesFechas = computed(() =>
+  calcularLimitesFechasAnhio(formularioApertura.anhio, formularioApertura.fechaInicio, fechaHoy),
+)
 
 function abrirApertura(): void {
   editandoAnhio.value = false
@@ -302,7 +308,7 @@ function abrirApertura(): void {
 }
 
 function editarPeriodoAnhio(): void {
-  if (!resumenAnhio.value) return
+  if (!resumenAnhio.value || anhioFinalizado.value) return
   formularioApertura.anhio = anhioActual.value
   formularioApertura.fechaInicio = resumenAnhio.value.fechaInicio
   formularioApertura.fechaFin = resumenAnhio.value.fechaFin
@@ -317,7 +323,7 @@ async function confirmarApertura(): Promise<void> {
   errorApertura.value = ''
   erroresApertura.fechaInicio = undefined
   erroresApertura.fechaFin = undefined
-  Object.assign(erroresApertura, validarAperturaAnhio(formularioApertura))
+  Object.assign(erroresApertura, validarAperturaAnhio(formularioApertura, fechaHoy, inicioBloqueado.value))
 
   if (tieneErrores(erroresApertura)) {
     return
@@ -363,7 +369,17 @@ async function confirmarApertura(): Promise<void> {
         >
           Abrir año escolar
         </BotonAccion>
-        <BotonAccion v-if="anhioAbierto" variante="secundario" @click="editarPeriodoAnhio">Editar periodo del año</BotonAccion>
+        <BotonAccion
+          v-if="anhioAbierto"
+          variante="secundario"
+          :deshabilitado="anhioFinalizado"
+          :title="
+            anhioFinalizado ? `Las clases de ${anhioActual} ya terminaron; sus fechas no se pueden cambiar.` : undefined
+          "
+          @click="editarPeriodoAnhio"
+        >
+          Editar periodo del año
+        </BotonAccion>
         <BotonAccion @click="abrirRegistroSeccion">+ Agregar sección</BotonAccion>
       </template>
     </EncabezadoPagina>
@@ -398,6 +414,9 @@ async function confirmarApertura(): Promise<void> {
             :texto="obtenerEtiquetaEstadoAnhio(resumenAnhio.estado)"
             :variante="obtenerVarianteEstadoAnhio(resumenAnhio.estado)"
           />
+          <small v-if="anhioFinalizado" class="nota-finalizado"
+            >Solo consulta: sus fechas ya no se pueden cambiar.</small
+          >
         </p>
       </section>
 
@@ -650,17 +669,54 @@ async function confirmarApertura(): Promise<void> {
     <VentanaModal
       :abierta="aperturaAbierta"
       :titulo="editandoAnhio ? 'Editar periodo del año escolar' : 'Abrir año escolar'"
-      :descripcion="editandoAnhio ? 'Actualiza las fechas de clases de todas las secciones del año.' : 'Crea el periodo de clases de cada sección para el año indicado.'"
+      :descripcion="
+        editandoAnhio
+          ? 'Actualiza las fechas de clases de todas las secciones del año.'
+          : 'Crea el periodo de clases de cada sección para el año indicado.'
+      "
       :bloqueada="abriendo"
       @cerrar="aperturaAbierta = false"
     >
       <form id="formulario-apertura" class="formulario" novalidate @submit.prevent="confirmarApertura">
         <div class="campo">
           <label for="anhio-apertura">Año escolar <span class="obligatorio">*</span></label>
-          <select id="anhio-apertura" v-model.number="formularioApertura.anhio" :disabled="editandoAnhio" aria-describedby="ayuda-anhio-apertura">
-            <option v-for="anhio in anhiosParaAbrir" :key="anhio" :value="anhio">{{ anhio }}</option>
+          <select
+            id="anhio-apertura"
+            v-model.number="formularioApertura.anhio"
+            :disabled="editandoAnhio"
+            :aria-describedby="editandoAnhio ? undefined : 'ayuda-anhio-apertura'"
+          >
+            <option
+              v-for="anhio in editandoAnhio ? [formularioApertura.anhio] : anhiosParaAbrir"
+              :key="anhio"
+              :value="anhio"
+            >
+              {{ anhio }}
+            </option>
           </select>
-          <small id="ayuda-anhio-apertura" class="ayuda">Solo se listan los años con secciones sin periodo.</small>
+          <small v-if="!editandoAnhio" id="ayuda-anhio-apertura" class="ayuda">
+            Solo se listan los años con secciones sin periodo.
+          </small>
+        </div>
+
+        <div class="reglas-fechas" role="note">
+          <strong>{{ inicioBloqueado ? 'Reglas para un año en curso' : 'Reglas de las fechas' }}</strong>
+          <ul v-if="inicioBloqueado">
+            <li>
+              El inicio no se cambia: las clases empezaron el {{ formatearFecha(formularioApertura.fechaInicio) }}.
+            </li>
+            <li>
+              El fin de clases debe ser desde hoy ({{ formatearFecha(fechaHoy) }}) y dentro de
+              {{ formularioApertura.anhio }}.
+            </li>
+          </ul>
+          <ul v-else>
+            <li>
+              Inicio de clases: desde el {{ formatearFecha(limitesFechas.minimoInicio) }} y dentro de
+              {{ formularioApertura.anhio }}.
+            </li>
+            <li>Fin de clases: posterior al inicio y dentro de {{ formularioApertura.anhio }}.</li>
+          </ul>
         </div>
 
         <div class="cuadricula-campos">
@@ -670,13 +726,23 @@ async function confirmarApertura(): Promise<void> {
               id="inicio-clases"
               v-model="formularioApertura.fechaInicio"
               type="date"
+              :min="limitesFechas.minimoInicio"
+              :max="limitesFechas.maximo"
+              :disabled="inicioBloqueado"
               :aria-invalid="Boolean(erroresApertura.fechaInicio)"
-              :aria-describedby="erroresApertura.fechaInicio ? 'error-inicio-clases' : undefined"
+              :aria-describedby="
+                erroresApertura.fechaInicio
+                  ? 'error-inicio-clases'
+                  : inicioBloqueado
+                    ? 'ayuda-inicio-clases'
+                    : undefined
+              "
               @input="erroresApertura.fechaInicio = undefined"
             />
             <small v-if="erroresApertura.fechaInicio" id="error-inicio-clases" class="error">
               {{ erroresApertura.fechaInicio }}
             </small>
+            <small v-else-if="inicioBloqueado" id="ayuda-inicio-clases" class="ayuda">Las clases ya empezaron.</small>
           </div>
 
           <div class="campo">
@@ -685,7 +751,8 @@ async function confirmarApertura(): Promise<void> {
               id="fin-clases"
               v-model="formularioApertura.fechaFin"
               type="date"
-              :min="formularioApertura.fechaInicio || undefined"
+              :min="limitesFechas.minimoFin"
+              :max="limitesFechas.maximo"
               :aria-invalid="Boolean(erroresApertura.fechaFin)"
               :aria-describedby="erroresApertura.fechaFin ? 'error-fin-clases' : undefined"
               @input="erroresApertura.fechaFin = undefined"
@@ -720,9 +787,15 @@ async function confirmarApertura(): Promise<void> {
         <BotonAccion
           tipo="submit"
           form="formulario-apertura"
-          :deshabilitado="abriendo || seccionesPorCrear.length === 0"
+          :deshabilitado="abriendo || (!editandoAnhio && seccionesPorCrear.length === 0)"
         >
-          {{ abriendo ? 'Guardando...' : editandoAnhio ? `Guardar cambios de ${formularioApertura.anhio}` : `Abrir año ${formularioApertura.anhio}` }}
+          {{
+            abriendo
+              ? 'Guardando...'
+              : editandoAnhio
+                ? `Guardar cambios de ${formularioApertura.anhio}`
+                : `Abrir año ${formularioApertura.anhio}`
+          }}
         </BotonAccion>
       </template>
     </VentanaModal>
@@ -1048,6 +1121,33 @@ td {
 
 .ayuda {
   color: #737686;
+  font-size: 12px;
+}
+
+.formulario input:disabled,
+.formulario select:disabled {
+  background: #f2f4f6;
+  color: #434655;
+  cursor: not-allowed;
+}
+
+.reglas-fechas {
+  padding: 12px 14px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #1e3a8a;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.reglas-fechas ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+.nota-finalizado {
+  color: #434655;
   font-size: 12px;
 }
 
