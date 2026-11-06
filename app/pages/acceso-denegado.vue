@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useAutenticacionStore } from '~/stores/autenticacion'
-import { obtenerNombreRol, puedeAcceder } from '~/composables/usePermisosRol'
+import { obtenerNombreRol, obtenerRutaInicio, puedeAcceder } from '~/composables/usePermisosRol'
 
 definePageMeta({
   layout: 'autenticacion',
@@ -13,12 +13,13 @@ const ruta = useRoute()
 
 const rutaSolicitada = computed(() => (typeof ruta.query.ruta === 'string' ? ruta.query.ruta : ''))
 const nombreRol = computed(() => (autenticacion.usuario ? obtenerNombreRol(autenticacion.usuario.rol) : ''))
+const rutaInicio = computed(() => (autenticacion.usuario ? obtenerRutaInicio(autenticacion.usuario.rol) : '/panel'))
 const puedeVolverAlPanel = computed(() =>
-  autenticacion.usuario ? puedeAcceder(autenticacion.usuario.rol, '/panel') : false,
+  autenticacion.usuario ? puedeAcceder(autenticacion.usuario.rol, rutaInicio.value) : false,
 )
 
 async function irAlPanel(): Promise<void> {
-  await navigateTo('/panel')
+  await navigateTo(rutaInicio.value)
 }
 
 async function cerrarSesion(): Promise<void> {
@@ -54,7 +55,7 @@ async function cerrarSesion(): Promise<void> {
     </header>
 
     <div class="acciones">
-      <BotonPrincipal v-if="puedeVolverAlPanel" @click="irAlPanel">Volver al panel</BotonPrincipal>
+      <BotonPrincipal v-if="puedeVolverAlPanel" @click="irAlPanel">Volver al inicio</BotonPrincipal>
 
       <button type="button" class="boton-secundario" @click="cerrarSesion">Cerrar sesión</button>
     </div>

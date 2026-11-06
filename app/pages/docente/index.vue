@@ -1,20 +1,51 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useAutenticacionStore } from '~/stores/autenticacion'
+import { obtenerFechaHoyIso } from '~/composables/useFechas'
+import { obtenerSituacion, useSesionesClase } from '~/composables/useSesionesClase'
 
 definePageMeta({ layout: 'docente', middleware: 'autenticacion' })
 
 const autenticacion = useAutenticacionStore()
 const saludo = computed(() => autenticacion.usuario?.nombreCompleto?.trim().split(/\s+/)[0] || 'docente')
-const indicadores = [
-  { nombre: 'Clases de hoy', descripcion: 'A la espera del horario asignado', icono: '/icons/menu-horarios.svg' },
-  { nombre: 'Tareas activas', descripcion: 'Pendiente de consulta por docente', icono: '/icons/menu-tareas.svg' },
+const { listarMias } = useSesionesClase()
+const clasesHoy = ref<{ total: number; pendientes: number } | null>(null)
+
+onMounted(async () => {
+  if (autenticacion.usuario?.rol !== 'DOCENTE') return
+  try {
+    const sesiones = await listarMias(obtenerFechaHoyIso())
+    clasesHoy.value = {
+      total: sesiones.length,
+      pendientes: sesiones.filter((sesion) => obtenerSituacion(sesion) !== 'REGISTRADA').length,
+    }
+  } catch {
+    clasesHoy.value = null
+  }
+})
+
+const indicadores = computed(() => [
+  {
+    nombre: 'Clases de hoy',
+    valor: clasesHoy.value ? String(clasesHoy.value.total) : '—',
+    descripcion: clasesHoy.value
+      ? `${clasesHoy.value.pendientes} sin asistencia registrada`
+      : 'A la espera de tus sesiones de clase',
+    icono: '/icons/menu-horarios.svg',
+  },
+  {
+    nombre: 'Tareas activas',
+    valor: '—',
+    descripcion: 'Pendiente de consulta por docente',
+    icono: '/icons/menu-tareas.svg',
+  },
   {
     nombre: 'Notas por registrar',
+    valor: '—',
     descripcion: 'Pendiente de consulta por docente',
     icono: '/icons/menu-competencias.svg',
   },
-]
+])
 const accesos = [
   {
     titulo: 'Mis tareas',
@@ -68,7 +99,7 @@ const accesos = [
         <article v-for="indicador in indicadores" :key="indicador.nombre" class="docente-tarjeta docente-indicador">
           <div class="docente-indicador__icono"><img :src="indicador.icono" alt="" /></div>
           <span class="docente-indicador__nombre">{{ indicador.nombre }}</span>
-          <strong class="docente-indicador__valor">—</strong>
+          <strong class="docente-indicador__valor">{{ indicador.valor }}</strong>
           <small>{{ indicador.descripcion }}</small>
         </article>
       </div>

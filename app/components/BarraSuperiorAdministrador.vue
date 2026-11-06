@@ -16,6 +16,7 @@ const nombrePagina = computed(() => {
   if (ruta.path.startsWith('/usuarios')) return 'Usuarios'
   if (ruta.path.startsWith('/roles-permisos')) return 'Roles y permisos'
   if (ruta.path.startsWith('/logs-sistema')) return 'Logs del sistema'
+  if (ruta.path.startsWith('/sesiones-clase')) return 'Sesiones de clase'
   return 'Panel'
 })
 
