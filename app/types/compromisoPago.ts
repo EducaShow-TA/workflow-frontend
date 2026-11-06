@@ -25,3 +25,26 @@ export interface CuotaCronograma {
   /** En céntimos, para repartir el monto sin errores de redondeo. */
   montoCentimos: number
 }
+
+/** CompromisoPagoResponse: compromiso creado al confirmar la matrícula. */
+export interface CompromisoPagoApi {
+  id: number
+  matriculaId: number
+  estudianteId: number
+  apoderadoId: number
+  concepto: string
+  montoTotal: number
+  fechaEmision: string
+  /** "2027-03". */
+  mesInicio: string
+  numeroCuotas: number
+  primerVencimiento: string
+  diaVencimiento: number
+}
+
+/** Mes del cronograma del compromiso y la boleta que ya le corresponde, si existe. */
+export interface MesCompromiso {
+  mes: string
+  numeroCuota: number
+  boleta: { id: number; estado: string; mecanismo: 'AUTOMATICO' | 'MANUAL' } | null
+}
