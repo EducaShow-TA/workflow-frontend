@@ -26,3 +26,30 @@ export interface Calificacion {
   evidenciaTamanio: number | null
   fechaRegistro: string
 }
+
+/** Competencia activa del área de una clase del docente. */
+export interface CompetenciaClase {
+  codigo: string
+  nombre: string
+}
+
+/** Respuesta de /api/v1/docentes/mis-clases: un área dictada en una sección, con su periodo vigente. */
+export interface MiClase {
+  periodoId: number
+  seccionId: number
+  gradoNumero: number
+  seccionCodigo: string
+  anhio: number
+  areaCodigo: string
+  areaNombre: string
+  totalAlumnos: number
+  competencias: CompetenciaClase[]
+}
+
+/** Respuesta de /api/v1/docentes/mis-clases/{periodoId}/alumnos. */
+export interface AlumnoClase {
+  matriculaId: number
+  estudianteId: number
+  dni: string
+  nombreCompleto: string
+}
