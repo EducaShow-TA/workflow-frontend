@@ -1,0 +1,41 @@
+# Nuxt dev/build outputs
+.output
+.data
+.nuxt
+.nitro
+.cache
+dist
+
+# Node dependencies
+node_modules
+
+# Herramientas
+coverage/
+.eslintcache
+
+# Nuxt no lee vite.config.*: la configuracion de Vite va en nuxt.config.ts (clave `vite`)
+vite.config.*
+
+# Logs
+logs
+*.log
+
+# Local env files
+.env
+.env.*
+!.env.example
+
+# Editores
+.idea/
+.fleet/
+.vscode/
+!.vscode/extensions.json
+
+# Misc
+.DS_Store
+Thumbs.db
+*.bak
+
+# Visual Studio y NetBeans
+.vs/
+nbproject/private/

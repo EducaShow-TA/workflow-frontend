@@ -1,0 +1,42 @@
+name: Frontend CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Lint, format, types, and tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      # Node 22 trae npm 10, que no acepta el package-lock.json generado con npm 11 (ver .npmrc).
+      - name: Set up npm 11
+        run: npm install -g npm@11.16.0
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Check types
+        run: npm run typecheck
+
+      - name: Run tests
+        run: npm test
