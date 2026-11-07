@@ -59,7 +59,13 @@ async function procesarInicioSesion(): Promise<void> {
     return
   }
 
-  await navigateTo(autenticacion.usuario?.rol === 'DOCENTE' ? '/docente' : '/panel')
+  await navigateTo(
+    autenticacion.usuario?.rol === 'DOCENTE'
+      ? '/docente'
+      : autenticacion.usuario?.rol === 'APODERADO'
+        ? '/libretas'
+        : '/panel',
+  )
 }
 
 function irARecuperacion(): void {

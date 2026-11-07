@@ -230,6 +230,10 @@ async function descargar(item: Calificacion): Promise<void> {
 
 <template>
   <main class="pagina-calificaciones">
+    <nav aria-label="Secciones de calificaciones" style="display: flex; gap: 24px; margin-bottom: 24px">
+      <strong aria-current="page">Registro de calificaciones</strong>
+      <NuxtLink to="/calificaciones/libretas">Libretas e informes</NuxtLink>
+    </nav>
     <header class="cabecera">
       <div>
         <h1>Calificaciones y evidencias</h1>
