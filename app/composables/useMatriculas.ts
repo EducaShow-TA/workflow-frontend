@@ -22,8 +22,8 @@ export function useMatriculas() {
     })
   }
 
-  function retirar(periodoId: number, estudianteId: number): Promise<void> {
-    return solicitar<void>(`${RUTA_PERIODOS}/${periodoId}/matriculas/${estudianteId}`, {
+  function retirar(periodoId: number, estudianteId: number): Promise<unknown> {
+    return solicitar<unknown>(`${RUTA_PERIODOS}/${periodoId}/matriculas/${estudianteId}`, {
       metodo: 'DELETE',
     })
   }
