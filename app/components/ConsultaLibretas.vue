@@ -87,12 +87,14 @@ async function cargarCatalogos(): Promise<void> {
         periodos: item.periodos.map((periodo) => periodo.periodoId),
       }))
       const disponibles = new Map<number, OpcionPeriodo>()
-      vinculados.forEach((estudiante) => estudiante.periodos.forEach((periodo) => {
-        disponibles.set(periodo.periodoId, {
-          id: periodo.periodoId,
-          nombre: `${periodo.gradoNumero}.° ${periodo.seccion} · ${periodo.fechaInicio.slice(0, 4)}`,
-        })
-      }))
+      vinculados.forEach((estudiante) =>
+        estudiante.periodos.forEach((periodo) => {
+          disponibles.set(periodo.periodoId, {
+            id: periodo.periodoId,
+            nombre: `${periodo.gradoNumero}.° ${periodo.seccion} · ${periodo.fechaInicio.slice(0, 4)}`,
+          })
+        }),
+      )
       periodos.value = [...disponibles.values()].sort((a, b) => b.id - a.id)
     }
   } catch (fallo: unknown) {
@@ -230,11 +232,19 @@ onMounted(cargarCatalogos)
           </label>
         </div>
         <p v-if="cargando" role="status">Cargando opciones…</p>
-        <p v-else-if="(esAdministrador || esDocente || esApoderado) && !periodos.length && !errorCatalogos" class="ayuda">
+        <p
+          v-else-if="(esAdministrador || esDocente || esApoderado) && !periodos.length && !errorCatalogos"
+          class="ayuda"
+        >
           No hay periodos disponibles para tu cuenta.
         </p>
         <p
-          v-else-if="periodoId && (esAdministrador || esDocente || esApoderado) && !estudiantesDisponibles.length && !errorCatalogos"
+          v-else-if="
+            periodoId &&
+            (esAdministrador || esDocente || esApoderado) &&
+            !estudiantesDisponibles.length &&
+            !errorCatalogos
+          "
           class="ayuda"
         >
           No hay estudiantes con matrícula confirmada para este periodo.
@@ -294,8 +304,7 @@ onMounted(cargarCatalogos)
               <tbody>
                 <tr v-for="competencia in area.competencias" :key="competencia.codigo">
                   <td>
-                    <strong>{{ competencia.codigo }}</strong
-                    ><br />{{ competencia.nombre }}
+                    <strong>{{ competencia.codigo }}</strong><br />{{ competencia.nombre }}
                   </td>
                   <td>
                     <span class="nota">{{ competencia.nota ?? 'Sin calificación' }}</span>

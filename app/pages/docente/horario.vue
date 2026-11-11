@@ -24,13 +24,20 @@ const hoy = new Date().getDay()
 const hoyCodigo = hoy >= 1 && hoy <= 5 ? DIAS[hoy - 1]?.codigo : null
 const nombreHoy = hoyCodigo ? DIAS.find((dia) => dia.codigo === hoyCodigo)?.nombre : ''
 const bloquesHoy = computed(() => sesiones.value.filter((item) => item.dia === hoyCodigo))
-const cantidadSecciones = computed(() => new Set(sesiones.value.map((item) => `${item.gradoNumero}:${item.seccionCodigo}`)).size)
+const cantidadSecciones = computed(
+  () => new Set(sesiones.value.map((item) => `${item.gradoNumero}:${item.seccionCodigo}`)).size,
+)
 const cantidadAsignaturas = computed(() => new Set(sesiones.value.map((item) => item.areaCodigo)).size)
-const sesionesPorDia = computed(() => Object.fromEntries(
-  DIAS.map((dia) => [dia.codigo, sesiones.value.filter((item) => item.dia === dia.codigo)]),
-) as Record<(typeof DIAS)[number]['codigo'], BloqueHorarioDocente[]>)
+const sesionesPorDia = computed(
+  () =>
+    Object.fromEntries(
+      DIAS.map((dia) => [dia.codigo, sesiones.value.filter((item) => item.dia === dia.codigo)]),
+    ) as Record<(typeof DIAS)[number]['codigo'], BloqueHorarioDocente[]>,
+)
 
-function hora(valor: string): string { return valor.slice(0, 5) }
+function hora(valor: string): string {
+  return valor.slice(0, 5)
+}
 function descripcion(bloque: BloqueHorarioDocente): string {
   return `${bloque.gradoNumero}.° Secundaria · Sección ${bloque.seccionCodigo}`
 }
@@ -57,46 +64,127 @@ onMounted(cargar)
         <h1>Mi horario de clases</h1>
         <p>Consulta tus asignaturas, secciones, aulas y bloques asignados por administración.</p>
       </div>
-      <label class="selector-anio">Año escolar
-        <select v-model.number="anio"><option :value="anioActual">{{ anioActual }}</option><option :value="anioActual + 1">{{ anioActual + 1 }}</option></select>
+      <label class="selector-anio"
+        >Año escolar
+        <select v-model.number="anio">
+          <option :value="anioActual">{{ anioActual }}</option>
+          <option :value="anioActual + 1">{{ anioActual + 1 }}</option>
+        </select>
       </label>
     </header>
 
     <section class="horario-informacion" aria-labelledby="horario-aviso-titulo">
-      <div class="horario-informacion__encabezado"><h2 id="horario-aviso-titulo">Horario personal</h2><span class="horario-etiqueta horario-etiqueta--demo">Sincronizado con el servidor</span></div>
-      <p>Solo se muestran bloques asignados a tu cuenta. Si administración modifica la grilla, vuelve a actualizar esta vista.</p>
-      <div class="horario-informacion__puntos"><span>Horario consolidado de todas tus secciones</span><span>Área, grado, sección y aula en cada bloque</span><span>Consulta semanal o del día actual</span></div>
+      <div class="horario-informacion__encabezado">
+        <h2 id="horario-aviso-titulo">Horario personal</h2>
+        <span class="horario-etiqueta horario-etiqueta--demo">Sincronizado con el servidor</span>
+      </div>
+      <p>
+        Solo se muestran bloques asignados a tu cuenta. Si administración modifica la grilla, vuelve a actualizar esta
+        vista.
+      </p>
+      <div class="horario-informacion__puntos">
+        <span>Horario consolidado de todas tus secciones</span><span>Área, grado, sección y aula en cada bloque</span
+        ><span>Consulta semanal o del día actual</span>
+      </div>
     </section>
 
     <section class="docente-grid docente-grid--tres horario-resumen" aria-label="Resumen de horario">
-      <article class="horario-indicador"><div class="horario-indicador__icono"><img src="/icons/menu-horarios.svg" alt="" /></div><div><span>Bloques semanales</span><strong>{{ sesiones.length }}</strong><small>Asignaciones del año escolar</small></div></article>
-      <article class="horario-indicador"><div class="horario-indicador__icono"><img src="/icons/menu-secciones.svg" alt="" /></div><div><span>Secciones</span><strong>{{ cantidadSecciones }}</strong><small>Secciones asignadas</small></div></article>
-      <article class="horario-indicador"><div class="horario-indicador__icono"><img src="/icons/menu-competencias.svg" alt="" /></div><div><span>Asignaturas</span><strong>{{ cantidadAsignaturas }}</strong><small>Áreas asignadas</small></div></article>
+      <article class="horario-indicador">
+        <div class="horario-indicador__icono"><img src="/icons/menu-horarios.svg" alt="" /></div>
+        <div>
+          <span>Bloques semanales</span><strong>{{ sesiones.length }}</strong
+          ><small>Asignaciones del año escolar</small>
+        </div>
+      </article>
+      <article class="horario-indicador">
+        <div class="horario-indicador__icono"><img src="/icons/menu-secciones.svg" alt="" /></div>
+        <div>
+          <span>Secciones</span><strong>{{ cantidadSecciones }}</strong
+          ><small>Secciones asignadas</small>
+        </div>
+      </article>
+      <article class="horario-indicador">
+        <div class="horario-indicador__icono"><img src="/icons/menu-competencias.svg" alt="" /></div>
+        <div>
+          <span>Asignaturas</span><strong>{{ cantidadAsignaturas }}</strong
+          ><small>Áreas asignadas</small>
+        </div>
+      </article>
     </section>
 
     <AvisoMensaje v-if="error" :mensaje="error" tipo="error" />
     <section class="docente-tarjeta horario-principal" aria-labelledby="horario-agenda-titulo" :aria-busy="cargando">
-      <div class="horario-principal__cabecera"><div><h2 id="horario-agenda-titulo">Agenda académica</h2><p class="docente-texto-secundario">{{ vista === 'SEMANA' ? `Semana · ${anio}` : `Hoy · ${nombreHoy || 'fin de semana'}` }}</p></div>
-        <div class="docente-controles" role="group" aria-label="Vista del horario"><button type="button" :class="{ 'docente-controles__activo': vista === 'SEMANA' }" :aria-pressed="vista === 'SEMANA'" @click="vista = 'SEMANA'">Semana completa</button><button type="button" :class="{ 'docente-controles__activo': vista === 'HOY' }" :aria-pressed="vista === 'HOY'" @click="vista = 'HOY'">Hoy</button></div>
+      <div class="horario-principal__cabecera">
+        <div>
+          <h2 id="horario-agenda-titulo">Agenda académica</h2>
+          <p class="docente-texto-secundario">
+            {{ vista === 'SEMANA' ? `Semana · ${anio}` : `Hoy · ${nombreHoy || 'fin de semana'}` }}
+          </p>
+        </div>
+        <div class="docente-controles" role="group" aria-label="Vista del horario">
+          <button
+            type="button"
+            :class="{ 'docente-controles__activo': vista === 'SEMANA' }"
+            :aria-pressed="vista === 'SEMANA'"
+            @click="vista = 'SEMANA'"
+          >
+            Semana completa</button
+          ><button
+            type="button"
+            :class="{ 'docente-controles__activo': vista === 'HOY' }"
+            :aria-pressed="vista === 'HOY'"
+            @click="vista = 'HOY'"
+          >
+            Hoy
+          </button>
+        </div>
       </div>
       <p v-if="cargando" role="status">Consultando horario…</p>
-      <p v-else-if="!sesiones.length" class="horario-dia-vacio"><strong>No tienes bloques asignados para {{ anio }}.</strong><br />Cuando administración publique tu horario, aparecerá aquí.</p>
+      <p v-else-if="!sesiones.length" class="horario-dia-vacio">
+        <strong>No tienes bloques asignados para {{ anio }}.</strong><br />Cuando administración publique tu horario,
+        aparecerá aquí.
+      </p>
       <div v-else-if="vista === 'SEMANA'" class="horario-semana">
         <section v-for="dia in DIAS" :key="dia.codigo" class="horario-dia" :aria-label="dia.nombre">
           <h3>{{ dia.nombre }}</h3>
           <p v-if="!sesionesPorDia[dia.codigo].length" class="horario-dia-vacio">Sin clases asignadas.</p>
           <article v-for="bloque in sesionesPorDia[dia.codigo]" :key="bloque.id" class="horario-dia-lista__fila">
-            <div class="horario-dia-lista__horas"><strong>{{ hora(bloque.horaInicio) }}</strong><span>{{ hora(bloque.horaFin) }}</span></div>
-            <div class="horario-dia-lista__contenido"><h4>{{ bloque.areaNombre }}</h4><p>{{ descripcion(bloque) }}</p><small>Aula {{ bloque.aulaCodigo }}</small></div>
+            <div class="horario-dia-lista__horas">
+              <strong>{{ hora(bloque.horaInicio) }}</strong><span>{{ hora(bloque.horaFin) }}</span>
+            </div>
+            <div class="horario-dia-lista__contenido">
+              <h4>{{ bloque.areaNombre }}</h4>
+              <p>{{ descripcion(bloque) }}</p>
+              <small>Aula {{ bloque.aulaCodigo }}</small>
+            </div>
           </article>
         </section>
       </div>
-      <div v-else-if="!hoyCodigo" class="horario-dia-vacio"><strong>Hoy no es un día lectivo de lunes a viernes.</strong><p>Selecciona Semana completa para consultar tus asignaciones.</p></div>
-      <div v-else-if="!bloquesHoy.length" class="horario-dia-vacio"><strong>No tienes clases asignadas para hoy.</strong></div>
-      <div v-else class="horario-dia-lista">
-        <article v-for="bloque in bloquesHoy" :key="bloque.id" class="horario-dia-lista__fila"><div class="horario-dia-lista__horas"><strong>{{ hora(bloque.horaInicio) }}</strong><span>{{ hora(bloque.horaFin) }}</span></div><div class="horario-dia-lista__contenido"><h3>{{ bloque.areaNombre }}</h3><p>{{ descripcion(bloque) }}</p><small>Aula {{ bloque.aulaCodigo }}</small></div></article>
+      <div v-else-if="!hoyCodigo" class="horario-dia-vacio">
+        <strong>Hoy no es un día lectivo de lunes a viernes.</strong>
+        <p>Selecciona Semana completa para consultar tus asignaciones.</p>
       </div>
-      <div class="horario-principal__pie"><p>La vista se actualiza directamente desde los horarios asignados a tu usuario.</p><button type="button" class="docente-boton docente-boton--secundario" :disabled="cargando" @click="cargar">Actualizar horario</button></div>
+      <div v-else-if="!bloquesHoy.length" class="horario-dia-vacio">
+        <strong>No tienes clases asignadas para hoy.</strong>
+      </div>
+      <div v-else class="horario-dia-lista">
+        <article v-for="bloque in bloquesHoy" :key="bloque.id" class="horario-dia-lista__fila">
+          <div class="horario-dia-lista__horas">
+            <strong>{{ hora(bloque.horaInicio) }}</strong><span>{{ hora(bloque.horaFin) }}</span>
+          </div>
+          <div class="horario-dia-lista__contenido">
+            <h3>{{ bloque.areaNombre }}</h3>
+            <p>{{ descripcion(bloque) }}</p>
+            <small>Aula {{ bloque.aulaCodigo }}</small>
+          </div>
+        </article>
+      </div>
+      <div class="horario-principal__pie">
+        <p>La vista se actualiza directamente desde los horarios asignados a tu usuario.</p>
+        <button type="button" class="docente-boton docente-boton--secundario" :disabled="cargando" @click="cargar">
+          Actualizar horario
+        </button>
+      </div>
     </section>
   </main>
 </template>

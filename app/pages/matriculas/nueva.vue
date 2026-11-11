@@ -100,9 +100,13 @@ watch(periodoId, () => {
   busquedaEstudiante.value = ''
   avisoSeleccion.value = ''
 })
-watch(seleccionPendientes, () => {
-  incidenciasCompromiso.value = []
-}, { deep: true })
+watch(
+  seleccionPendientes,
+  () => {
+    incidenciasCompromiso.value = []
+  },
+  { deep: true },
+)
 watch(gradoSeleccionado, () => {
   const siguientePeriodo =
     periodosDelGrado.value.find((periodo) => periodo.vacantesDisponibles > 0) ?? periodosDelGrado.value[0]

@@ -20,15 +20,14 @@ const error = ref('')
 const aviso = ref('')
 const registroHoy = computed(() => marcajes.value.find((item) => item.fecha === hoy) ?? null)
 const puedeMarcarEntrada = computed(() => !registroHoy.value || registroHoy.value.estado === 'PENDIENTE_MARCAJE')
-const puedeMarcarSalida = computed(
-  () => Boolean(registroHoy.value?.horaEntrada) && !registroHoy.value?.horaSalida,
-)
-const etiquetaEstado = (estado: AsistenciaDocente['estado']) => ({
-  PENDIENTE_MARCAJE: 'Pendiente',
-  PRESENTE: 'Presente',
-  TARDANZA: 'Tardanza',
-  INASISTENCIA: 'Inasistencia',
-})[estado]
+const puedeMarcarSalida = computed(() => Boolean(registroHoy.value?.horaEntrada) && !registroHoy.value?.horaSalida)
+const etiquetaEstado = (estado: AsistenciaDocente['estado']) =>
+  ({
+    PENDIENTE_MARCAJE: 'Pendiente',
+    PRESENTE: 'Presente',
+    TARDANZA: 'Tardanza',
+    INASISTENCIA: 'Inasistencia',
+  })[estado]
 const fechaVisible = (fecha: string) => {
   const [anio, mes, dia] = fecha.split('-')
   return `${dia}/${mes}/${anio}`
@@ -79,22 +78,47 @@ onMounted(cargar)
 
     <section class="marcaje-condiciones" aria-labelledby="marcaje-titulo-condiciones">
       <h2 id="marcaje-titulo-condiciones">Marcaje de hoy</h2>
-      <p>Solo puedes registrar tu propia jornada dentro de la ventana habilitada. La fecha y hora se obtienen del servidor.</p>
+      <p>
+        Solo puedes registrar tu propia jornada dentro de la ventana habilitada. La fecha y hora se obtienen del
+        servidor.
+      </p>
       <div class="marcaje-datos">
-        <div><span>Docente</span><strong>{{ autenticacion.usuario?.nombreCompleto || 'Docente autenticado' }}</strong></div>
-        <div><span>Fecha</span><strong>{{ fechaVisible(hoy) }}</strong></div>
-        <div><span>Estado</span><strong>{{ registroHoy ? etiquetaEstado(registroHoy.estado) : 'Sin marcaje' }}</strong></div>
-        <div><span>Motivo de ajuste</span><strong>{{ registroHoy?.motivoAjuste || '—' }}</strong></div>
+        <div>
+          <span>Docente</span><strong>{{ autenticacion.usuario?.nombreCompleto || 'Docente autenticado' }}</strong>
+        </div>
+        <div>
+          <span>Fecha</span><strong>{{ fechaVisible(hoy) }}</strong>
+        </div>
+        <div>
+          <span>Estado</span><strong>{{ registroHoy ? etiquetaEstado(registroHoy.estado) : 'Sin marcaje' }}</strong>
+        </div>
+        <div>
+          <span>Motivo de ajuste</span><strong>{{ registroHoy?.motivoAjuste || '—' }}</strong>
+        </div>
       </div>
       <div class="marcaje-relojes">
-        <div><span class="marcaje-relojes__rotulo">Entrada</span><strong>{{ registroHoy?.horaEntrada || '—:—' }}</strong></div>
-        <div><span class="marcaje-relojes__rotulo">Salida</span><strong>{{ registroHoy?.horaSalida || '—:—' }}</strong></div>
+        <div>
+          <span class="marcaje-relojes__rotulo">Entrada</span><strong>{{ registroHoy?.horaEntrada || '—:—' }}</strong>
+        </div>
+        <div>
+          <span class="marcaje-relojes__rotulo">Salida</span><strong>{{ registroHoy?.horaSalida || '—:—' }}</strong>
+        </div>
       </div>
       <div class="docente-formulario__acciones marcaje-acciones">
-        <button type="button" class="docente-boton docente-boton--secundario" :disabled="guardando || !puedeMarcarEntrada" @click="marcar('entrada')">
+        <button
+          type="button"
+          class="docente-boton docente-boton--secundario"
+          :disabled="guardando || !puedeMarcarEntrada"
+          @click="marcar('entrada')"
+        >
           {{ guardando ? 'Guardando…' : registroHoy?.horaEntrada ? 'Entrada registrada' : 'Marcar entrada' }}
         </button>
-        <button type="button" class="docente-boton" :disabled="guardando || !puedeMarcarSalida" @click="marcar('salida')">
+        <button
+          type="button"
+          class="docente-boton"
+          :disabled="guardando || !puedeMarcarSalida"
+          @click="marcar('salida')"
+        >
           {{ registroHoy?.horaSalida ? 'Salida registrada' : 'Marcar salida' }}
         </button>
       </div>
@@ -111,13 +135,26 @@ onMounted(cargar)
       <p v-if="cargando" role="status">Consultando marcajes…</p>
       <div v-else class="docente-tabla-contenedor">
         <table class="docente-tabla">
-          <thead><tr><th scope="col">Fecha</th><th scope="col">Entrada</th><th scope="col">Salida</th><th scope="col">Estado</th><th scope="col">Observación</th></tr></thead>
+          <thead>
+            <tr>
+              <th scope="col">Fecha</th>
+              <th scope="col">Entrada</th>
+              <th scope="col">Salida</th>
+              <th scope="col">Estado</th>
+              <th scope="col">Observación</th>
+            </tr>
+          </thead>
           <tbody>
             <tr v-for="item in marcajes" :key="item.id">
-              <td>{{ fechaVisible(item.fecha) }}</td><td>{{ item.horaEntrada || '—' }}</td><td>{{ item.horaSalida || '—' }}</td>
-              <td>{{ etiquetaEstado(item.estado) }}</td><td>{{ item.motivoAjuste || '—' }}</td>
+              <td>{{ fechaVisible(item.fecha) }}</td>
+              <td>{{ item.horaEntrada || '—' }}</td>
+              <td>{{ item.horaSalida || '—' }}</td>
+              <td>{{ etiquetaEstado(item.estado) }}</td>
+              <td>{{ item.motivoAjuste || '—' }}</td>
             </tr>
-            <tr v-if="!marcajes.length"><td colspan="5" class="docente-tabla__vacia">No hay marcajes registrados este mes.</td></tr>
+            <tr v-if="!marcajes.length">
+              <td colspan="5" class="docente-tabla__vacia">No hay marcajes registrados este mes.</td>
+            </tr>
           </tbody>
         </table>
       </div>

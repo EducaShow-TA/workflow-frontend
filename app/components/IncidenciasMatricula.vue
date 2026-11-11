@@ -7,11 +7,7 @@ defineProps<{
 </script>
 
 <template>
-  <section
-    v-if="incidencias.length"
-    class="incidencias-matricula"
-    aria-label="Estudiantes que requieren atención"
-  >
+  <section v-if="incidencias.length" class="incidencias-matricula" aria-label="Estudiantes que requieren atención">
     <h2>Estudiantes que requieren atención</h2>
     <p>No se confirmó ninguna matrícula del grupo. Corrige los problemas indicados y vuelve a intentarlo.</p>
     <ul>

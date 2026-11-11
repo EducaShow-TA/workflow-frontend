@@ -151,9 +151,12 @@ function confirmar(): void {
           <div class="campo">
             <label for="monto-compromiso">Pensión mensual por estudiante (S/) <span class="obligatorio">*</span></label>
             <small v-if="montoPredeterminado !== null" class="ayuda">
-              Valor predeterminado: S/ {{ montoPredeterminado.toFixed(2) }} por cuota. Puedes editarlo para aplicar becas.
+              Valor predeterminado: S/ {{ montoPredeterminado.toFixed(2) }} por cuota. Puedes editarlo para aplicar
+              becas.
             </small>
-            <small v-else-if="errorConfiguracion" class="ayuda">{{ errorConfiguracion }} Ingresa el monto acordado.</small>
+            <small v-else-if="errorConfiguracion" class="ayuda"
+              >{{ errorConfiguracion }} Ingresa el monto acordado.</small
+            >
             <input
               id="monto-compromiso"
               v-model.number="montoCuota"
