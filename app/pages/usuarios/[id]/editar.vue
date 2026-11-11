@@ -207,8 +207,8 @@ async function cancelar(): Promise<void> {
             <h2 id="titulo-informacion">Información básica</h2>
 
             <p v-if="!nombreSeparadoDisponible" class="referencia">
-              Nombre registrado: <strong>{{ cuenta.nombreCompleto }}</strong
-              >. El sistema todavía no envía los nombres y apellidos por separado.
+              Nombre registrado: <strong>{{ cuenta.nombreCompleto }}</strong>. El sistema todavía no envía los nombres y
+              apellidos por separado.
             </p>
 
             <div class="campos">

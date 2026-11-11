@@ -22,6 +22,7 @@ const enlaces: EnlaceMenu[] = [
   { nombre: 'Tareas', icono: '/icons/menu-tareas.svg', destino: '/tareas' },
   { nombre: 'Portal Docente', icono: '/icons/menu-docentes.svg', destino: '/docente' },
   { nombre: 'Calificaciones', icono: '/icons/menu-calificaciones.svg', destino: '/calificaciones' },
+  { nombre: 'Auditoría de calificaciones', icono: '/icons/menu-logs.svg', destino: '/calificaciones/auditoria' },
   { nombre: 'Horarios', icono: '/icons/menu-horarios.svg', destino: '/horarios' },
   { nombre: 'Sesiones de clase', icono: '/icons/menu-matricula.svg', destino: '/sesiones-clase' },
   { nombre: 'Asistencia docente', icono: '/icons/menu-docentes.svg', destino: '/asistencia-docentes' },
