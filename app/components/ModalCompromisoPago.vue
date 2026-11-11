@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import type { ErroresCompromisoPago, FormularioCompromisoPago, SolicitudCompromisoPago } from '~/types/compromisoPago'
+import type { IncidenciaConfirmacionMatricula } from '~/types/matricula'
 import {
   CUOTAS_MAXIMAS,
   LONGITUD_MAXIMA_CONCEPTO,
@@ -23,11 +24,13 @@ const propiedades = withDefaults(
     destino?: string
     procesando?: boolean
     error?: string
+    incidencias?: IncidenciaConfirmacionMatricula[]
   }>(),
   {
     destino: '',
     procesando: false,
     error: '',
+    incidencias: () => [],
   },
 )
 
@@ -39,6 +42,7 @@ const emitir = defineEmits<{
 const formulario = reactive<FormularioCompromisoPago>(
   crearFormularioCompromiso(propiedades.anhioEscolar, obtenerFechaHoyIso()),
 )
+const fechaMinima = obtenerFechaHoyIso()
 const errores = ref<ErroresCompromisoPago>({})
 const { solicitar } = useApi()
 const montoPredeterminado = ref<number | null>(null)
@@ -190,6 +194,7 @@ function confirmar(): void {
             id="vencimiento-compromiso"
             v-model="formulario.primerVencimiento"
             type="date"
+            :min="fechaMinima"
             :aria-invalid="Boolean(errores.primerVencimiento)"
             :aria-describedby="errores.primerVencimiento ? 'error-vencimiento' : 'ayuda-vencimiento'"
             @input="limpiarError('primerVencimiento')"
@@ -208,6 +213,7 @@ function confirmar(): void {
         </p>
 
         <AvisoMensaje v-if="error" :mensaje="error" tipo="error" />
+        <IncidenciasMatricula :incidencias="incidencias" />
       </form>
 
       <section class="vista-previa" aria-labelledby="titulo-cronograma">
