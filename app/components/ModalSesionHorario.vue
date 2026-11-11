@@ -146,7 +146,7 @@ async function eliminar(): Promise<void> {
         <label for="sesion-docente">Docente <span class="obligatorio">*</span></label>
         <select id="sesion-docente" v-model.number="docenteId" :disabled="guardando">
           <option value="">Selecciona un docente</option>
-          <option v-for="docente in docentes" :key="docente.id" :value="docente.id">
+          <option v-for="docente in docentes" :key="docente.cuentaId" :value="docente.cuentaId">
             {{ docente.nombreCompleto }}
           </option>
         </select>

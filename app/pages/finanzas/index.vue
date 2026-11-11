@@ -4,7 +4,7 @@ import { crearFiltrosBoletas, etiquetaEstadoBoleta, useBoletasPension } from '~/
 import { usePeriodosAcademicos } from '~/composables/usePeriodosAcademicos'
 import { formatearFecha } from '~/composables/useFechas'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
-import type { BoletaPension, ComprobanteBoleta } from '~/types/boletaPension'
+import type { BoletaPension } from '~/types/boletaPension'
 import type { PeriodoAcademico } from '~/types/periodoAcademico'
 
 definePageMeta({ middleware: 'autenticacion' })
@@ -29,19 +29,6 @@ const totalBoletas = ref(0)
 const visibles = computed(() => boletas.value)
 const boletaManualAbierta = ref(false)
 const avisoBoletaManual = ref('')
-
-const boletaEnPago = ref<BoletaPension | null>(null)
-const pagoEnLineaAbierto = ref(false)
-
-function abrirPagoEnLinea(boleta: BoletaPension): void {
-  boletaEnPago.value = boleta
-  pagoEnLineaAbierto.value = true
-}
-
-async function alPagarEnLinea(comprobante: ComprobanteBoleta): Promise<void> {
-  avisoBoletaManual.value = `Pago en línea (simulado) aprobado para la boleta #${comprobante.boletaId}. Comprobante ${comprobante.numeroComprobante}.`
-  await consultar()
-}
 
 async function alGenerarBoletaManual(boleta: BoletaPension): Promise<void> {
   boletaManualAbierta.value = false
@@ -114,7 +101,7 @@ onMounted(async () => {
       <div>
         <p class="ruta">Finanzas / Pensiones</p>
         <h1>Boletas de pensiones</h1>
-        <p>Consulta las boletas generadas, registra pagos aprobados o simula un pago en línea.</p>
+        <p>Consulta las boletas generadas, registra pagos recibidos y revisa el reporte de cobranza.</p>
       </div>
       <button type="button" class="boton primario" @click="boletaManualAbierta = true">+ Generar boleta manual</button>
     </header>
@@ -130,12 +117,6 @@ onMounted(async () => {
       :estudiantes="estudiantes"
       @cerrar="boletaManualAbierta = false"
       @generada="alGenerarBoletaManual"
-    />
-    <ModalPagoEnLinea
-      :abierta="pagoEnLineaAbierto"
-      :boleta="boletaEnPago"
-      @cerrar="pagoEnLineaAbierto = false"
-      @pagada="alPagarEnLinea"
     />
     <section class="tarjeta" aria-labelledby="filtros-boletas">
       <h2 id="filtros-boletas">Consultar boletas</h2>
@@ -252,16 +233,6 @@ onMounted(async () => {
                     @click="detalleId = boleta.id"
                   >
                     Ver detalle
-                  </button>
-                  <button
-                    v-if="boleta.estadoPago !== 'PAGADA'"
-                    type="button"
-                    class="boton primario pagar"
-                    :disabled="pagoEnCurso"
-                    :aria-label="`Pagar en línea la boleta ${boleta.id}`"
-                    @click="abrirPagoEnLinea(boleta)"
-                  >
-                    Pagar en línea
                   </button>
                 </td>
               </tr>

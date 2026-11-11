@@ -5,6 +5,7 @@ import { useLibretas } from '~/composables/useLibretas'
 import { useEstudiantesMatriculables } from '~/composables/useEstudiantesMatriculables'
 import { usePeriodosAcademicos } from '~/composables/usePeriodosAcademicos'
 import { useMisClases } from '~/composables/useMisClases'
+import { useApi } from '~/composables/useApi'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
 import type { LibretaNotas } from '~/types/libreta'
 
@@ -17,13 +18,20 @@ interface OpcionPeriodo {
   id: number
   nombre: string
 }
+interface EstudianteVinculado {
+  estudianteId: number
+  nombreCompleto: string
+  periodos: { periodoId: number; gradoNumero: number; seccion: string; fechaInicio: string; fechaFin: string }[]
+}
 const autenticacion = useAutenticacionStore()
+const { solicitar } = useApi()
 const { consultar: solicitarLibreta, descargar } = useLibretas()
 const { listar: listarEstudiantes } = useEstudiantesMatriculables()
 const { listar: listarPeriodos } = usePeriodosAcademicos()
 const { listar: listarClases, listarAlumnos } = useMisClases()
 const esAdministrador = computed(() => autenticacion.usuario?.rol === 'ADMINISTRADOR')
 const esDocente = computed(() => autenticacion.usuario?.rol === 'DOCENTE')
+const esApoderado = computed(() => autenticacion.usuario?.rol === 'APODERADO')
 const estudiantes = ref<OpcionEstudiante[]>([])
 const periodos = ref<OpcionPeriodo[]>([])
 const estudianteId = ref<number | ''>('')
@@ -71,6 +79,21 @@ async function cargarCatalogos(): Promise<void> {
           ]),
         ).values(),
       ]
+    } else if (esApoderado.value) {
+      const vinculados = await solicitar<EstudianteVinculado[]>('/api/v1/apoderados/mis-estudiantes')
+      estudiantes.value = vinculados.map((item) => ({
+        id: item.estudianteId,
+        nombre: item.nombreCompleto,
+        periodos: item.periodos.map((periodo) => periodo.periodoId),
+      }))
+      const disponibles = new Map<number, OpcionPeriodo>()
+      vinculados.forEach((estudiante) => estudiante.periodos.forEach((periodo) => {
+        disponibles.set(periodo.periodoId, {
+          id: periodo.periodoId,
+          nombre: `${periodo.gradoNumero}.° ${periodo.seccion} · ${periodo.fechaInicio.slice(0, 4)}`,
+        })
+      }))
+      periodos.value = [...disponibles.values()].sort((a, b) => b.id - a.id)
     }
   } catch (fallo: unknown) {
     errorCatalogos.value = obtenerMensajeError(fallo, 'No se pudieron cargar los datos para consultar las libretas.')
@@ -174,13 +197,16 @@ onMounted(cargarCatalogos)
       <p v-if="esDocente" class="ayuda">
         Solo se consultan tus clases y alumnos. El servidor limita las competencias a las áreas que dictas.
       </p>
-      <p v-if="!esAdministrador && !esDocente" class="ayuda">
+      <p v-if="esApoderado" class="ayuda">
+        Selecciona a uno de tus hijos y su período académico. Solo se muestran estudiantes vinculados a tu cuenta.
+      </p>
+      <p v-else-if="!esAdministrador && !esDocente" class="ayuda">
         Ingresa los identificadores de estudiante y periodo proporcionados por el colegio. La consulta está limitada a
-        tus estudiantes vinculados. El listado de hijos aún no está disponible.
+        tu propio historial.
       </p>
       <form @submit.prevent="consultar">
         <div class="campos">
-          <label v-if="esAdministrador || esDocente"
+          <label v-if="esAdministrador || esDocente || esApoderado"
             >Periodo académico
             <select v-model="periodoId" required :disabled="cargando || descargando">
               <option value="">Selecciona un periodo</option>
@@ -191,7 +217,7 @@ onMounted(cargarCatalogos)
             >Identificador del periodo
             <input v-model.number="periodoId" type="number" min="1" step="1" required :disabled="descargando" />
           </label>
-          <label v-if="esAdministrador || esDocente"
+          <label v-if="esAdministrador || esDocente || esApoderado"
             >Estudiante con matrícula confirmada
             <select v-model="estudianteId" required :disabled="!periodoId || cargando || descargando">
               <option value="">Selecciona un estudiante</option>
@@ -204,11 +230,11 @@ onMounted(cargarCatalogos)
           </label>
         </div>
         <p v-if="cargando" role="status">Cargando opciones…</p>
-        <p v-else-if="(esAdministrador || esDocente) && !periodos.length && !errorCatalogos" class="ayuda">
+        <p v-else-if="(esAdministrador || esDocente || esApoderado) && !periodos.length && !errorCatalogos" class="ayuda">
           No hay periodos disponibles para tu cuenta.
         </p>
         <p
-          v-else-if="periodoId && (esAdministrador || esDocente) && !estudiantesDisponibles.length && !errorCatalogos"
+          v-else-if="periodoId && (esAdministrador || esDocente || esApoderado) && !estudiantesDisponibles.length && !errorCatalogos"
           class="ayuda"
         >
           No hay estudiantes con matrícula confirmada para este periodo.
@@ -245,6 +271,9 @@ onMounted(cargarCatalogos)
       <article v-for="periodo in libreta.periodos" :key="periodo.periodoId" class="tarjeta periodo">
         <div class="resumen">
           <h2>{{ periodo.gradoNumero }}.° · Sección {{ periodo.seccion }} · {{ periodo.fechaInicio.slice(0, 4) }}</h2>
+          <span class="estado" :class="periodo.actasCerradas ? 'oficial' : 'borrador'">
+            {{ periodo.actasCerradas ? 'Actas cerradas · Libreta oficial' : 'Actas abiertas · Informe preliminar' }}
+          </span>
         </div>
         <p class="ayuda">
           {{ periodo.fechaInicio }} a {{ periodo.fechaFin
@@ -391,6 +420,10 @@ button:disabled {
 .exito {
   background: #eaf8ef;
   color: #17623c;
+}
+.borrador {
+  background: #fff4d9;
+  color: #795400;
 }
 .exito {
   padding: 16px;
