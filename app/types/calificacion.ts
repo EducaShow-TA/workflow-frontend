@@ -53,3 +53,13 @@ export interface AlumnoClase {
   dni: string
   nombreCompleto: string
 }
+
+/** Resultado del análisis de riesgo académico para un área y periodo. */
+export interface RiesgoAcademico {
+  periodoId: number
+  areaCodigo: string
+  umbral: number
+  totalAlumnos: number
+  alumnosEnRiesgo: number
+  alumnos: Array<AlumnoClase & { notasC: number; enRiesgo: boolean }>
+}

@@ -5,6 +5,7 @@ import PasoConfirmacion from '~/components/PasoConfirmacion.vue'
 import type { RegistroEstudiante } from '~/types/registroEstudiante'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
 import { useApi } from '~/composables/useApi'
+import { validarPoliticaContrasena } from '~/composables/usePoliticaContrasena'
 import {
   formatearCelular,
   normalizarCelular,
@@ -160,9 +161,7 @@ function validarContacto(): boolean {
     errores.username = 'El usuario solo puede contener letras y números.'
   }
 
-  if (formulario.password.length < 8 || formulario.password.length > 72) {
-    errores.password = 'La contraseña debe tener entre 8 y 72 caracteres.'
-  }
+  errores.password = validarPoliticaContrasena(formulario.password) ?? ''
 
   formulario.correoElectronico = normalizarCorreo(formulario.correoElectronico)
 
@@ -463,6 +462,9 @@ async function registrarEstudiante(): Promise<void> {
               :aria-invalid="Boolean(errores.password)"
             />
             <small v-if="errores.password" class="error">{{ errores.password }}</small>
+            <small class="ayuda"
+              >Mínimo 8 caracteres, con minúscula, mayúscula, número y símbolo; máximo 72 bytes UTF-8.</small
+            >
           </div>
           <div class="campo">
             <label for="correo-contacto"> Correo electrónico (opcional) </label>

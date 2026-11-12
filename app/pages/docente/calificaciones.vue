@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import type { AlumnoClase, Calificacion, MiClase, NotaCualitativa } from '~/types/calificacion'
+import type { AlumnoClase, Calificacion, MiClase, NotaCualitativa, RiesgoAcademico } from '~/types/calificacion'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
 import { formatearFecha } from '~/composables/useFechas'
 import { useCalificaciones } from '~/composables/useCalificaciones'
@@ -16,7 +16,7 @@ const UMBRALES = [1, 2, 3, 4, 5]
 type FiltroNota = NotaCualitativa | 'SIN_NOTA' | 'RIESGO' | ''
 
 const autenticacion = useAutenticacionStore()
-const { listar: listarClases, listarAlumnos } = useMisClases()
+const { listar: listarClases, listarAlumnos, obtenerRiesgo } = useMisClases()
 const { listar: listarNotas, descargarEvidencia } = useCalificaciones()
 const esDocente = computed(() => autenticacion.usuario?.rol === 'DOCENTE')
 
@@ -26,6 +26,7 @@ const claseElegida = ref('')
 const competenciaElegida = ref('')
 const alumnos = ref<AlumnoClase[]>([])
 const notasPorCompetencia = ref<Record<string, Calificacion[]>>({})
+const riesgoAcademico = ref<RiesgoAcademico | null>(null)
 const busqueda = ref('')
 const filtroNota = ref<FiltroNota>('')
 const umbralRiesgo = ref(2)
@@ -63,21 +64,13 @@ const conteo = computed(() => {
   return resultado
 })
 
-const notasCPorMatricula = computed(() => {
-  const conteoC = new Map<number, number>()
-  for (const lista of Object.values(notasPorCompetencia.value)) {
-    for (const nota of lista) {
-      if (nota.nota === 'C') conteoC.set(nota.matriculaId, (conteoC.get(nota.matriculaId) ?? 0) + 1)
-    }
-  }
-  return conteoC
-})
+const riesgoPorMatricula = computed(
+  () => new Map((riesgoAcademico.value?.alumnos ?? []).map((alumno) => [alumno.matriculaId, alumno])),
+)
 const enRiesgo = computed(
   () =>
     new Set(
-      alumnos.value
-        .filter((alumno) => (notasCPorMatricula.value.get(alumno.matriculaId) ?? 0) >= umbralRiesgo.value)
-        .map((alumno) => alumno.matriculaId),
+      (riesgoAcademico.value?.alumnos ?? []).filter((alumno) => alumno.enRiesgo).map((alumno) => alumno.matriculaId),
     ),
 )
 
@@ -168,13 +161,18 @@ async function cargarClase(): Promise<void> {
   error.value = ''
   alumnos.value = []
   notasPorCompetencia.value = {}
+  riesgoAcademico.value = null
   try {
-    const [lista, ...porCompetencia] = await Promise.all([
+    const [lista, riesgo] = await Promise.all([
       listarAlumnos(actual.periodoId),
-      ...actual.competencias.map((item) => listarNotas(actual.periodoId, item.codigo)),
+      obtenerRiesgo(actual.periodoId, actual.areaCodigo, umbralRiesgo.value),
     ])
+    const porCompetencia = await Promise.all(
+      actual.competencias.map((item) => listarNotas(actual.periodoId, item.codigo)),
+    )
     if (claveClase(actual) !== claseElegida.value) return
     alumnos.value = lista
+    riesgoAcademico.value = riesgo
     notasPorCompetencia.value = Object.fromEntries(
       actual.competencias.map((item, indice) => [item.codigo, porCompetencia[indice] ?? []]),
     )
@@ -185,13 +183,19 @@ async function cargarClase(): Promise<void> {
   }
 }
 
-function cambiarUmbral(valor: number): void {
+async function cambiarUmbral(valor: number): Promise<void> {
   umbralRiesgo.value = valor
   if (!enRiesgo.value.size && filtroNota.value === 'RIESGO') filtroNota.value = ''
   try {
     localStorage.setItem(CLAVE_UMBRAL, String(valor))
   } catch {
     /* el navegador puede bloquear el almacenamiento */
+  }
+  if (!clase.value) return
+  try {
+    riesgoAcademico.value = await obtenerRiesgo(clase.value.periodoId, clase.value.areaCodigo, valor)
+  } catch (fallo: unknown) {
+    error.value = obtenerMensajeError(fallo, 'No se pudo actualizar el análisis de riesgo académico.')
   }
 }
 
@@ -222,6 +226,15 @@ function alGuardar(calificacion: Calificacion, siguiente: boolean): void {
     (nota) => nota.matriculaId !== calificacion.matriculaId,
   )
   notasPorCompetencia.value = { ...notasPorCompetencia.value, [codigo]: [...lista, calificacion] }
+  if (clase.value) {
+    void obtenerRiesgo(clase.value.periodoId, clase.value.areaCodigo, umbralRiesgo.value)
+      .then((resultado) => {
+        riesgoAcademico.value = resultado
+      })
+      .catch((fallo: unknown) => {
+        error.value = obtenerMensajeError(fallo, 'No se pudo actualizar el análisis de riesgo académico.')
+      })
+  }
   aviso.value = `Nota ${calificacion.nota} guardada para ${alumnoEnEdicion.value?.nombreCompleto ?? 'el alumno'}.`
 
   const proximo = siguiente ? pendientes.value[0] : undefined
@@ -374,8 +387,8 @@ onMounted(async () => {
               <div class="riesgo__texto">
                 <strong>
                   {{
-                    enRiesgo.size
-                      ? `${enRiesgo.size} ${enRiesgo.size === 1 ? 'alumno en riesgo académico' : 'alumnos en riesgo académico'}`
+                    (riesgoAcademico?.alumnosEnRiesgo ?? 0)
+                      ? `${riesgoAcademico?.alumnosEnRiesgo} ${(riesgoAcademico?.alumnosEnRiesgo ?? 0) === 1 ? 'alumno en riesgo académico' : 'alumnos en riesgo académico'}`
                       : 'Ningún alumno en riesgo académico'
                   }}
                 </strong>
@@ -473,7 +486,7 @@ onMounted(async () => {
                       <strong class="nombre">{{ alumno.nombreCompleto }}</strong>
                       <small class="dni">DNI {{ alumno.dni }}</small>
                       <span v-if="enRiesgo.has(alumno.matriculaId)" class="marca-riesgo">
-                        En riesgo · {{ notasCPorMatricula.get(alumno.matriculaId) }} C
+                        En riesgo · {{ riesgoPorMatricula.get(alumno.matriculaId)?.notasC ?? 0 }} C
                       </span>
                     </td>
                     <template v-if="notaPorMatricula.get(alumno.matriculaId)">
