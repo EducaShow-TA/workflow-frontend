@@ -43,6 +43,29 @@ const errorCatalogos = ref('')
 const error = ref('')
 const aviso = ref('')
 const libreta = ref<LibretaNotas | null>(null)
+const comentariosPorPeriodo = computed(
+  () =>
+    new Map(
+      libreta.value?.periodos.map((periodo) => [
+        periodo.periodoId,
+        periodo.areas.flatMap((area) =>
+          area.competencias.flatMap((competencia) => {
+            const comentario = competencia.observacion?.trim()
+            return comentario
+              ? [
+                  {
+                    clave: `${area.codigo}:${competencia.codigo}`,
+                    area: area.nombre,
+                    competencia: competencia.nombre,
+                    comentario,
+                  },
+                ]
+              : []
+          }),
+        ),
+      ]),
+    ),
+)
 let consultaActual = 0
 let catalogoActual = 0
 const estudiantesDisponibles = computed(() =>
@@ -298,23 +321,32 @@ onMounted(cargarCatalogos)
                 <tr>
                   <th scope="col">Competencia</th>
                   <th scope="col">Logro</th>
-                  <th scope="col">Observación</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="competencia in area.competencias" :key="competencia.codigo">
                   <td>
-                    <strong>{{ competencia.codigo }}</strong><br />{{ competencia.nombre }}
+                    <strong>{{ competencia.codigo }}</strong
+                    ><br />{{ competencia.nombre }}
                   </td>
                   <td>
                     <span class="nota">{{ competencia.nota ?? 'Sin calificación' }}</span>
                   </td>
-                  <td>{{ competencia.observacion || 'Sin observaciones' }}</td>
                 </tr>
               </tbody>
             </table>
           </div>
         </div>
+        <section class="comentarios" :aria-labelledby="`comentarios-${periodo.periodoId}`">
+          <h3 :id="`comentarios-${periodo.periodoId}`">Comentarios cualitativos</h3>
+          <ul v-if="comentariosPorPeriodo.get(periodo.periodoId)?.length" class="lista-comentarios">
+            <li v-for="item in comentariosPorPeriodo.get(periodo.periodoId)" :key="item.clave">
+              <h4>{{ item.area }} · {{ item.competencia }}</h4>
+              <p>{{ item.comentario }}</p>
+            </li>
+          </ul>
+          <p v-else class="ayuda">No hay comentarios registrados para este periodo.</p>
+        </section>
       </article>
       <p class="ayuda">Escala de logro: AD — destacado · A — esperado · B — en proceso · C — en inicio.</p>
     </section>
@@ -462,6 +494,31 @@ th {
 }
 .area + .area {
   margin-top: 28px;
+}
+.comentarios {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid #e1e6ef;
+}
+.lista-comentarios {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  list-style: none;
+}
+.lista-comentarios li {
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: #f5f7fb;
+}
+.lista-comentarios h4 {
+  margin: 0 0 6px;
+  font-size: 14px;
+}
+.lista-comentarios p {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 @media (max-width: 700px) {
   .libretas {
