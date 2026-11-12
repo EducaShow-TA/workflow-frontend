@@ -167,7 +167,8 @@ onMounted(cargar)
         <div v-else-if="revisar" class="confirmacion" role="region" aria-label="Confirmación del pago">
           <p>
             ¿Confirmas el pago aprobado de <strong>{{ moneda.format(boleta.montoTotal) }}</strong> para
-            <strong>{{ boleta.estudiante }}</strong>, boleta #{{ boleta.id }}?
+            <strong>{{ boleta.estudiante }}</strong
+            >, boleta #{{ boleta.id }}?
           </p>
           <p>
             Medio: {{ medio === 'PRESENCIAL' ? 'Presencial' : 'Virtual' }}. Comprobante:

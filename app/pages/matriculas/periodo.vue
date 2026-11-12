@@ -226,10 +226,10 @@ async function confirmarDesactivacion(): Promise<void> {
             <InsigniaEstado texto="Matrícula abierta" variante="exito" />
 
             <p>
-              Periodo <strong>{{ describirPeriodo(periodoVigente) }}</strong>: del
-              <strong>{{ formatearFecha(periodoVigente.fechaInicio) }}</strong> al
-              <strong>{{ formatearFecha(periodoVigente.fechaLimite) }}</strong>. Cierra
-              {{ describirDiasHasta(periodoVigente.fechaLimite) }}.
+              Periodo <strong>{{ describirPeriodo(periodoVigente) }}</strong
+              >: del <strong>{{ formatearFecha(periodoVigente.fechaInicio) }}</strong> al
+              <strong>{{ formatearFecha(periodoVigente.fechaLimite) }}</strong
+              >. Cierra {{ describirDiasHasta(periodoVigente.fechaLimite) }}.
             </p>
           </div>
 

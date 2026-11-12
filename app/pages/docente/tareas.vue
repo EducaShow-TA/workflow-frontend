@@ -243,9 +243,8 @@ onMounted(cargarClases)
           </p>
           <article v-for="tarea in tareasOrdenadas" :key="tarea.id" class="docente-ficha">
             <div>
-              <strong>{{ tarea.titulo }}</strong><span
-                >{{ tarea.competencia }} · vence {{ fechaVisible(tarea.fechaLimite) }}</span
-              >
+              <strong>{{ tarea.titulo }}</strong
+              ><span>{{ tarea.competencia }} · vence {{ fechaVisible(tarea.fechaLimite) }}</span>
               <p>{{ tarea.descripcion }}</p>
             </div>
             <p>
@@ -255,7 +254,8 @@ onMounted(cargarClases)
               <summary>Ver entregas de estudiantes</summary>
               <p v-if="!tarea.entregas.length" class="docente-texto-secundario">No hay matrículas confirmadas.</p>
               <div v-for="entrega in tarea.entregas" :key="entrega.matriculaId" class="docente-ficha">
-                <span>{{ entrega.estudiante }}</span><strong>{{ entrega.cumplida ? 'Entregada' : 'Pendiente' }}</strong>
+                <span>{{ entrega.estudiante }}</span
+                ><strong>{{ entrega.cumplida ? 'Entregada' : 'Pendiente' }}</strong>
                 <small>{{
                   entrega.fechaCumplimiento ? fechaVisible(entrega.fechaCumplimiento) : 'Sin fecha de entrega'
                 }}</small>

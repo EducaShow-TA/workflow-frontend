@@ -231,19 +231,18 @@ onMounted(async () => {
       <div class="resumen" aria-label="Resumen del reporte">
         <article class="tarjeta">
           <p>Monto total pendiente</p>
-          <strong>{{ moneda.format(reporte.montoPendiente) }}</strong><small
-            >Incluye los recargos de las boletas seleccionadas.</small
-          >
+          <strong>{{ moneda.format(reporte.montoPendiente) }}</strong
+          ><small>Incluye los recargos de las boletas seleccionadas.</small>
         </article>
         <article class="tarjeta">
           <p>Familias morosas</p>
-          <strong>{{ reporte.familiasMorosas }}</strong><small
-            >Apoderados titulares con al menos una boleta en mora.</small
-          >
+          <strong>{{ reporte.familiasMorosas }}</strong
+          ><small>Apoderados titulares con al menos una boleta en mora.</small>
         </article>
         <article class="tarjeta">
           <p>Boletas por cobrar</p>
-          <strong>{{ totalBoletas }}</strong><small>Según los filtros aplicados.</small>
+          <strong>{{ totalBoletas }}</strong
+          ><small>Según los filtros aplicados.</small>
         </article>
       </div>
       <section class="tarjeta" aria-labelledby="titulo-detalle" :aria-busy="cargando">

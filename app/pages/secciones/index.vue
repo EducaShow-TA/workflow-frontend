@@ -544,8 +544,8 @@ async function confirmarApertura(): Promise<void> {
         @submit.prevent="guardarCapacidad"
       >
         <p class="dato-informativo">
-          Alumnos matriculados actualmente: <strong>{{ seccionEnEdicion.cantidadMatriculados }}</strong>. La nueva
-          capacidad no puede ser menor que esta cantidad.
+          Alumnos matriculados actualmente: <strong>{{ seccionEnEdicion.cantidadMatriculados }}</strong
+          >. La nueva capacidad no puede ser menor que esta cantidad.
         </p>
 
         <div class="campo">
