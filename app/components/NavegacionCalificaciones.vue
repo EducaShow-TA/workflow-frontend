@@ -20,6 +20,7 @@ const secciones = computed(() =>
       ]
     : [
         { titulo: 'Registro de calificaciones', destino: '/calificaciones' },
+        { titulo: 'Evaluaciones parciales', destino: '/calificaciones/evaluaciones' },
         { titulo: 'Libretas e informes', destino: '/calificaciones/libretas' },
         { titulo: 'Auditoría de cambios', destino: '/calificaciones/auditoria' },
       ],
