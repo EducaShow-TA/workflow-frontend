@@ -44,7 +44,6 @@ const competencias = computed(() =>
     )
     .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')),
 )
-const competenciaActual = computed(() => competencias.value.find((item) => item.codigo === competenciaCodigo.value))
 
 async function cargarRegla(): Promise<void> {
   regla.value = null
@@ -117,12 +116,11 @@ onMounted(cargarCatalogo)
 
 <template>
   <main class="pagina-reglas">
-    <nav aria-label="Secciones de competencias">
-      <NuxtLink to="/competencias">Catálogo de competencias</NuxtLink
-      ><strong aria-current="page">Reglas de consolidación</strong>
-    </nav>
+    <NuxtLink class="volver" to="/competencias">
+      <span aria-hidden="true">←</span>
+      Volver a áreas y competencias
+    </NuxtLink>
     <header>
-      <p>Gestión Académica / US-3.1</p>
       <h1>Reglas de consolidación del logro</h1>
       <p>Define los umbrales que convierten el promedio de evaluaciones en un nivel de logro.</p>
     </header>
@@ -136,7 +134,6 @@ onMounted(cargarCatalogo)
           {{ item.areaNombre }} · {{ item.nombre }}
         </option>
       </select>
-      <p v-if="competenciaActual">Código: {{ competenciaActual.codigo }}</p>
       <p v-if="!competencias.length">No hay competencias activas para configurar.</p>
       <div v-if="regla" class="umbrales">
         <label>Valor de C <input :value="regla.valorC" type="number" disabled /></label>
@@ -169,9 +166,21 @@ onMounted(cargarCatalogo)
   padding: 32px;
   max-width: 900px;
 }
-.pagina-reglas nav {
-  display: flex;
-  gap: 20px;
+.volver {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 8px;
+  color: #075eb3;
+  font-weight: 600;
+  text-decoration: none;
+}
+.volver:hover {
+  text-decoration: underline;
+}
+.volver span {
+  font-size: 20px;
+  line-height: 1;
 }
 .pagina-reglas header p {
   margin: 0 0 6px;

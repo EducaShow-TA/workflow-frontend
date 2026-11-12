@@ -27,6 +27,11 @@ interface MatriculaConfirmada {
   estudiante: string
   dni: string
 }
+interface ConfirmacionRegistro {
+  estudiante: string
+  competencia: string
+  nota: NotaCualitativa
+}
 
 const { solicitar } = useApi()
 const { listar: listarPeriodos } = usePeriodosAcademicos()
@@ -50,7 +55,7 @@ const consultando = ref(false)
 const guardando = ref(false)
 const descargandoId = ref<number | null>(null)
 const error = ref('')
-const mensaje = ref('')
+const confirmacionRegistro = ref<ConfirmacionRegistro | null>(null)
 let secuenciaConsulta = 0
 
 const competencias = computed(() => {
@@ -82,6 +87,7 @@ const matriculas = computed<MatriculaConfirmada[]>(() => {
 })
 
 const notaExistente = computed(() => calificaciones.value.find((item) => item.matriculaId === matriculaId.value))
+const matriculaSeleccionada = computed(() => matriculas.value.find((item) => item.matriculaId === matriculaId.value))
 const periodoSeleccionado = computed(() => periodos.value.find((item) => item.periodoId === periodoId.value))
 const competenciaSeleccionada = computed(() =>
   competencias.value.find((item) => item.codigo === competenciaCodigo.value),
@@ -99,7 +105,7 @@ function formatearFecha(fecha: string): string {
 }
 function limpiarAvisos(): void {
   error.value = ''
-  mensaje.value = ''
+  confirmacionRegistro.value = null
 }
 function cambiarArchivo(evento: Event): void {
   const elemento = evento.target as HTMLInputElement
@@ -154,6 +160,9 @@ watch(periodoId, () => {
   matriculaId.value = null
   limpiarFormulario()
 })
+watch(matriculaId, () => {
+  confirmacionRegistro.value = null
+})
 watch([periodoId, competenciaCodigo], () => {
   limpiarAvisos()
   void cargarCalificaciones()
@@ -169,7 +178,7 @@ async function guardar(): Promise<void> {
   }
   if (notaExistente.value) {
     error.value =
-      'Este estudiante ya tiene una calificación en esta competencia. La rectificación requiere el flujo US-3.6.'
+      'Este estudiante ya tiene una calificación en esta competencia. No se puede registrar otra desde este formulario.'
     return
   }
   if (observacion.value.trim().length > 1000) {
@@ -205,9 +214,13 @@ async function guardar(): Promise<void> {
   guardando.value = true
   try {
     await registrar(solicitud, archivo.value)
+    confirmacionRegistro.value = {
+      estudiante: matriculaSeleccionada.value?.estudiante ?? 'Estudiante seleccionado',
+      competencia: competenciaSeleccionada.value?.nombre ?? 'competencia seleccionada',
+      nota: solicitud.nota,
+    }
     await cargarCalificaciones()
     limpiarFormulario()
-    mensaje.value = 'Calificación y evidencia registradas correctamente.'
   } catch (fallo: unknown) {
     error.value = obtenerMensajeError(fallo, 'No se pudo registrar la calificación.')
   } finally {
@@ -230,21 +243,15 @@ async function descargar(item: Calificacion): Promise<void> {
 
 <template>
   <main class="pagina-calificaciones">
-    <nav aria-label="Secciones de calificaciones" style="display: flex; gap: 24px; margin-bottom: 24px">
-      <strong aria-current="page">Registro de calificaciones</strong>
-      <NuxtLink to="/calificaciones/libretas">Libretas e informes</NuxtLink>
-      <NuxtLink to="/calificaciones/auditoria">Auditoría de cambios</NuxtLink>
-    </nav>
+    <NavegacionCalificaciones class="navegacion-pagina" />
     <header class="cabecera">
       <div>
         <h1>Calificaciones y evidencias</h1>
         <p>Registra logros cualitativos y respáldalos con archivos o enlaces pedagógicos.</p>
       </div>
-      <span class="marca-historia">US-3.8 · Primera fase</span>
     </header>
 
     <p v-if="error" class="mensaje error" role="alert">{{ error }}</p>
-    <p v-if="mensaje" class="mensaje exito" role="status">{{ mensaje }}</p>
 
     <section class="tarjeta" aria-labelledby="titulo-filtros">
       <h2 id="titulo-filtros">1. Contexto académico</h2>
@@ -264,7 +271,7 @@ async function descargar(item: Calificacion): Promise<void> {
           <label for="competencia-calificacion">Competencia</label>
           <select id="competencia-calificacion" v-model="competenciaCodigo" :disabled="!competencias.length">
             <option v-for="competencia in competencias" :key="competencia.codigo" :value="competencia.codigo">
-              {{ competencia.nombre }} ({{ competencia.codigo }})
+              {{ competencia.nombre }}
             </option>
           </select>
           <small v-if="!competencias.length">Primero registra competencias activas en el catálogo.</small>
@@ -341,9 +348,13 @@ async function descargar(item: Calificacion): Promise<void> {
             :disabled="Boolean(notaExistente)"
           />
         </div>
-        <p v-if="notaExistente" class="aviso ancho" role="status">
+        <p v-if="confirmacionRegistro" class="aviso aviso-exito ancho" role="status">
+          Calificación registrada correctamente para <strong>{{ confirmacionRegistro.estudiante }}</strong>: obtuvo
+          <strong>{{ confirmacionRegistro.nota }}</strong> en <strong>{{ confirmacionRegistro.competencia }}</strong>.
+        </p>
+        <p v-else-if="notaExistente" class="aviso ancho" role="status">
           Este estudiante ya tiene nota <strong>{{ notaExistente.nota }}</strong> en la competencia seleccionada. La
-          rectificación se implementará mediante el flujo US-3.6.
+          rectificación debe realizarse mediante el procedimiento definido por el colegio.
         </p>
         <div class="acciones ancho">
           <button
@@ -427,10 +438,6 @@ async function descargar(item: Calificacion): Promise<void> {
         </table>
       </div>
     </section>
-    <p class="nota-alcance">
-      Primera fase disponible para administradores. El flujo docente requiere habilitar consultas académicas por rol en
-      el backend.
-    </p>
   </main>
 </template>
 
@@ -439,6 +446,9 @@ async function descargar(item: Calificacion): Promise<void> {
   max-width: 1320px;
   margin: 0 auto;
   padding: 32px 40px 56px;
+}
+.navegacion-pagina {
+  margin-bottom: 24px;
 }
 .cabecera {
   display: flex;
@@ -457,15 +467,6 @@ async function descargar(item: Calificacion): Promise<void> {
   margin: 0;
   font-size: 14px;
   color: var(--color-text-secondary);
-}
-.marca-historia {
-  white-space: nowrap;
-  border-radius: 100px;
-  background: #dbeafe;
-  color: #1e40af;
-  font-size: 12px;
-  font-weight: 600;
-  padding: 8px 12px;
 }
 .tarjeta {
   margin: 0 0 20px;
@@ -581,11 +582,6 @@ h2 {
   border: 1px solid #fecaca;
   background: #fef2f2;
 }
-.mensaje.exito {
-  color: #166534;
-  border: 1px solid #bbf7d0;
-  background: #f0fdf4;
-}
 .aviso {
   padding: 12px;
   margin: 0;
@@ -594,6 +590,11 @@ h2 {
   border: 1px solid #fde68a;
   border-radius: 8px;
   font-size: 13px;
+}
+.aviso-exito {
+  color: #166534;
+  border-color: #bbf7d0;
+  background: #f0fdf4;
 }
 .etiqueta {
   border-radius: 8px;
@@ -665,11 +666,6 @@ th {
   font-size: 14px;
   color: var(--color-text-secondary);
 }
-.nota-alcance {
-  margin: 18px 0 0;
-  color: var(--color-text-secondary);
-  font-size: 12px;
-}
 @media (max-width: 850px) {
   .pagina-calificaciones {
     padding: 24px 18px;
@@ -681,9 +677,6 @@ th {
   .encabezado-seccion {
     flex-direction: column;
     align-items: flex-start;
-  }
-  .marca-historia {
-    white-space: normal;
   }
 }
 </style>

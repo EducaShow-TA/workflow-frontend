@@ -432,7 +432,7 @@ function solicitarCambioEstadoCompetencia(competencia: Competencia): void {
 <template>
   <main class="pagina-competencias">
     <EncabezadoPagina
-      titulo="Áreas y Competencias"
+      titulo="Áreas y competencias"
       descripcion="Configura el catálogo de áreas curriculares y sus competencias según el plan curricular vigente."
     >
       <template #acciones>

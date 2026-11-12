@@ -185,15 +185,11 @@ onMounted(cargarCatalogos)
 
 <template>
   <main class="libretas">
+    <NavegacionCalificaciones v-if="esAdministrador || esDocente" :docente="esDocente" />
     <header>
-      <p class="ruta">Calificaciones / Libretas · US-3.3</p>
       <h1>Libretas e informes de progreso</h1>
       <p>Consulta los avances por área y competencia y descarga el documento generado por el colegio.</p>
     </header>
-    <nav v-if="esAdministrador || esDocente" class="pestanas" aria-label="Secciones de calificaciones">
-      <NuxtLink :to="esDocente ? '/docente/calificaciones' : '/calificaciones'">Registro de calificaciones</NuxtLink>
-      <span aria-current="page">Libretas e informes</span>
-    </nav>
     <section class="tarjeta" aria-labelledby="titulo-consulta">
       <h2 id="titulo-consulta">Consultar libreta</h2>
       <p v-if="esDocente" class="ayuda">
@@ -303,9 +299,7 @@ onMounted(cargarCatalogos)
               </thead>
               <tbody>
                 <tr v-for="competencia in area.competencias" :key="competencia.codigo">
-                  <td>
-                    <strong>{{ competencia.codigo }}</strong><br />{{ competencia.nombre }}
-                  </td>
+                  <td>{{ competencia.nombre }}</td>
                   <td>
                     <span class="nota">{{ competencia.nota ?? 'Sin calificación' }}</span>
                   </td>
@@ -345,7 +339,6 @@ h2 {
 h3 {
   font-size: 17px;
 }
-.ruta,
 .ayuda {
   color: #526477;
   font-size: 14px;
@@ -358,20 +351,8 @@ h3 {
   padding: 24px;
   margin-bottom: 20px;
 }
-.pestanas {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 20px;
-  margin: 0 0 24px;
-}
-.pestanas a,
-.pestanas span {
-  padding: 10px 0;
-  color: #2444b0;
-}
-.pestanas span {
-  border-bottom: 3px solid #2444b0;
-  font-weight: 700;
+.libretas > :deep(.navegacion-calificaciones) {
+  margin-bottom: 24px;
 }
 .campos {
   display: grid;
