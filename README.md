@@ -9,7 +9,7 @@ La interfaz disponible depende del rol autenticado:
 - **Administración:** panel general; registro de estudiantes con datos de apoderados y consulta de estudiantes; matrícula, periodos y vacantes; cuentas, roles y carga masiva CSV; catálogo curricular; calificaciones, reglas de consolidación y libretas; pensiones y reportes; plantillas de horario y programación semanal por sección, con selección de aulas; asistencia por sesión y gestión de asistencia docente; registro de errores y auditoría de calificaciones.
 - **Docencia:** portal con clases y horario propios, marcaje de entrada/salida, listas y asistencia de estudiantes, registro de calificaciones con evidencia, seguimiento de tareas y consulta de libretas.
 - **Familia y estudiante:** consulta de libretas en `/libretas`, según los permisos del backend. La interfaz actual no incluye un portal para consultar boletas o registrar pagos como apoderado.
-- **Acceso:** inicio de sesión, recuperación y restablecimiento de contraseña, y control de navegación por rol.
+- **Acceso:** inicio de sesión, recuperación y restablecimiento de contraseña, y control de navegación por rol. Las contraseñas nuevas deben tener al menos 8 caracteres, incluir minúscula, mayúscula, número y símbolo, y ocupar como máximo 72 bytes UTF-8.
 
 El indicador de riesgo académico de la pantalla docente se calcula en el navegador contando notas `C` y aplicando un umbral configurable. El backend no ofrece un endpoint específico para detectar o persistir ese riesgo. El flujo de pagos permite registrar pagos en el sistema, pero no procesa transacciones con una pasarela externa. La recuperación completa por correo depende de configurar el servicio de correo del backend.
 
