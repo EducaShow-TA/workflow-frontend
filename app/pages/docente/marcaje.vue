@@ -1,71 +1,66 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import type { AsistenciaDocente } from '~/types/asistenciaDocente'
+import { useMiAsistenciaDocente } from '~/composables/useMiAsistenciaDocente'
+import { obtenerMensajeError } from '~/composables/useMensajesError'
+import { obtenerFechaHoyIso } from '~/composables/useFechas'
 import { useAutenticacionStore } from '~/stores/autenticacion'
 
 definePageMeta({ layout: 'docente', middleware: 'autenticacion' })
 
 const autenticacion = useAutenticacionStore()
-const nombreDocente = computed(() => autenticacion.usuario?.nombreCompleto?.trim() || 'Docente autenticado')
-
-/** Vista previa sin solicitudes HTTP ni persistencia. No representa marcajes oficiales. */
-const modoDemostracion = ref(false)
-const fechaDemostracion = ref('')
-const entradaDemostracion = ref<string | null>(null)
-const salidaDemostracion = ref<string | null>(null)
-
-function fechaLocal(): string {
-  const fecha = new Date()
-  const anhio = fecha.getFullYear()
-  const mes = String(fecha.getMonth() + 1).padStart(2, '0')
-  const dia = String(fecha.getDate()).padStart(2, '0')
-  return `${anhio}-${mes}-${dia}`
+const api = useMiAsistenciaDocente()
+const hoy = obtenerFechaHoyIso()
+const desde = `${hoy.slice(0, 7)}-01`
+const hasta = hoy
+const marcajes = ref<AsistenciaDocente[]>([])
+const cargando = ref(true)
+const guardando = ref(false)
+const error = ref('')
+const aviso = ref('')
+const registroHoy = computed(() => marcajes.value.find((item) => item.fecha === hoy) ?? null)
+const puedeMarcarEntrada = computed(() => !registroHoy.value || registroHoy.value.estado === 'PENDIENTE_MARCAJE')
+const puedeMarcarSalida = computed(() => Boolean(registroHoy.value?.horaEntrada) && !registroHoy.value?.horaSalida)
+const etiquetaEstado = (estado: AsistenciaDocente['estado']) =>
+  ({
+    PENDIENTE_MARCAJE: 'Pendiente',
+    PRESENTE: 'Presente',
+    TARDANZA: 'Tardanza',
+    INASISTENCIA: 'Inasistencia',
+  })[estado]
+const fechaVisible = (fecha: string) => {
+  const [anio, mes, dia] = fecha.split('-')
+  return `${dia}/${mes}/${anio}`
 }
 
-function horaLocal(): string {
-  return new Intl.DateTimeFormat('es-PE', { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date())
+async function cargar(): Promise<void> {
+  cargando.value = true
+  error.value = ''
+  try {
+    marcajes.value = await api.listar(desde, hasta)
+  } catch (fallo: unknown) {
+    error.value = obtenerMensajeError(fallo, 'No se pudo consultar tu historial de marcajes.')
+  } finally {
+    cargando.value = false
+  }
 }
 
-function fechaVisible(fechaIso: string): string {
-  if (!fechaIso) return '—'
-  const [anhio = '', mes = '', dia = ''] = fechaIso.split('-')
-  return `${dia}/${mes}/${anhio}`
+async function marcar(tipo: 'entrada' | 'salida'): Promise<void> {
+  guardando.value = true
+  error.value = ''
+  aviso.value = ''
+  try {
+    const guardado = tipo === 'entrada' ? await api.marcarEntrada() : await api.marcarSalida()
+    marcajes.value = [guardado, ...marcajes.value.filter((item) => item.id !== guardado.id)]
+    aviso.value = tipo === 'entrada' ? 'La hora de entrada quedó registrada.' : 'La hora de salida quedó registrada.'
+  } catch (fallo: unknown) {
+    error.value = obtenerMensajeError(fallo, 'No se pudo registrar el marcaje.')
+  } finally {
+    guardando.value = false
+  }
 }
 
-function activarDemostracion(): void {
-  modoDemostracion.value = true
-  fechaDemostracion.value = fechaLocal()
-  entradaDemostracion.value = null
-  salidaDemostracion.value = null
-}
-
-function cerrarDemostracion(): void {
-  modoDemostracion.value = false
-  entradaDemostracion.value = null
-  salidaDemostracion.value = null
-  fechaDemostracion.value = ''
-}
-
-function simularEntrada(): void {
-  if (!modoDemostracion.value || entradaDemostracion.value) return
-  entradaDemostracion.value = horaLocal()
-}
-
-function simularSalida(): void {
-  if (!modoDemostracion.value || !entradaDemostracion.value || salidaDemostracion.value) return
-  salidaDemostracion.value = horaLocal()
-}
-
-function reiniciarDemostracion(): void {
-  if (!modoDemostracion.value) return
-  entradaDemostracion.value = null
-  salidaDemostracion.value = null
-  fechaDemostracion.value = fechaLocal()
-}
-
-const estadoDemostracion = computed(() => {
-  if (!entradaDemostracion.value) return 'Pendiente de entrada'
-  return salidaDemostracion.value ? 'Jornada simulada completa' : 'Entrada simulada'
-})
+onMounted(cargar)
 </script>
 
 <template>
@@ -74,182 +69,71 @@ const estadoDemostracion = computed(() => {
       <div>
         <span class="docente-sobrelinea">US-2.3 · Control de asistencia</span>
         <h1>Mi marcaje</h1>
-        <p>Consulta tu jornada laboral y registra tus propias horas de entrada y salida.</p>
+        <p>Registra tu entrada y salida. El servidor valida el horario y conserva la hora oficial.</p>
       </div>
-      <span class="docente-insignia">Diseño del Sprint 2</span>
+      <button type="button" class="docente-boton docente-boton--secundario" :disabled="cargando" @click="cargar">
+        Actualizar
+      </button>
     </header>
 
     <section class="marcaje-condiciones" aria-labelledby="marcaje-titulo-condiciones">
-      <div class="marcaje-cabecera">
-        <h2 id="marcaje-titulo-condiciones">Condiciones para registrar tu marcaje</h2>
-        <span class="marcaje-etiqueta marcaje-etiqueta--pendiente">Validación pendiente</span>
-      </div>
+      <h2 id="marcaje-titulo-condiciones">Marcaje de hoy</h2>
       <p>
-        Solo podrás registrar tus propias horas de entrada y salida dentro de la ventana habilitada para tu jornada. Los
-        horarios y la tolerancia deberán verificarse en el servidor.
+        Solo puedes registrar tu propia jornada dentro de la ventana habilitada. La fecha y hora se obtienen del
+        servidor.
       </p>
-      <div class="marcaje-verificaciones">
-        <div class="marcaje-verificacion">
-          <span class="marcaje-punto" aria-hidden="true" />
-          <div><strong>Identidad del docente</strong><small>La cuenta autenticada será la única autorizada</small></div>
+      <div class="marcaje-datos">
+        <div>
+          <span>Docente</span><strong>{{ autenticacion.usuario?.nombreCompleto || 'Docente autenticado' }}</strong>
         </div>
-        <div class="marcaje-verificacion">
-          <span class="marcaje-punto" aria-hidden="true" />
-          <div><strong>Horario asignado</strong><small>Pendiente de consulta por docente</small></div>
+        <div>
+          <span>Fecha</span><strong>{{ fechaVisible(hoy) }}</strong>
         </div>
-        <div class="marcaje-verificacion">
-          <span class="marcaje-punto" aria-hidden="true" />
-          <div><strong>Ventana y tolerancia</strong><small>Parámetros X y Z por configurar (US-2.9)</small></div>
+        <div>
+          <span>Estado</span><strong>{{ registroHoy ? etiquetaEstado(registroHoy.estado) : 'Sin marcaje' }}</strong>
         </div>
+        <div>
+          <span>Motivo de ajuste</span><strong>{{ registroHoy?.motivoAjuste || '—' }}</strong>
+        </div>
+      </div>
+      <div class="marcaje-relojes">
+        <div>
+          <span class="marcaje-relojes__rotulo">Entrada</span><strong>{{ registroHoy?.horaEntrada || '—:—' }}</strong>
+        </div>
+        <div>
+          <span class="marcaje-relojes__rotulo">Salida</span><strong>{{ registroHoy?.horaSalida || '—:—' }}</strong>
+        </div>
+      </div>
+      <div class="docente-formulario__acciones marcaje-acciones">
+        <button
+          type="button"
+          class="docente-boton docente-boton--secundario"
+          :disabled="guardando || !puedeMarcarEntrada"
+          @click="marcar('entrada')"
+        >
+          {{ guardando ? 'Guardando…' : registroHoy?.horaEntrada ? 'Entrada registrada' : 'Marcar entrada' }}
+        </button>
+        <button
+          type="button"
+          class="docente-boton"
+          :disabled="guardando || !puedeMarcarSalida"
+          @click="marcar('salida')"
+        >
+          {{ registroHoy?.horaSalida ? 'Salida registrada' : 'Marcar salida' }}
+        </button>
       </div>
     </section>
 
-    <div class="docente-grid docente-grid--dos marcaje-columnas">
-      <section class="docente-tarjeta" aria-labelledby="marcaje-titulo-jornada">
-        <div class="docente-tarjeta__titulo marcaje-cabecera">
-          <h2 id="marcaje-titulo-jornada">1. Jornada de hoy</h2>
-          <span
-            class="marcaje-etiqueta"
-            :class="modoDemostracion ? 'marcaje-etiqueta--demo' : 'marcaje-etiqueta--neutra'"
-          >
-            {{ modoDemostracion ? 'Simulación local' : 'Sin sincronizar' }}
-          </span>
-        </div>
-
-        <div class="marcaje-datos">
-          <div>
-            <span>Docente</span><strong>{{ nombreDocente }}</strong>
-          </div>
-          <div>
-            <span>Fecha de referencia</span
-            ><strong>{{ modoDemostracion ? fechaVisible(fechaDemostracion) : '—' }}</strong>
-          </div>
-          <div><span>Hora de inicio programada</span><strong>—:—</strong></div>
-          <div><span>Hora de fin programada</span><strong>—:—</strong></div>
-        </div>
-
-        <div class="marcaje-relojes" aria-label="Resumen de marcaje">
-          <div>
-            <span class="marcaje-relojes__rotulo">Entrada</span>
-            <strong>{{ modoDemostracion ? (entradaDemostracion ?? '—:—') : '—:—' }}</strong>
-            <small>{{ modoDemostracion ? 'Hora local ilustrativa' : 'Sin consulta del servidor' }}</small>
-          </div>
-          <div>
-            <span class="marcaje-relojes__rotulo">Salida</span>
-            <strong>{{ modoDemostracion ? (salidaDemostracion ?? '—:—') : '—:—' }}</strong>
-            <small>{{ modoDemostracion ? 'Hora local ilustrativa' : 'Sin consulta del servidor' }}</small>
-          </div>
-        </div>
-
-        <div class="marcaje-estado" role="status">
-          <span class="marcaje-estado__punto" aria-hidden="true" />
-          <div>
-            <strong>{{ modoDemostracion ? estadoDemostracion : 'Marcaje no disponible' }}</strong>
-            <small>{{
-              modoDemostracion
-                ? 'Este estado no se guarda en MySQL.'
-                : 'Esperando integración con la asistencia del docente.'
-            }}</small>
-          </div>
-        </div>
-
-        <div class="docente-formulario__acciones marcaje-acciones">
-          <button
-            type="button"
-            class="docente-boton docente-boton--secundario"
-            disabled
-            title="Necesita validación del backend"
-          >
-            Marcar entrada
-          </button>
-          <button type="button" class="docente-boton" disabled title="Necesita validación del backend">
-            Marcar salida
-          </button>
-        </div>
-        <p class="marcaje-ayuda">
-          El servidor deberá registrar la hora oficial y validar la ventana de marcaje antes de aceptar una operación
-          real.
-        </p>
-      </section>
-
-      <section class="docente-tarjeta" aria-labelledby="marcaje-titulo-vista-previa">
-        <div class="docente-tarjeta__titulo marcaje-cabecera">
-          <h2 id="marcaje-titulo-vista-previa">2. Vista previa interactiva</h2>
-          <span class="marcaje-etiqueta marcaje-etiqueta--neutra">Sin guardar datos</span>
-        </div>
-        <p class="docente-texto-secundario">
-          Puedes simular el flujo de entrada y salida para revisar el diseño. No se enviará información a ningún API.
-        </p>
-        <button
-          type="button"
-          class="docente-boton docente-boton--secundario marcaje-boton-previa"
-          @click="modoDemostracion ? cerrarDemostracion() : activarDemostracion()"
-        >
-          {{ modoDemostracion ? 'Cerrar vista previa' : 'Ver diseño con marcaje de ejemplo' }}
-        </button>
-
-        <div v-if="modoDemostracion" class="marcaje-demo" role="region" aria-label="Simulación de marcaje">
-          <p class="marcaje-demo__aviso">
-            <strong>Modo demostración activo.</strong> Las horas mostradas provienen del navegador y son ilustrativas,
-            no oficiales.
-          </p>
-          <div class="marcaje-demo__pasos">
-            <div class="marcaje-demo__paso" :class="{ 'marcaje-demo__paso--listo': entradaDemostracion !== null }">
-              <span>1</span>
-              <div>
-                <strong>Entrada</strong><small>{{ entradaDemostracion ?? 'Sin simular' }}</small>
-              </div>
-            </div>
-            <div class="marcaje-demo__paso" :class="{ 'marcaje-demo__paso--listo': salidaDemostracion !== null }">
-              <span>2</span>
-              <div>
-                <strong>Salida</strong><small>{{ salidaDemostracion ?? 'Sin simular' }}</small>
-              </div>
-            </div>
-          </div>
-          <div class="marcaje-demo__acciones">
-            <button
-              type="button"
-              class="docente-boton docente-boton--secundario"
-              :disabled="entradaDemostracion !== null"
-              @click="simularEntrada"
-            >
-              Simular entrada
-            </button>
-            <button
-              type="button"
-              class="docente-boton"
-              :disabled="!entradaDemostracion || salidaDemostracion !== null"
-              @click="simularSalida"
-            >
-              Simular salida
-            </button>
-          </div>
-          <button type="button" class="marcaje-reiniciar" @click="reiniciarDemostracion">Reiniciar simulación</button>
-        </div>
-        <DocenteEstadoVacio
-          v-else
-          titulo="Vista previa disponible"
-          descripcion="Activa la demostración para revisar cómo cambian los estados después de una entrada y una salida."
-          icono="/icons/menu-docentes.svg"
-        />
-      </section>
-    </div>
+    <AvisoMensaje v-if="error" :mensaje="error" tipo="error" />
+    <AvisoMensaje v-if="aviso" :mensaje="aviso" tipo="exito" />
 
     <section class="docente-tarjeta" aria-labelledby="marcaje-titulo-historial">
       <div class="docente-tarjeta__titulo marcaje-cabecera">
-        <h2 id="marcaje-titulo-historial">3. Historial de marcajes</h2>
-        <span
-          class="marcaje-etiqueta"
-          :class="modoDemostracion ? 'marcaje-etiqueta--demo' : 'marcaje-etiqueta--neutra'"
-        >
-          {{ modoDemostracion ? 'Ejemplo local' : 'Pendiente de API' }}
-        </span>
+        <h2 id="marcaje-titulo-historial">Historial del mes</h2>
+        <span class="marcaje-etiqueta marcaje-etiqueta--neutra">{{ marcajes.length }} registros</span>
       </div>
-      <p class="docente-texto-secundario">
-        Los marcajes reales aparecerán aquí cuando esté disponible el servicio de consulta del docente autenticado.
-      </p>
-      <div class="docente-tabla-contenedor">
+      <p v-if="cargando" role="status">Consultando marcajes…</p>
+      <div v-else class="docente-tabla-contenedor">
         <table class="docente-tabla">
           <thead>
             <tr>
@@ -257,25 +141,19 @@ const estadoDemostracion = computed(() => {
               <th scope="col">Entrada</th>
               <th scope="col">Salida</th>
               <th scope="col">Estado</th>
-              <th scope="col">Origen</th>
+              <th scope="col">Observación</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-if="modoDemostracion && entradaDemostracion">
-              <td>{{ fechaVisible(fechaDemostracion) }}</td>
-              <td>{{ entradaDemostracion }}</td>
-              <td>{{ salidaDemostracion ?? '—:—' }}</td>
-              <td>{{ estadoDemostracion }}</td>
-              <td><span class="marcaje-etiqueta marcaje-etiqueta--demo">Demostración</span></td>
+            <tr v-for="item in marcajes" :key="item.id">
+              <td>{{ fechaVisible(item.fecha) }}</td>
+              <td>{{ item.horaEntrada || '—' }}</td>
+              <td>{{ item.horaSalida || '—' }}</td>
+              <td>{{ etiquetaEstado(item.estado) }}</td>
+              <td>{{ item.motivoAjuste || '—' }}</td>
             </tr>
-            <tr v-else>
-              <td colspan="5" class="docente-tabla__vacia">
-                {{
-                  modoDemostracion
-                    ? 'Simula la entrada para visualizar un registro de ejemplo.'
-                    : 'No se han consultado registros reales. No se puede determinar aún si existen marcajes.'
-                }}
-              </td>
+            <tr v-if="!marcajes.length">
+              <td colspan="5" class="docente-tabla__vacia">No hay marcajes registrados este mes.</td>
             </tr>
           </tbody>
         </table>

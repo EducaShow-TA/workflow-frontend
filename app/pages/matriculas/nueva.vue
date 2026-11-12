@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import type { EstudianteMatriculable } from '~/types/matricula'
+import type {
+  ErrorConfirmacionMatricula,
+  EstudianteMatriculable,
+  IncidenciaConfirmacionMatricula,
+} from '~/types/matricula'
 import type { SolicitudCompromisoPago } from '~/types/compromisoPago'
 import type { PeriodoAcademico } from '~/types/periodoAcademico'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
@@ -9,13 +13,14 @@ import { useMatriculas } from '~/composables/useMatriculas'
 import { obtenerAnhio } from '~/composables/useAnhioEscolar'
 import { usePeriodoMatricula } from '~/composables/usePeriodoMatricula'
 import { usePeriodosAcademicos } from '~/composables/usePeriodosAcademicos'
+import { ErrorSolicitudApi } from '~/types/api'
 
 definePageMeta({ middleware: 'autenticacion' })
 
 const { listar } = useEstudiantesMatriculables()
 const { listarPorAnhio } = usePeriodosAcademicos()
 const { obtenerPeriodoVigente } = usePeriodoMatricula()
-const { registrarMasivamente, confirmarMasivamente } = useMatriculas()
+const { registrarMasivamente, retirar, confirmarMasivamente } = useMatriculas()
 
 const estudiantes = ref<EstudianteMatriculable[]>([])
 const periodos = ref<PeriodoAcademico[]>([])
@@ -31,6 +36,7 @@ const avisoSeleccion = ref('')
 const confirmacionExitosa = ref(false)
 const modalCompromisoAbierto = ref(false)
 const errorCompromiso = ref('')
+const incidenciasCompromiso = ref<IncidenciaConfirmacionMatricula[]>([])
 const seleccionPendientes = ref<number[]>([])
 const estudiantesSeleccionados = ref<number[]>([])
 
@@ -89,10 +95,18 @@ const ocupacion = computed(() =>
 
 watch(periodoId, () => {
   seleccionPendientes.value = []
+  incidenciasCompromiso.value = []
   estudiantesSeleccionados.value = []
   busquedaEstudiante.value = ''
   avisoSeleccion.value = ''
 })
+watch(
+  seleccionPendientes,
+  () => {
+    incidenciasCompromiso.value = []
+  },
+  { deep: true },
+)
 watch(gradoSeleccionado, () => {
   const siguientePeriodo =
     periodosDelGrado.value.find((periodo) => periodo.vacantesDisponibles > 0) ?? periodosDelGrado.value[0]
@@ -178,6 +192,31 @@ function alternarSeleccionPendientes(): void {
     : pendientesDeConfirmacion.value.map((estudiante) => estudiante.estudianteId)
 }
 
+async function retirarPendiente(estudiante: EstudianteMatriculable): Promise<void> {
+  const periodo = periodoSeleccionado.value
+  if (!periodo || guardando.value) return
+
+  const nombre = nombreCompleto(estudiante)
+  const mensaje = `¿Retirar la matrícula pendiente de ${nombre}? El estudiante volverá a estar disponible para matricularse.`
+  if (!window.confirm(mensaje)) {
+    return
+  }
+
+  guardando.value = true
+  error.value = ''
+  aviso.value = ''
+  try {
+    await retirar(periodo.periodoId, estudiante.estudianteId)
+    seleccionPendientes.value = seleccionPendientes.value.filter((id) => id !== estudiante.estudianteId)
+    await cargarDatos()
+    aviso.value = `Se retiró la matrícula pendiente de ${nombre}. El estudiante volvió a estar disponible.`
+  } catch (fallo: unknown) {
+    error.value = obtenerMensajeError(fallo, `No se pudo retirar la matrícula pendiente de ${nombre}.`)
+  } finally {
+    guardando.value = false
+  }
+}
+
 async function cargarDatos(): Promise<void> {
   cargando.value = true
   error.value = ''
@@ -250,6 +289,7 @@ async function confirmarSeleccion(compromiso: SolicitudCompromisoPago): Promise<
   guardando.value = true
   error.value = ''
   errorCompromiso.value = ''
+  incidenciasCompromiso.value = []
   try {
     const resultados = await confirmarMasivamente(
       periodoSeleccionado.value.periodoId,
@@ -258,6 +298,7 @@ async function confirmarSeleccion(compromiso: SolicitudCompromisoPago): Promise<
     )
     modalCompromisoAbierto.value = false
     seleccionPendientes.value = []
+    incidenciasCompromiso.value = []
     await cargarDatos()
     aviso.value =
       resultados.length === 1
@@ -265,6 +306,12 @@ async function confirmarSeleccion(compromiso: SolicitudCompromisoPago): Promise<
         : `Se confirmaron ${resultados.length} matrículas. Se creó el compromiso "${compromiso.concepto}" y la primera boleta de cada estudiante.`
     confirmacionExitosa.value = true
   } catch (fallo: unknown) {
+    if (fallo instanceof ErrorSolicitudApi && fallo.datos && typeof fallo.datos === 'object') {
+      const respuesta = fallo.datos as Partial<ErrorConfirmacionMatricula>
+      if (Array.isArray(respuesta.incidencias)) {
+        incidenciasCompromiso.value = respuesta.incidencias as IncidenciaConfirmacionMatricula[]
+      }
+    }
     errorCompromiso.value = obtenerMensajeError(
       fallo,
       'No se pudieron confirmar las matrículas. Ninguna fue confirmada; revisa los datos e inténtalo nuevamente.',
@@ -442,6 +489,7 @@ onMounted(cargarDatos)
 
     <PanelEstadoCarga v-if="cargando" :cargando="true" texto-carga="Cargando estudiantes y vacantes..." />
     <AvisoMensaje v-if="error" :mensaje="error" tipo="error" />
+    <IncidenciasMatricula :incidencias="incidenciasCompromiso" />
     <div v-if="aviso" class="aviso-exito">
       <AvisoMensaje :mensaje="aviso" tipo="exito" />
       <NuxtLink v-if="confirmacionExitosa" to="/finanzas" class="enlace-finanzas">Ver boletas en Finanzas →</NuxtLink>
@@ -460,14 +508,26 @@ onMounted(cargarDatos)
         <button type="button" class="boton-agregar" :disabled="guardando" @click="alternarSeleccionPendientes">
           {{ todosPendientesSeleccionados ? 'Quitar selección' : 'Seleccionar todos' }}
         </button>
-        <label
-          v-for="estudiante in pendientesDeConfirmacion"
-          :key="estudiante.estudianteId"
-          class="seleccion-pendiente"
-        >
-          <input v-model="seleccionPendientes" type="checkbox" :value="estudiante.estudianteId" />
-          {{ nombreCompleto(estudiante) }} — DNI {{ estudiante.dni }}
-        </label>
+        <div v-for="estudiante in pendientesDeConfirmacion" :key="estudiante.estudianteId" class="fila-pendiente">
+          <label class="seleccion-pendiente">
+            <input
+              v-model="seleccionPendientes"
+              type="checkbox"
+              :value="estudiante.estudianteId"
+              :disabled="guardando"
+            />
+            {{ nombreCompleto(estudiante) }} — DNI {{ estudiante.dni }}
+          </label>
+          <button
+            type="button"
+            class="boton-quitar"
+            :disabled="guardando"
+            :aria-label="`Retirar matrícula pendiente de ${nombreCompleto(estudiante)}`"
+            @click="retirarPendiente(estudiante)"
+          >
+            {{ guardando ? 'Procesando…' : 'Retirar' }}
+          </button>
+        </div>
         <button
           type="button"
           class="boton-confirmar"
@@ -501,6 +561,7 @@ onMounted(cargarDatos)
       :destino="destinoConfirmacion"
       :procesando="guardando"
       :error="errorCompromiso"
+      :incidencias="incidenciasCompromiso"
       @confirmar="confirmarSeleccion"
       @cerrar="modalCompromisoAbierto = false"
     />
@@ -522,6 +583,13 @@ onMounted(cargarDatos)
   align-items: center;
   gap: 10px;
   padding: 8px 0;
+}
+.fila-pendiente {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid #e2e5ef;
 }
 .lista-seleccion-estudiantes {
   display: grid;
@@ -629,6 +697,10 @@ onMounted(cargarDatos)
   cursor: pointer;
 }
 .boton-agregar:disabled {
+  color: #7a7d8a;
+  cursor: not-allowed;
+}
+.boton-quitar:disabled {
   color: #7a7d8a;
   cursor: not-allowed;
 }

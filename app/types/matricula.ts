@@ -42,6 +42,22 @@ export interface MatriculaApi {
   estado: EstadoMatriculaApi
 }
 
+export interface IncidenciaConfirmacionMatricula {
+  matriculaId: number | null
+  estudianteId: number
+  nombreEstudiante: string
+  problemas: string[]
+}
+
+export interface ErrorConfirmacionMatricula {
+  timestamp: string
+  status: number
+  error: string
+  message: string
+  path: string
+  incidencias: IncidenciaConfirmacionMatricula[]
+}
+
 export function calcularVacantes(cupo: CupoSeccion): number {
   return Math.max(0, cupo.capacidadMaxima - cupo.matriculados)
 }

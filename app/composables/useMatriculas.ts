@@ -22,6 +22,12 @@ export function useMatriculas() {
     })
   }
 
+  function retirar(periodoId: number, estudianteId: number): Promise<unknown> {
+    return solicitar<unknown>(`${RUTA_PERIODOS}/${periodoId}/matriculas/${estudianteId}`, {
+      metodo: 'DELETE',
+    })
+  }
+
   /** Al confirmar, el back crea el compromiso de pago con estos términos y la primera boleta (US-1.3). */
   function confirmar(
     periodoId: number,
@@ -45,5 +51,5 @@ export function useMatriculas() {
     })
   }
 
-  return { registrar, registrarMasivamente, confirmar, confirmarMasivamente }
+  return { registrar, registrarMasivamente, retirar, confirmar, confirmarMasivamente }
 }

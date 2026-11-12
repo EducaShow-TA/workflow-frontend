@@ -6,6 +6,7 @@ const enlaces = [
   { nombre: 'Tareas', destino: '/docente/tareas', icono: '/icons/menu-tareas.svg' },
   { nombre: 'Calificaciones', destino: '/docente/calificaciones', icono: '/icons/menu-competencias.svg' },
   { nombre: 'Asistencia de alumnos', destino: '/docente/asistencia', icono: '/icons/menu-estudiantes.svg' },
+  { nombre: 'Libretas e informes', destino: '/docente/libretas', icono: '/icons/menu-calificaciones.svg' },
   { nombre: 'Mi marcaje', destino: '/docente/marcaje', icono: '/icons/menu-docentes.svg' },
   { nombre: 'Mi horario', destino: '/docente/horario', icono: '/icons/menu-horarios.svg' },
 ]

@@ -436,6 +436,7 @@ function solicitarCambioEstadoCompetencia(competencia: Competencia): void {
       descripcion="Configura el catálogo de áreas curriculares y sus competencias según el plan curricular vigente."
     >
       <template #acciones>
+        <NuxtLink class="enlace-reglas" to="/competencias/reglas">Reglas de consolidación</NuxtLink>
         <BotonAccion @click="abrirNuevaArea">+ Nueva área</BotonAccion>
       </template>
     </EncabezadoPagina>
@@ -734,6 +735,22 @@ function solicitarCambioEstadoCompetencia(competencia: Competencia): void {
     />
   </main>
 </template>
+
+<style scoped>
+.enlace-reglas {
+  display: inline-flex;
+  align-items: center;
+  padding: 9px 14px;
+  border: 1px solid #9aa9ba;
+  border-radius: 8px;
+  color: #174b7d;
+  font-weight: 600;
+  text-decoration: none;
+}
+.enlace-reglas:hover {
+  background: #f1f5f9;
+}
+</style>
 
 <style scoped>
 .pagina-competencias {
