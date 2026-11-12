@@ -164,8 +164,7 @@ onMounted(async () => {
       <article v-for="item in registros" :key="item.id" class="registro">
         <header>
           <div>
-            <strong>{{ item.accion }}</strong
-            ><span>{{ fechaVisible(item.fechaHora) }}</span>
+            <strong>{{ item.accion }}</strong><span>{{ fechaVisible(item.fechaHora) }}</span>
           </div>
           <span class="tipo">{{ item.tipoCalificacion === 'FINAL' ? 'Final' : 'Parcial' }}</span>
         </header>

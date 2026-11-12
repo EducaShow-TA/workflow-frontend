@@ -326,8 +326,7 @@ onMounted(cargarCatalogos)
               <tbody>
                 <tr v-for="competencia in area.competencias" :key="competencia.codigo">
                   <td>
-                    <strong>{{ competencia.codigo }}</strong
-                    ><br />{{ competencia.nombre }}
+                    <strong>{{ competencia.codigo }}</strong><br />{{ competencia.nombre }}
                   </td>
                   <td>
                     <span class="nota">{{ competencia.nota ?? 'Sin calificación' }}</span>

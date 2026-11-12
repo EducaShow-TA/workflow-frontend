@@ -150,8 +150,7 @@ onMounted(cargar)
           <p v-if="!sesionesPorDia[dia.codigo].length" class="horario-dia-vacio">Sin clases asignadas.</p>
           <article v-for="bloque in sesionesPorDia[dia.codigo]" :key="bloque.id" class="horario-dia-lista__fila">
             <div class="horario-dia-lista__horas">
-              <strong>{{ hora(bloque.horaInicio) }}</strong
-              ><span>{{ hora(bloque.horaFin) }}</span>
+              <strong>{{ hora(bloque.horaInicio) }}</strong><span>{{ hora(bloque.horaFin) }}</span>
             </div>
             <div class="horario-dia-lista__contenido">
               <h4>{{ bloque.areaNombre }}</h4>
@@ -171,8 +170,7 @@ onMounted(cargar)
       <div v-else class="horario-dia-lista">
         <article v-for="bloque in bloquesHoy" :key="bloque.id" class="horario-dia-lista__fila">
           <div class="horario-dia-lista__horas">
-            <strong>{{ hora(bloque.horaInicio) }}</strong
-            ><span>{{ hora(bloque.horaFin) }}</span>
+            <strong>{{ hora(bloque.horaInicio) }}</strong><span>{{ hora(bloque.horaFin) }}</span>
           </div>
           <div class="horario-dia-lista__contenido">
             <h3>{{ bloque.areaNombre }}</h3>
