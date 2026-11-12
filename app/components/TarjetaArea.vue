@@ -16,6 +16,7 @@ const emitir = defineEmits<{
   cambiarEstadoArea: []
   agregarCompetencia: []
   editarCompetencia: [competencia: Competencia]
+  configurarRegla: [competencia: Competencia]
   cambiarEstadoCompetencia: [competencia: Competencia]
 }>()
 
@@ -118,6 +119,15 @@ function describirCantidad(cantidad: number): string {
                     @click="emitir('editarCompetencia', competencia)"
                   >
                     Editar
+                  </button>
+
+                  <button
+                    type="button"
+                    class="boton-tabla"
+                    :aria-label="`Configurar regla de consolidación para ${competencia.nombre}`"
+                    @click="emitir('configurarRegla', competencia)"
+                  >
+                    Regla de logro
                   </button>
 
                   <button
@@ -380,7 +390,7 @@ td {
   }
 
   table {
-    min-width: 760px;
+    min-width: 900px;
   }
 }
 </style>
