@@ -3,9 +3,8 @@ import { computed, reactive, ref } from 'vue'
 import type { ErroresRestablecimiento } from '~/types/autenticacion'
 import { ErrorSolicitudApi } from '~/types/api'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
+import { LONGITUD_MINIMA_CONTRASENA, evaluarRequisitosContrasena } from '~/composables/usePoliticaContrasena'
 import {
-  LONGITUD_MINIMA_CONTRASENA,
-  evaluarRequisitosContrasena,
   evaluarFuerzaContrasena,
   useRecuperacionContrasena,
   validarRestablecimiento,

@@ -9,7 +9,6 @@ import { useApi } from '~/composables/useApi'
 import {
   LONGITUD_MAXIMA_BYTES_CONTRASENA,
   LONGITUD_MINIMA_CONTRASENA,
-  evaluarRequisitosContrasena,
   validarPoliticaContrasena,
 } from '~/composables/usePoliticaContrasena'
 
@@ -22,7 +21,6 @@ export const INTENTOS_ANTES_DE_BLOQUEO = 3
 export const MINUTOS_BLOQUEO = 15
 
 // Política igual a los formularios de alta y al backend (US-5.7).
-export { LONGITUD_MINIMA_CONTRASENA }
 export const LONGITUD_MAXIMA_CONTRASENA = LONGITUD_MAXIMA_BYTES_CONTRASENA
 
 export const SEGUNDOS_ESPERA_REENVIO = 30
@@ -63,8 +61,6 @@ export function validarRestablecimiento(contrasena: string, confirmacion: string
 
   return errores
 }
-
-export { evaluarRequisitosContrasena }
 
 /** Recuperación de contraseña por correo (US-5.6, criterio 2). */
 export function useRecuperacionContrasena() {

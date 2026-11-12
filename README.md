@@ -11,7 +11,7 @@ La interfaz disponible depende del rol autenticado:
 - **Familia y estudiante:** consulta de libretas en `/libretas`, según los permisos del backend. La interfaz actual no incluye un portal para consultar boletas o registrar pagos como apoderado.
 - **Acceso:** inicio de sesión, recuperación y restablecimiento de contraseña, y control de navegación por rol. Las contraseñas nuevas deben tener al menos 8 caracteres, incluir minúscula, mayúscula, número y símbolo, y ocupar como máximo 72 bytes UTF-8.
 
-El indicador de riesgo académico de la pantalla docente se calcula en el navegador contando notas `C` y aplicando un umbral configurable. El backend no ofrece un endpoint específico para detectar o persistir ese riesgo. El flujo de pagos permite registrar pagos en el sistema, pero no procesa transacciones con una pasarela externa. La recuperación completa por correo depende de configurar el servicio de correo del backend.
+La pantalla docente consulta el endpoint de riesgo académico, que cuenta las notas finales `C` por área y aplica el umbral elegido. El flujo de pagos permite registrar pagos en el sistema, pero no procesa transacciones con una pasarela externa. La recuperación completa por correo depende de configurar el servicio de correo del backend.
 
 El README del backend mantiene el [estado por historia](https://github.com/EducaShow-TA/workflow-backend/blob/Development/README.md) con dos etiquetas: **Completa** (sin brechas conocidas en el código revisado) y **Parcial** (con una brecha descrita). Es una revisión del código, no una aprobación formal de aceptación.
 

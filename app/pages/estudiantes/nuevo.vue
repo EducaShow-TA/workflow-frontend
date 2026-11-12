@@ -462,7 +462,9 @@ async function registrarEstudiante(): Promise<void> {
               :aria-invalid="Boolean(errores.password)"
             />
             <small v-if="errores.password" class="error">{{ errores.password }}</small>
-            <small class="ayuda">Mínimo 8 caracteres, con minúscula, mayúscula, número y símbolo; máximo 72 bytes UTF-8.</small>
+            <small class="ayuda"
+              >Mínimo 8 caracteres, con minúscula, mayúscula, número y símbolo; máximo 72 bytes UTF-8.</small
+            >
           </div>
           <div class="campo">
             <label for="correo-contacto"> Correo electrónico (opcional) </label>
