@@ -31,9 +31,7 @@ describe('libretas US-3.3', () => {
     }
     solicitar.mockResolvedValueOnce(libreta)
     expect(await useLibretas().consultar(7, 12, 2)).toBe(libreta)
-    expect(solicitar).toHaveBeenCalledExactlyOnceWith(
-      '/api/v1/estudiantes/7/libreta?periodoId=12&bimestre=2',
-    )
+    expect(solicitar).toHaveBeenCalledExactlyOnceWith('/api/v1/estudiantes/7/libreta?periodoId=12&bimestre=2')
   })
 
   it('impide construir consultas con IDs vacíos, negativos, fraccionarios o no seguros', () => {
