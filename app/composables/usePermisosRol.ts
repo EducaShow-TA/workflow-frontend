@@ -15,11 +15,18 @@ const NOMBRES_ROL: Record<RolUsuario, string> = {
 const DESCRIPCIONES_ROL: Record<RolUsuario, string> = {
   ADMINISTRADOR: 'Gestiona la matrícula, la estructura académica y las cuentas de usuario del colegio.',
   DOCENTE: 'Registrará asistencia y calificaciones de sus secciones (sprints 2 y 3).',
-  ALUMNO: 'Consultará su horario, asistencia y calificaciones (sprints 2 y 3).',
-  APODERADO: 'Consultará las boletas, pagos y el avance de sus hijos (sprints 2 y 3).',
+  ALUMNO: 'Consulta su historial de asistencia.',
+  APODERADO: 'Consulta las libretas y el historial de asistencia de sus estudiantes vinculados.',
 }
 
 export const PERMISOS: Permiso[] = [
+  {
+    codigo: 'ASISTENCIA_HISTORIAL_VER',
+    modulo: 'Asistencia',
+    nombre: 'Consultar historial de asistencia',
+    descripcion: 'Consultar los registros propios o los de estudiantes vinculados.',
+    sensible: false,
+  },
   {
     codigo: 'LIBRETA_VER',
     modulo: 'Calificaciones',
@@ -184,13 +191,14 @@ export const PERMISOS: Permiso[] = [
 ]
 
 export const PERMISOS_POR_ROL: Record<RolUsuario, string[]> = {
-  ADMINISTRADOR: PERMISOS.map((permiso) => permiso.codigo),
+  ADMINISTRADOR: PERMISOS.map((permiso) => permiso.codigo).filter((codigo) => codigo !== 'ASISTENCIA_HISTORIAL_VER'),
   DOCENTE: ['PORTAL_DOCENTE_VER', 'LIBRETA_VER'],
-  ALUMNO: [],
-  APODERADO: ['LIBRETA_VER'],
+  ALUMNO: ['ASISTENCIA_HISTORIAL_VER'],
+  APODERADO: ['LIBRETA_VER', 'ASISTENCIA_HISTORIAL_VER'],
 }
 
 export const REGLAS_RUTA: ReglaRuta[] = [
+  { prefijo: '/asistencia', permiso: 'ASISTENCIA_HISTORIAL_VER' },
   { prefijo: '/calificaciones/libretas', permiso: 'LIBRETA_VER' },
   { prefijo: '/docente/libretas', permiso: 'LIBRETA_VER' },
   { prefijo: '/libretas', permiso: 'LIBRETA_VER' },
@@ -222,7 +230,9 @@ export const RUTAS_LIBRES = ['/', '/login', '/acceso-denegado']
 
 /** Pantalla de inicio de cada rol. */
 export function obtenerRutaInicio(rol: RolUsuario): string {
-  return rol === 'DOCENTE' ? '/docente' : rol === 'APODERADO' ? '/libretas' : '/panel'
+  if (rol === 'ALUMNO') return '/asistencia'
+  if (rol === 'APODERADO') return '/libretas'
+  return rol === 'DOCENTE' ? '/docente' : '/panel'
 }
 
 export function obtenerNombreRol(rol: RolUsuario): string {
