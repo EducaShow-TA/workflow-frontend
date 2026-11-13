@@ -123,6 +123,14 @@ function mostrarExito(mensaje: string): void {
   mensajeExito.value = mensaje
 }
 
+function cerrarReglaConsolidacion(): void {
+  competenciaRegla.value = null
+}
+
+function mostrarReglaGuardada(nombreCompetencia: string): void {
+  mostrarExito(`Regla de «${nombreCompetencia}» guardada. Se recalcularon los logros en períodos abiertos.`)
+}
+
 // Formulario de area (crear con su primera competencia, o editar)
 const modoArea = ref<'crear' | 'editar' | null>(null)
 const areaEnEdicion = ref<Area | null>(null)
@@ -244,6 +252,7 @@ async function guardarArea(): Promise<void> {
 // Formulario de competencia (agregar a un area, o editar)
 const areaDeCompetencia = ref<Area | null>(null)
 const competenciaEnEdicion = ref<Competencia | null>(null)
+const competenciaRegla = ref<Competencia | null>(null)
 const guardandoCompetencia = ref(false)
 const errorGuardadoCompetencia = ref('')
 
@@ -423,7 +432,7 @@ function solicitarCambioEstadoCompetencia(competencia: Competencia): void {
 <template>
   <main class="pagina-competencias">
     <EncabezadoPagina
-      titulo="Áreas y Competencias"
+      titulo="Áreas y competencias"
       descripcion="Configura el catálogo de áreas curriculares y sus competencias según el plan curricular vigente."
     >
       <template #acciones>
@@ -517,6 +526,7 @@ function solicitarCambioEstadoCompetencia(competencia: Competencia): void {
             @cambiar-estado-area="solicitarCambioEstadoArea(area)"
             @agregar-competencia="abrirNuevaCompetencia(area)"
             @editar-competencia="abrirEdicionCompetencia(area, $event)"
+            @configurar-regla="competenciaRegla = $event"
             @cambiar-estado-competencia="solicitarCambioEstadoCompetencia"
           />
 
@@ -705,6 +715,12 @@ function solicitarCambioEstadoCompetencia(competencia: Competencia): void {
         </BotonAccion>
       </template>
     </VentanaModal>
+
+    <ModalReglaConsolidacion
+      :competencia="competenciaRegla"
+      @cerrar="cerrarReglaConsolidacion"
+      @guardada="mostrarReglaGuardada"
+    />
 
     <VentanaConfirmacion
       :abierta="accionPendiente !== null"
