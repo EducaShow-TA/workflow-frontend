@@ -5,6 +5,7 @@ import type {
   DocenteOpcion,
   ErroresSesionClase,
   EstadoAsistenciaAlumno,
+  GeneracionSesiones,
   ListaAsistencia,
   SesionClaseResumen,
   SituacionSesion,
@@ -111,6 +112,10 @@ export function useSesionesClase() {
     return solicitar(RUTA_SESIONES, { metodo: 'POST', cuerpo: solicitud })
   }
 
+  function generar(periodoId: number): Promise<GeneracionSesiones> {
+    return solicitar<GeneracionSesiones>(`${RUTA_SESIONES}/generar?periodoId=${periodoId}`, { metodo: 'POST' })
+  }
+
   function listarDocentes(): Promise<DocenteOpcion[]> {
     return solicitar<DocenteOpcion[]>('/api/v1/docentes')
   }
@@ -120,5 +125,5 @@ export function useSesionesClase() {
     return areas.filter((area) => area.activo !== false).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
   }
 
-  return { listarMias, listar, obtenerLista, guardarAsistencias, crear, listarDocentes, listarAreas }
+  return { listarMias, listar, obtenerLista, guardarAsistencias, crear, generar, listarDocentes, listarAreas }
 }
