@@ -66,9 +66,9 @@ export interface SolicitudSesionClase {
 
 export type ErroresSesionClase = Partial<Record<keyof SolicitudSesionClase, string>>
 
+/** id = docentes.id: es el docenteId que esperan horarios, sesiones de clase y asistencia docente. */
 export interface DocenteOpcion {
   id: number
-  cuentaId: number
   username: string
   nombreCompleto: string
   dni: string
