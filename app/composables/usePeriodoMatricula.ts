@@ -65,10 +65,9 @@ export function describirPeriodo(periodo: Pick<PeriodoMatricula, 'fechaInicio' |
 }
 
 /** Un periodo vencido con matriculas es historia: no se edita, aunque si se puede desactivar. */
-export function obtenerMotivoNoEditable(periodo: Pick<PeriodoMatricula, 'estado' | 'tieneMatriculas'>): string {
+/** Un periodo vencido con matrículas se conserva como historial: no se edita ni se desactiva. */
+export function esPeriodoSoloLectura(periodo: Pick<PeriodoMatricula, 'estado' | 'tieneMatriculas'>): boolean {
   return periodo.estado === 'VENCIDO' && periodo.tieneMatriculas
-    ? 'Tiene matrículas registradas: no se puede modificar.'
-    : ''
 }
 
 /** Periodo activo cuyas fechas se cruzan con las indicadas (ambas inclusivas), sin contar el que se edita. */
@@ -88,22 +87,27 @@ export function buscarCruce(
 /**
  * Equivale a PeriodoMatricula.validarFechas() mas la regla de no cruzarse con otro periodo.
  * El backend vuelve a validar; esta validacion solo evita enviar datos que seguro seran rechazados.
+ * Con inicioBloqueado (periodo vigente) el inicio no se revisa y la fecha limite no puede quedar en el pasado.
  */
 export function validarPeriodoMatricula(
   solicitud: SolicitudPeriodoMatricula,
   periodosExistentes: PeriodoMatricula[] = [],
   idEnEdicion: number | null = null,
+  inicioBloqueado = false,
 ): ErroresPeriodoMatricula {
   const errores: ErroresPeriodoMatricula = {}
+  const hoy = obtenerFechaHoyIso()
 
   if (!esFechaIsoValida(solicitud.fechaInicio)) {
     errores.fechaInicio = 'La fecha de inicio es obligatoria.'
-  } else if (solicitud.fechaInicio < obtenerFechaHoyIso()) {
+  } else if (!inicioBloqueado && solicitud.fechaInicio < hoy) {
     errores.fechaInicio = 'La fecha de inicio no puede ser anterior a hoy.'
   }
 
   if (!esFechaIsoValida(solicitud.fechaLimite)) {
     errores.fechaLimite = 'La fecha límite es obligatoria.'
+  } else if (inicioBloqueado && solicitud.fechaLimite < hoy) {
+    errores.fechaLimite = `La fecha límite no puede ser anterior a hoy (${formatearFecha(hoy)}).`
   } else if (!errores.fechaInicio && solicitud.fechaLimite <= solicitud.fechaInicio) {
     errores.fechaLimite = 'La fecha límite debe ser posterior a la fecha de inicio.'
   } else if (

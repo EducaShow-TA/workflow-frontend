@@ -8,7 +8,7 @@ import {
   describirPeriodo,
   estaPeriodoVigente,
   obtenerEtiquetaEstadoPeriodo,
-  obtenerMotivoNoEditable,
+  esPeriodoSoloLectura,
   obtenerVarianteEstadoPeriodo,
   usePeriodoMatricula,
   validarPeriodoMatricula,
@@ -87,6 +87,10 @@ const formulario = reactive<SolicitudPeriodoMatricula>({
 
 const errores = reactive<ErroresPeriodoMatricula>({})
 
+// Un periodo vigente ya abrió la matrícula: su inicio queda fijo y solo se mueve la fecha límite.
+const periodoEnEdicion = computed(() => periodos.value.find((periodo) => periodo.id === idEnEdicion.value) ?? null)
+const inicioBloqueado = computed(() => periodoEnEdicion.value?.estado === 'VIGENTE')
+
 // Vista previa del estado con las fechas ingresadas, antes de guardar.
 const estadoPrevisto = computed(() => {
   if (!formulario.fechaInicio || !formulario.fechaLimite || formulario.fechaLimite <= formulario.fechaInicio) {
@@ -124,7 +128,7 @@ function cerrarModal(): void {
 
 async function guardarPeriodo(): Promise<void> {
   limpiarErrores()
-  Object.assign(errores, validarPeriodoMatricula(formulario, periodos.value, idEnEdicion.value))
+  Object.assign(errores, validarPeriodoMatricula(formulario, periodos.value, idEnEdicion.value, inicioBloqueado.value))
 
   if (tieneErrores(errores)) {
     return
@@ -275,12 +279,13 @@ async function confirmarDesactivacion(): Promise<void> {
                   />
                 </td>
                 <td>
-                  <div class="acciones-fila">
+                  <p v-if="esPeriodoSoloLectura(periodo)" class="solo-lectura">
+                    <span aria-hidden="true">🔒</span> Solo lectura: tiene matrículas registradas
+                  </p>
+                  <div v-else class="acciones-fila">
                     <button
                       type="button"
                       class="boton-tabla"
-                      :disabled="Boolean(obtenerMotivoNoEditable(periodo))"
-                      :title="obtenerMotivoNoEditable(periodo) || undefined"
                       :aria-label="`Editar periodo ${describirPeriodo(periodo)}`"
                       @click="abrirEdicion(periodo)"
                     >
@@ -318,6 +323,16 @@ async function confirmarDesactivacion(): Promise<void> {
       @cerrar="cerrarModal"
     >
       <form id="formulario-periodo" class="formulario" novalidate @submit.prevent="guardarPeriodo">
+        <div v-if="inicioBloqueado && periodoEnEdicion" class="reglas-fechas" role="note">
+          <strong>Reglas para un periodo vigente</strong>
+          <ul>
+            <li>
+              El inicio no se cambia: la matrícula se abrió el {{ formatearFecha(periodoEnEdicion.fechaInicio) }}.
+            </li>
+            <li>La fecha límite debe ser desde hoy ({{ formatearFecha(fechaHoy) }}).</li>
+          </ul>
+        </div>
+
         <div class="cuadricula-fechas">
           <div class="campo">
             <label for="fecha-inicio">Fecha de inicio <span class="obligatorio">*</span></label>
@@ -326,13 +341,17 @@ async function confirmarDesactivacion(): Promise<void> {
               id="fecha-inicio"
               v-model="formulario.fechaInicio"
               type="date"
-              :min="fechaHoy"
+              :min="inicioBloqueado ? undefined : fechaHoy"
+              :disabled="inicioBloqueado"
               :aria-invalid="Boolean(errores.fechaInicio)"
-              :aria-describedby="errores.fechaInicio ? 'error-fecha-inicio' : undefined"
+              :aria-describedby="
+                errores.fechaInicio ? 'error-fecha-inicio' : inicioBloqueado ? 'ayuda-fecha-inicio' : undefined
+              "
               @input="errores.fechaInicio = undefined"
             />
 
             <small v-if="errores.fechaInicio" id="error-fecha-inicio" class="error">{{ errores.fechaInicio }}</small>
+            <small v-else-if="inicioBloqueado" id="ayuda-fecha-inicio" class="ayuda">La matrícula ya se abrió.</small>
           </div>
 
           <div class="campo">
@@ -342,7 +361,7 @@ async function confirmarDesactivacion(): Promise<void> {
               id="fecha-limite"
               v-model="formulario.fechaLimite"
               type="date"
-              :min="formulario.fechaInicio || undefined"
+              :min="inicioBloqueado ? fechaHoy : formulario.fechaInicio || undefined"
               :aria-invalid="Boolean(errores.fechaLimite)"
               :aria-describedby="errores.fechaLimite ? 'error-fecha-limite' : undefined"
               @input="errores.fechaLimite = undefined"
@@ -470,6 +489,30 @@ td {
   font-weight: 600;
 }
 
+.solo-lectura {
+  margin: 0;
+  color: #434655;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.reglas-fechas {
+  margin-bottom: 4px;
+  padding: 12px 14px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #1e3a8a;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.reglas-fechas ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
 .boton-tabla {
   padding: 6px 12px;
   border: 1px solid #c3c6d7;
@@ -556,6 +599,17 @@ td {
 
 .error {
   font-size: 12px;
+}
+
+.ayuda {
+  color: #434655;
+  font-size: 12px;
+}
+
+.campo input:disabled {
+  background: #f2f4f6;
+  color: #6b7280;
+  cursor: not-allowed;
 }
 
 .vista-previa {
