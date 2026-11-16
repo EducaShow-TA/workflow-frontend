@@ -23,6 +23,7 @@ const secciones = computed(() =>
         { titulo: 'Evaluaciones parciales', destino: '/calificaciones/evaluaciones' },
         { titulo: 'Libretas e informes', destino: '/calificaciones/libretas' },
         { titulo: 'Auditoría de cambios', destino: '/calificaciones/auditoria' },
+        { titulo: 'Cierre de actas', destino: '/calificaciones/cierre-actas' },
       ],
 )
 </script>
