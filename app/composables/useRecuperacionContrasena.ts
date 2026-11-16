@@ -6,6 +6,11 @@ import type {
   SolicitudRestablecimiento,
 } from '~/types/autenticacion'
 import { useApi } from '~/composables/useApi'
+import {
+  LONGITUD_MAXIMA_BYTES_CONTRASENA,
+  LONGITUD_MINIMA_CONTRASENA,
+  validarPoliticaContrasena,
+} from '~/composables/usePoliticaContrasena'
 
 const RUTA_AUTENTICACION = '/api/v1/auth'
 
@@ -15,9 +20,8 @@ export const MINUTOS_VIGENCIA_ENLACE = 15
 export const INTENTOS_ANTES_DE_BLOQUEO = 3
 export const MINUTOS_BLOQUEO = 15
 
-// Mismos límites que RestablecerPasswordRequestDTO. Las reglas de complejidad corresponden a la US-5.7.
-export const LONGITUD_MINIMA_CONTRASENA = 8
-export const LONGITUD_MAXIMA_CONTRASENA = 72
+// Política igual a los formularios de alta y al backend (US-5.7).
+export const LONGITUD_MAXIMA_CONTRASENA = LONGITUD_MAXIMA_BYTES_CONTRASENA
 
 export const SEGUNDOS_ESPERA_REENVIO = 30
 
@@ -45,10 +49,8 @@ export function validarRestablecimiento(contrasena: string, confirmacion: string
 
   if (!contrasena) {
     errores.contrasena = 'La nueva contraseña es obligatoria.'
-  } else if (contrasena.length < LONGITUD_MINIMA_CONTRASENA) {
-    errores.contrasena = `La contraseña debe tener al menos ${LONGITUD_MINIMA_CONTRASENA} caracteres.`
-  } else if (contrasena.length > LONGITUD_MAXIMA_CONTRASENA) {
-    errores.contrasena = `La contraseña no puede superar los ${LONGITUD_MAXIMA_CONTRASENA} caracteres.`
+  } else {
+    errores.contrasena = validarPoliticaContrasena(contrasena)
   }
 
   if (!confirmacion) {

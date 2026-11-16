@@ -5,6 +5,7 @@
 export interface Competencia {
   id: number
   areaId: number
+  codigo: string
   nombre: string
   descripcion: string
   activo: boolean

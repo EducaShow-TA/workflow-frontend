@@ -5,6 +5,14 @@ export interface CompetenciaLibreta {
   nota: string | null
   puntajeConsolidado: number | null
   observacion: string | null
+  evaluaciones: EvaluacionLibreta[]
+}
+export interface EvaluacionLibreta {
+  evaluacionId: number
+  titulo: string
+  ponderacion: number
+  nota: string | null
+  justificada: boolean
 }
 export interface PeriodoLibreta {
   periodoId: number
@@ -20,5 +28,7 @@ export interface LibretaNotas {
   estudiante: string
   periodoSolicitadoId: number
   anhioEscolar: number
+  bimestre: number
+  evaluacionesSinBimestre: number
   periodos: PeriodoLibreta[]
 }

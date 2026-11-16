@@ -259,7 +259,10 @@ async function cancelar(): Promise<void> {
               @input="limpiarError('password')"
             />
             <small v-if="errores.password" class="error">{{ errores.password }}</small>
-            <small id="ayuda-password" class="ayuda">Mínimo {{ LONGITUD_MINIMA_PASSWORD }} caracteres.</small>
+            <small id="ayuda-password" class="ayuda">
+              Mínimo {{ LONGITUD_MINIMA_PASSWORD }} caracteres, con minúscula, mayúscula, número y símbolo; máximo 72
+              bytes UTF-8.
+            </small>
           </div>
 
           <div class="campo">

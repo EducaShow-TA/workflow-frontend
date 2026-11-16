@@ -40,6 +40,7 @@ const error = ref('')
 const aviso = ref('')
 
 const modalAbierto = ref(false)
+const generacionAbierta = ref(false)
 const creando = ref(false)
 const errorCrear = ref('')
 const formulario = reactive<Partial<SolicitudSesionClase>>({})
@@ -144,6 +145,7 @@ onMounted(() => {
       descripcion="Programa las sesiones de cada sección; el docente asignado toma la asistencia desde su portal."
     >
       <template #acciones>
+        <BotonAccion variante="secundario" @click="generacionAbierta = true">Generar desde el horario</BotonAccion>
         <BotonAccion @click="abrirNuevaSesion">+ Nueva sesión</BotonAccion>
       </template>
     </EncabezadoPagina>
@@ -203,6 +205,8 @@ onMounted(() => {
         </table>
       </div>
     </section>
+
+    <ModalGenerarSesiones :abierta="generacionAbierta" @cerrar="generacionAbierta = false" @generado="cargarSesiones" />
 
     <VentanaModal
       :abierta="modalAbierto"

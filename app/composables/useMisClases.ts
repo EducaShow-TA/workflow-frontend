@@ -1,5 +1,5 @@
 import { useApi } from '~/composables/useApi'
-import type { AlumnoClase, MiClase, NotaCualitativa } from '~/types/calificacion'
+import type { AlumnoClase, MiClase, NotaCualitativa, RiesgoAcademico } from '~/types/calificacion'
 
 const RUTA = '/api/v1/docentes/mis-clases'
 
@@ -31,5 +31,10 @@ export function useMisClases() {
     return solicitar<AlumnoClase[]>(`${RUTA}/${periodoId}/alumnos`)
   }
 
-  return { listar, listarAlumnos }
+  function obtenerRiesgo(periodoId: number, areaCodigo: string, umbral: number): Promise<RiesgoAcademico> {
+    const parametros = new URLSearchParams({ areaCodigo, umbral: String(umbral) })
+    return solicitar<RiesgoAcademico>(`${RUTA}/${periodoId}/riesgo-academico?${parametros}`)
+  }
+
+  return { listar, listarAlumnos, obtenerRiesgo }
 }

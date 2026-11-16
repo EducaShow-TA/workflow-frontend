@@ -18,7 +18,7 @@ const enlaces: EnlaceMenu[] = [
     prefijoActivo: '/matriculas',
   },
   { nombre: 'Grados/Secciones', icono: '/icons/menu-secciones.svg', destino: '/secciones' },
-  { nombre: 'Competencias', icono: '/icons/menu-competencias.svg', destino: '/competencias' },
+  { nombre: 'Áreas y competencias', icono: '/icons/menu-competencias.svg', destino: '/competencias' },
   { nombre: 'Tareas', icono: '/icons/menu-tareas.svg', destino: '/tareas' },
   { nombre: 'Portal Docente', icono: '/icons/menu-docentes.svg', destino: '/docente' },
   { nombre: 'Calificaciones', icono: '/icons/menu-calificaciones.svg', destino: '/calificaciones' },

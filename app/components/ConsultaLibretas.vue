@@ -5,6 +5,7 @@ import { useLibretas } from '~/composables/useLibretas'
 import { useEstudiantesMatriculables } from '~/composables/useEstudiantesMatriculables'
 import { usePeriodosAcademicos } from '~/composables/usePeriodosAcademicos'
 import { useMisClases } from '~/composables/useMisClases'
+import { useApi } from '~/composables/useApi'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
 import type { LibretaNotas } from '~/types/libreta'
 
@@ -17,17 +18,25 @@ interface OpcionPeriodo {
   id: number
   nombre: string
 }
+interface EstudianteVinculado {
+  estudianteId: number
+  nombreCompleto: string
+  periodos: { periodoId: number; gradoNumero: number; seccion: string; fechaInicio: string; fechaFin: string }[]
+}
 const autenticacion = useAutenticacionStore()
+const { solicitar } = useApi()
 const { consultar: solicitarLibreta, descargar } = useLibretas()
 const { listar: listarEstudiantes } = useEstudiantesMatriculables()
 const { listar: listarPeriodos } = usePeriodosAcademicos()
 const { listar: listarClases, listarAlumnos } = useMisClases()
 const esAdministrador = computed(() => autenticacion.usuario?.rol === 'ADMINISTRADOR')
 const esDocente = computed(() => autenticacion.usuario?.rol === 'DOCENTE')
+const esApoderado = computed(() => autenticacion.usuario?.rol === 'APODERADO')
 const estudiantes = ref<OpcionEstudiante[]>([])
 const periodos = ref<OpcionPeriodo[]>([])
 const estudianteId = ref<number | ''>('')
 const periodoId = ref<number | ''>('')
+const bimestre = ref<number | ''>('')
 const cargando = ref(true)
 const consultando = ref(false)
 const descargando = ref(false)
@@ -35,6 +44,29 @@ const errorCatalogos = ref('')
 const error = ref('')
 const aviso = ref('')
 const libreta = ref<LibretaNotas | null>(null)
+const comentariosPorPeriodo = computed(
+  () =>
+    new Map(
+      libreta.value?.periodos.map((periodo) => [
+        periodo.periodoId,
+        periodo.areas.flatMap((area) =>
+          area.competencias.flatMap((competencia) => {
+            const comentario = competencia.observacion?.trim()
+            return comentario
+              ? [
+                  {
+                    clave: `${area.codigo}:${competencia.codigo}`,
+                    area: area.nombre,
+                    competencia: competencia.nombre,
+                    comentario,
+                  },
+                ]
+              : []
+          }),
+        ),
+      ]),
+    ),
+)
 let consultaActual = 0
 let catalogoActual = 0
 const estudiantesDisponibles = computed(() =>
@@ -56,7 +88,7 @@ async function cargarCatalogos(): Promise<void> {
       }))
       periodos.value = listaPeriodos.map((item) => ({
         id: item.periodoId,
-        nombre: `${item.numeroGrado}.° ${item.seccion} · ${item.fechaInicio} a ${item.fechaFin}`,
+        nombre: `${item.numeroGrado}.° ${item.nivelEducativo} · Sección ${item.seccion} · ${item.fechaInicio.slice(0, 4)}`,
       }))
     } else if (esDocente.value) {
       const clases = await listarClases()
@@ -71,6 +103,23 @@ async function cargarCatalogos(): Promise<void> {
           ]),
         ).values(),
       ]
+    } else if (esApoderado.value) {
+      const vinculados = await solicitar<EstudianteVinculado[]>('/api/v1/apoderados/mis-estudiantes')
+      estudiantes.value = vinculados.map((item) => ({
+        id: item.estudianteId,
+        nombre: item.nombreCompleto,
+        periodos: item.periodos.map((periodo) => periodo.periodoId),
+      }))
+      const disponibles = new Map<number, OpcionPeriodo>()
+      vinculados.forEach((estudiante) =>
+        estudiante.periodos.forEach((periodo) => {
+          disponibles.set(periodo.periodoId, {
+            id: periodo.periodoId,
+            nombre: `${periodo.gradoNumero}.° ${periodo.seccion} · ${periodo.fechaInicio.slice(0, 4)}`,
+          })
+        }),
+      )
+      periodos.value = [...disponibles.values()].sort((a, b) => b.id - a.id)
     }
   } catch (fallo: unknown) {
     errorCatalogos.value = obtenerMensajeError(fallo, 'No se pudieron cargar los datos para consultar las libretas.')
@@ -104,7 +153,7 @@ watch(periodoId, async (id) => {
 })
 
 watch(
-  [estudianteId, periodoId],
+  [estudianteId, periodoId, bimestre],
   () => {
     consultaActual++
     consultando.value = false
@@ -122,7 +171,11 @@ async function consultar(): Promise<void> {
   aviso.value = ''
   consultando.value = true
   try {
-    const resultado = await solicitarLibreta(Number(estudianteId.value), Number(periodoId.value))
+    const resultado = await solicitarLibreta(
+      Number(estudianteId.value),
+      Number(periodoId.value),
+      Number(bimestre.value),
+    )
     if (turno === consultaActual) libreta.value = resultado
   } catch (fallo: unknown) {
     if (turno === consultaActual) error.value = obtenerMensajeError(fallo, 'No se pudo consultar la libreta.')
@@ -139,11 +192,11 @@ async function descargarPdf(): Promise<void> {
   error.value = ''
   aviso.value = ''
   try {
-    const archivo = await descargar(actual.estudianteId, actual.periodoSolicitadoId)
+    const archivo = await descargar(actual.estudianteId, actual.periodoSolicitadoId, actual.bimestre)
     const url = URL.createObjectURL(archivo)
     const enlace = document.createElement('a')
     enlace.href = url
-    enlace.download = `libreta-estudiante-${actual.estudianteId}-periodo-${actual.periodoSolicitadoId}.pdf`
+    enlace.download = `libreta-estudiante-${actual.estudianteId}-periodo-${actual.periodoSolicitadoId}-bimestre-${actual.bimestre}.pdf`
     document.body.appendChild(enlace)
     enlace.click()
     enlace.remove()
@@ -160,28 +213,27 @@ onMounted(cargarCatalogos)
 
 <template>
   <main class="libretas">
+    <NavegacionCalificaciones v-if="esAdministrador || esDocente" :docente="esDocente" />
     <header>
-      <p class="ruta">Calificaciones / Libretas · US-3.3</p>
       <h1>Libretas e informes de progreso</h1>
       <p>Consulta los avances por área y competencia y descarga el documento generado por el colegio.</p>
     </header>
-    <nav v-if="esAdministrador || esDocente" class="pestanas" aria-label="Secciones de calificaciones">
-      <NuxtLink :to="esDocente ? '/docente/calificaciones' : '/calificaciones'">Registro de calificaciones</NuxtLink>
-      <span aria-current="page">Libretas e informes</span>
-    </nav>
     <section class="tarjeta" aria-labelledby="titulo-consulta">
       <h2 id="titulo-consulta">Consultar libreta</h2>
       <p v-if="esDocente" class="ayuda">
         Solo se consultan tus clases y alumnos. El servidor limita las competencias a las áreas que dictas.
       </p>
-      <p v-if="!esAdministrador && !esDocente" class="ayuda">
+      <p v-if="esApoderado" class="ayuda">
+        Selecciona a uno de tus hijos y su período académico. Solo se muestran estudiantes vinculados a tu cuenta.
+      </p>
+      <p v-else-if="!esAdministrador && !esDocente" class="ayuda">
         Ingresa los identificadores de estudiante y periodo proporcionados por el colegio. La consulta está limitada a
-        tus estudiantes vinculados. El listado de hijos aún no está disponible.
+        tu propio historial.
       </p>
       <form @submit.prevent="consultar">
         <div class="campos">
-          <label v-if="esAdministrador || esDocente"
-            >Periodo académico
+          <label v-if="esAdministrador || esDocente || esApoderado"
+            >Grado y sección
             <select v-model="periodoId" required :disabled="cargando || descargando">
               <option value="">Selecciona un periodo</option>
               <option v-for="item in periodos" :key="item.id" :value="item.id">{{ item.nombre }}</option>
@@ -191,7 +243,14 @@ onMounted(cargarCatalogos)
             >Identificador del periodo
             <input v-model.number="periodoId" type="number" min="1" step="1" required :disabled="descargando" />
           </label>
-          <label v-if="esAdministrador || esDocente"
+          <label>
+            Bimestre
+            <select v-model.number="bimestre" required :disabled="cargando || descargando">
+              <option value="">Selecciona un bimestre</option>
+              <option v-for="numero in 4" :key="numero" :value="numero">Bimestre {{ numero }}</option>
+            </select>
+          </label>
+          <label v-if="esAdministrador || esDocente || esApoderado"
             >Estudiante con matrícula confirmada
             <select v-model="estudianteId" required :disabled="!periodoId || cargando || descargando">
               <option value="">Selecciona un estudiante</option>
@@ -204,11 +263,19 @@ onMounted(cargarCatalogos)
           </label>
         </div>
         <p v-if="cargando" role="status">Cargando opciones…</p>
-        <p v-else-if="(esAdministrador || esDocente) && !periodos.length && !errorCatalogos" class="ayuda">
+        <p
+          v-else-if="(esAdministrador || esDocente || esApoderado) && !periodos.length && !errorCatalogos"
+          class="ayuda"
+        >
           No hay periodos disponibles para tu cuenta.
         </p>
         <p
-          v-else-if="periodoId && (esAdministrador || esDocente) && !estudiantesDisponibles.length && !errorCatalogos"
+          v-else-if="
+            periodoId &&
+            (esAdministrador || esDocente || esApoderado) &&
+            !estudiantesDisponibles.length &&
+            !errorCatalogos
+          "
           class="ayuda"
         >
           No hay estudiantes con matrícula confirmada para este periodo.
@@ -218,7 +285,9 @@ onMounted(cargarCatalogos)
         <button
           class="primario"
           type="submit"
-          :disabled="cargando || consultando || descargando || !estudianteId || !periodoId || !!errorCatalogos"
+          :disabled="
+            cargando || consultando || descargando || !estudianteId || !periodoId || !bimestre || !!errorCatalogos
+          "
         >
           {{ consultando ? 'Consultando…' : 'Consultar libreta' }}
         </button>
@@ -231,20 +300,32 @@ onMounted(cargarCatalogos)
       <div class="tarjeta resumen">
         <div>
           <h2>{{ libreta.estudiante }}</h2>
-          <p>Año escolar {{ libreta.anhioEscolar }} · Estudiante #{{ libreta.estudianteId }}</p>
+          <p>
+            Año escolar {{ libreta.anhioEscolar }} · Bimestre {{ libreta.bimestre }} · Estudiante #{{
+              libreta.estudianteId
+            }}
+          </p>
         </div>
         <button class="primario" type="button" :disabled="descargando" @click="descargarPdf">
           {{ descargando ? 'Descargando…' : 'Descargar PDF' }}
         </button>
       </div>
+      <AvisoMensaje
+        v-if="libreta.evaluacionesSinBimestre > 0"
+        :mensaje="`${libreta.evaluacionesSinBimestre} evaluación(es) aún no tienen bimestre asignado y no se incluyen en este informe.`"
+        tipo="advertencia"
+      />
       <p class="ayuda">
-        El informe incluye los periodos del año que devuelve el servidor hasta el seleccionado. Una competencia sin nota
-        se muestra como «Sin calificación».
+        El logro de cada competencia se calcula solo con las evaluaciones del bimestre seleccionado. Se muestran también
+        las evaluaciones que lo componen.
       </p>
       <p v-if="!libreta.periodos.length" class="tarjeta">No hay información académica para mostrar.</p>
       <article v-for="periodo in libreta.periodos" :key="periodo.periodoId" class="tarjeta periodo">
         <div class="resumen">
           <h2>{{ periodo.gradoNumero }}.° · Sección {{ periodo.seccion }} · {{ periodo.fechaInicio.slice(0, 4) }}</h2>
+          <span class="estado" :class="periodo.actasCerradas ? 'oficial' : 'borrador'">
+            {{ periodo.actasCerradas ? 'Actas cerradas · Libreta oficial' : 'Actas abiertas · Informe preliminar' }}
+          </span>
         </div>
         <p class="ayuda">
           {{ periodo.fechaInicio }} a {{ periodo.fechaFin
@@ -259,24 +340,44 @@ onMounted(cargarCatalogos)
                 <tr>
                   <th scope="col">Competencia</th>
                   <th scope="col">Logro</th>
+                  <th scope="col">Evaluaciones del bimestre</th>
                   <th scope="col">Observación</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="competencia in area.competencias" :key="competencia.codigo">
-                  <td>
-                    <strong>{{ competencia.codigo }}</strong
-                    ><br />{{ competencia.nombre }}
-                  </td>
+                  <td>{{ competencia.nombre }}</td>
                   <td>
                     <span class="nota">{{ competencia.nota ?? 'Sin calificación' }}</span>
+                    <small v-if="competencia.puntajeConsolidado !== null" class="puntaje">
+                      Puntaje: {{ competencia.puntajeConsolidado }}
+                    </small>
                   </td>
-                  <td>{{ competencia.observacion || 'Sin observaciones' }}</td>
+                  <td>
+                    <ul v-if="competencia.evaluaciones.length" class="evaluaciones">
+                      <li v-for="evaluacion in competencia.evaluaciones" :key="evaluacion.evaluacionId">
+                        <strong>{{ evaluacion.titulo }}</strong> ·
+                        {{ evaluacion.justificada ? 'Justificada' : (evaluacion.nota ?? 'Sin calificación') }}
+                        · {{ evaluacion.ponderacion }}%
+                      </li>
+                    </ul>
+                    <span v-else>Sin evaluaciones en este bimestre</span>
+                  </td>
                 </tr>
               </tbody>
             </table>
           </div>
         </div>
+        <section class="comentarios" :aria-labelledby="`comentarios-${periodo.periodoId}`">
+          <h3 :id="`comentarios-${periodo.periodoId}`">Comentarios cualitativos</h3>
+          <ul v-if="comentariosPorPeriodo.get(periodo.periodoId)?.length" class="lista-comentarios">
+            <li v-for="item in comentariosPorPeriodo.get(periodo.periodoId)" :key="item.clave">
+              <h4>{{ item.area }} · {{ item.competencia }}</h4>
+              <p>{{ item.comentario }}</p>
+            </li>
+          </ul>
+          <p v-else class="ayuda">No hay comentarios registrados para este periodo.</p>
+        </section>
       </article>
       <p class="ayuda">Escala de logro: AD — destacado · A — esperado · B — en proceso · C — en inicio.</p>
     </section>
@@ -307,7 +408,6 @@ h2 {
 h3 {
   font-size: 17px;
 }
-.ruta,
 .ayuda {
   color: #526477;
   font-size: 14px;
@@ -320,20 +420,8 @@ h3 {
   padding: 24px;
   margin-bottom: 20px;
 }
-.pestanas {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 20px;
-  margin: 0 0 24px;
-}
-.pestanas a,
-.pestanas span {
-  padding: 10px 0;
-  color: #2444b0;
-}
-.pestanas span {
-  border-bottom: 3px solid #2444b0;
-  font-weight: 700;
+.libretas > :deep(.navegacion-calificaciones) {
+  margin-bottom: 24px;
 }
 .campos {
   display: grid;
@@ -392,6 +480,10 @@ button:disabled {
   background: #eaf8ef;
   color: #17623c;
 }
+.borrador {
+  background: #fff4d9;
+  color: #795400;
+}
 .exito {
   padding: 16px;
   border-radius: 8px;
@@ -402,7 +494,7 @@ button:disabled {
 table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 640px;
+  min-width: 900px;
 }
 th,
 td {
@@ -418,8 +510,46 @@ th {
 .nota {
   font-weight: 700;
 }
+.puntaje {
+  display: block;
+  margin-top: 4px;
+  color: #526477;
+  font-size: 12px;
+}
+.evaluaciones {
+  margin: 0;
+  padding-left: 18px;
+}
+.evaluaciones li + li {
+  margin-top: 6px;
+}
 .area + .area {
   margin-top: 28px;
+}
+.comentarios {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid #e1e6ef;
+}
+.lista-comentarios {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  list-style: none;
+}
+.lista-comentarios li {
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: #f5f7fb;
+}
+.lista-comentarios h4 {
+  margin: 0 0 6px;
+  font-size: 14px;
+}
+.lista-comentarios p {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 @media (max-width: 700px) {
   .libretas {

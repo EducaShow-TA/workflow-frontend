@@ -14,6 +14,7 @@ import { ErrorSolicitudApi } from '~/types/api'
 import { useApi } from '~/composables/useApi'
 import { normalizarCorreo, normalizarDocumento, normalizarNombre } from '~/composables/useMascarasFormulario'
 import { ROLES } from '~/composables/usePermisosRol'
+import { validarPoliticaContrasena } from '~/composables/usePoliticaContrasena'
 
 export const RUTA_CUENTAS = '/api/v1/cuentas-usuario'
 export const LONGITUD_DNI = 8
@@ -146,8 +147,8 @@ export function validarCuenta(formulario: FormularioCuenta, cuentas: CuentaUsuar
 
   if (!formulario.password) {
     errores.password = 'La contraseña es obligatoria.'
-  } else if (formulario.password.length < LONGITUD_MINIMA_PASSWORD) {
-    errores.password = `La contraseña debe tener al menos ${LONGITUD_MINIMA_PASSWORD} caracteres.`
+  } else {
+    errores.password = validarPoliticaContrasena(formulario.password)
   }
 
   if (formulario.password && formulario.confirmacionPassword !== formulario.password) {

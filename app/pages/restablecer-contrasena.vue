@@ -3,8 +3,8 @@ import { computed, reactive, ref } from 'vue'
 import type { ErroresRestablecimiento } from '~/types/autenticacion'
 import { ErrorSolicitudApi } from '~/types/api'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
+import { LONGITUD_MINIMA_CONTRASENA, evaluarRequisitosContrasena } from '~/composables/usePoliticaContrasena'
 import {
-  LONGITUD_MINIMA_CONTRASENA,
   evaluarFuerzaContrasena,
   useRecuperacionContrasena,
   validarRestablecimiento,
@@ -30,7 +30,8 @@ const errorGeneral = ref('')
 const errores = reactive<ErroresRestablecimiento>({})
 
 const fuerza = computed(() => evaluarFuerzaContrasena(contrasena.value))
-const cumpleLongitud = computed(() => contrasena.value.length >= LONGITUD_MINIMA_CONTRASENA)
+const cumpleLongitud = computed(() => Array.from(contrasena.value).length >= LONGITUD_MINIMA_CONTRASENA)
+const requisitos = computed(() => evaluarRequisitosContrasena(contrasena.value))
 
 async function guardarContrasena(): Promise<void> {
   errorGeneral.value = ''
@@ -101,6 +102,21 @@ async function guardarContrasena(): Promise<void> {
           </div>
           <p class="requisito" :class="{ cumplido: cumpleLongitud }">
             {{ cumpleLongitud ? '✓' : '○' }} Al menos {{ LONGITUD_MINIMA_CONTRASENA }} caracteres
+          </p>
+          <p class="requisito" :class="{ cumplido: requisitos.minuscula }">
+            {{ requisitos.minuscula ? '✓' : '○' }} Una letra minúscula
+          </p>
+          <p class="requisito" :class="{ cumplido: requisitos.mayuscula }">
+            {{ requisitos.mayuscula ? '✓' : '○' }} Una letra mayúscula
+          </p>
+          <p class="requisito" :class="{ cumplido: requisitos.numero }">
+            {{ requisitos.numero ? '✓' : '○' }} Un número
+          </p>
+          <p class="requisito" :class="{ cumplido: requisitos.simbolo }">
+            {{ requisitos.simbolo ? '✓' : '○' }} Un símbolo
+          </p>
+          <p class="requisito" :class="{ cumplido: requisitos.limiteBytes }">
+            {{ requisitos.limiteBytes ? '✓' : '○' }} Máximo 72 bytes UTF-8
           </p>
           <p class="sugerencia">Sugerencia: una frase larga es más segura que mezclar símbolos.</p>
         </div>

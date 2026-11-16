@@ -1,121 +1,277 @@
 <script setup lang="ts">
-import { reactive } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
+import type { AlumnoClase, MiClase } from '~/types/calificacion'
+import type { EntregaTarea, SolicitudTarea, Tarea } from '~/types/tarea'
+import { useTareas } from '~/composables/useTareas'
+import { claveClase, nombreClase, useMisClases } from '~/composables/useMisClases'
+import { obtenerMensajeError } from '~/composables/useMensajesError'
 
 definePageMeta({ layout: 'docente', middleware: 'autenticacion' })
 
-const formulario = reactive({
-  titulo: '',
-  descripcion: '',
-  fechaLimite: '',
-  ponderacion: '',
-})
+const api = useTareas()
+const { listar: listarClases, listarAlumnos } = useMisClases()
+const clases = ref<MiClase[]>([])
+const claseElegida = ref('')
+const competenciaCodigo = ref('')
+const alumnos = ref<AlumnoClase[]>([])
+const tareas = ref<Tarea[]>([])
+const cargando = ref(true)
+const cargandoTareas = ref(false)
+const guardando = ref(false)
+const entregaEnProceso = ref('')
+const error = ref('')
+const aviso = ref('')
+const formulario = reactive({ titulo: '', descripcion: '', fechaLimite: '', ponderacion: '' })
+const claseActual = computed(() => clases.value.find((item) => claveClase(item) === claseElegida.value) ?? null)
+const competencias = computed(() => claseActual.value?.competencias ?? [])
+const tareasOrdenadas = computed(() => [...tareas.value].sort((a, b) => b.id - a.id))
+
+function limpiarAvisos(): void {
+  error.value = ''
+  aviso.value = ''
+}
+
+async function cargarTareas(): Promise<void> {
+  tareas.value = []
+  alumnos.value = []
+  const clase = claseActual.value
+  if (!clase) return
+  cargandoTareas.value = true
+  limpiarAvisos()
+  try {
+    const [listaTareas, listaAlumnos] = await Promise.all([
+      api.listarPorPeriodo(clase.periodoId),
+      listarAlumnos(clase.periodoId),
+    ])
+    if (claseElegida.value !== claveClase(clase)) return
+    tareas.value = listaTareas
+    alumnos.value = listaAlumnos
+  } catch (fallo: unknown) {
+    error.value = obtenerMensajeError(fallo, 'No se pudieron cargar las tareas y matrículas de tu clase.')
+  } finally {
+    cargandoTareas.value = false
+  }
+}
+
+async function cargarClases(): Promise<void> {
+  cargando.value = true
+  error.value = ''
+  try {
+    clases.value = await listarClases()
+    const primera = clases.value[0]
+    if (primera) {
+      claseElegida.value = claveClase(primera)
+      competenciaCodigo.value = primera.competencias[0]?.codigo ?? ''
+      await cargarTareas()
+    }
+  } catch (fallo: unknown) {
+    error.value = obtenerMensajeError(fallo, 'No se pudieron cargar tus clases asignadas.')
+  } finally {
+    cargando.value = false
+  }
+}
+
+function alCambiarClase(): void {
+  competenciaCodigo.value = competencias.value[0]?.codigo ?? ''
+  void cargarTareas()
+}
+
+async function crearTarea(): Promise<void> {
+  limpiarAvisos()
+  const clase = claseActual.value
+  if (!clase || !competenciaCodigo.value) {
+    error.value = 'Selecciona una clase y una competencia.'
+    return
+  }
+  if (!formulario.titulo.trim() || !formulario.descripcion.trim() || !formulario.fechaLimite) {
+    error.value = 'Completa el título, la descripción y la fecha límite.'
+    return
+  }
+  const ponderacion = formulario.ponderacion.trim() ? Number(formulario.ponderacion) : null
+  if (ponderacion !== null && (!Number.isFinite(ponderacion) || ponderacion < 0 || ponderacion > 100)) {
+    error.value = 'La ponderación debe estar entre 0 y 100.'
+    return
+  }
+  const solicitud: SolicitudTarea = {
+    periodoId: clase.periodoId,
+    competenciaCodigo: competenciaCodigo.value,
+    titulo: formulario.titulo.trim(),
+    descripcion: formulario.descripcion.trim(),
+    fechaLimite: formulario.fechaLimite.length === 16 ? `${formulario.fechaLimite}:00` : formulario.fechaLimite,
+    ponderacion,
+  }
+  guardando.value = true
+  try {
+    await api.registrar(solicitud)
+    Object.assign(formulario, { titulo: '', descripcion: '', fechaLimite: '', ponderacion: '' })
+    await cargarTareas()
+    aviso.value = 'Tarea publicada y asociada a las matrículas confirmadas de tu clase.'
+  } catch (fallo: unknown) {
+    error.value = obtenerMensajeError(fallo, 'No se pudo publicar la tarea.')
+  } finally {
+    guardando.value = false
+  }
+}
+
+async function cambiarEntrega(tarea: Tarea, entrega: EntregaTarea): Promise<void> {
+  const llave = `${tarea.id}-${entrega.matriculaId}`
+  entregaEnProceso.value = llave
+  limpiarAvisos()
+  try {
+    const actualizada = await api.marcarEntrega(tarea.id, entrega.matriculaId, !entrega.cumplida)
+    tareas.value = tareas.value.map((item) => (item.id === tarea.id ? actualizada : item))
+    aviso.value = 'Se actualizó el seguimiento de la entrega.'
+  } catch (fallo: unknown) {
+    error.value = obtenerMensajeError(fallo, 'No se pudo actualizar la entrega.')
+  } finally {
+    entregaEnProceso.value = ''
+  }
+}
+
+function fechaVisible(fecha: string): string {
+  const valor = new Date(fecha)
+  return Number.isNaN(valor.getTime())
+    ? fecha
+    : new Intl.DateTimeFormat('es-PE', { dateStyle: 'medium', timeStyle: 'short' }).format(valor)
+}
+
+function entregasCumplidas(tarea: Tarea): number {
+  return tarea.entregas.filter((item) => item.cumplida).length
+}
+
+onMounted(cargarClases)
 </script>
 
 <template>
   <main class="docente-vista">
     <header class="docente-titulo">
       <div>
-        <span class="docente-sobrelinea">US-3.7</span>
+        <span class="docente-sobrelinea">US-3.7 · Seguimiento académico</span>
         <h1>Mis tareas</h1>
-        <p>Registra actividades y revisa quiénes han cumplido sus entregas.</p>
+        <p>Publica actividades para tus clases y registra el cumplimiento de las entregas.</p>
       </div>
-      <span class="docente-insignia">Seguimiento académico</span>
+      <button
+        type="button"
+        class="docente-boton docente-boton--secundario"
+        :disabled="cargando || cargandoTareas"
+        @click="cargarTareas"
+      >
+        Actualizar
+      </button>
     </header>
 
-    <div class="docente-aviso" role="status">
-      <strong>Pendiente de integración docente</strong>
-      <span
-        >La API de tareas existe, pero falta consultar las secciones y competencias asignadas a tu cuenta. El formulario
-        se muestra sin habilitar el envío para evitar registrar tareas en una sección incorrecta.</span
-      >
-    </div>
+    <AvisoMensaje v-if="error" :mensaje="error" tipo="error" />
+    <AvisoMensaje v-if="aviso" :mensaje="aviso" tipo="exito" />
+    <p v-if="cargando" role="status">Cargando tus clases…</p>
+    <template v-else>
+      <p v-if="!clases.length" class="docente-aviso" role="status">No tienes clases asignadas para gestionar tareas.</p>
+      <template v-else>
+        <section class="docente-tarjeta" aria-labelledby="seleccion-clase">
+          <h2 id="seleccion-clase">Clase</h2>
+          <label class="docente-campo" for="clase-tareas">Sección y área</label>
+          <select id="clase-tareas" v-model="claseElegida" @change="alCambiarClase">
+            <option v-for="clase in clases" :key="claveClase(clase)" :value="claveClase(clase)">
+              {{ clase.areaNombre }} · {{ nombreClase(clase) }} · {{ clase.anhio }}
+            </option>
+          </select>
+          <p v-if="claseActual">Alumnos con matrícula confirmada: {{ claseActual.totalAlumnos }}</p>
+        </section>
 
-    <div class="docente-grid docente-grid--dos-tercios">
-      <section class="docente-tarjeta" aria-labelledby="crear-tarea-docente">
-        <div class="docente-tarjeta__titulo">
-          <h2 id="crear-tarea-docente">Nueva tarea</h2>
-          <span class="docente-insignia docente-insignia--neutral">Borrador de interfaz</span>
+        <div class="docente-grid docente-grid--dos-tercios">
+          <section class="docente-tarjeta" aria-labelledby="crear-tarea-docente">
+            <h2 id="crear-tarea-docente">Nueva tarea</h2>
+            <form class="docente-formulario" @submit.prevent="crearTarea">
+              <div class="docente-campo">
+                <label for="tarea-competencia">Competencia *</label>
+                <select id="tarea-competencia" v-model="competenciaCodigo" required :disabled="!competencias.length">
+                  <option value="" disabled>Selecciona una competencia</option>
+                  <option v-for="item in competencias" :key="item.codigo" :value="item.codigo">
+                    {{ item.nombre }}
+                  </option>
+                </select>
+              </div>
+              <div class="docente-campo">
+                <label for="tarea-titulo">Título *</label
+                ><input id="tarea-titulo" v-model="formulario.titulo" maxlength="180" required />
+              </div>
+              <div class="docente-campo">
+                <label for="tarea-descripcion">Descripción *</label
+                ><textarea id="tarea-descripcion" v-model="formulario.descripcion" rows="4" maxlength="5000" required />
+              </div>
+              <div class="docente-grid docente-grid--dos">
+                <div class="docente-campo">
+                  <label for="tarea-fecha">Fecha límite *</label
+                  ><input id="tarea-fecha" v-model="formulario.fechaLimite" type="datetime-local" required />
+                </div>
+                <div class="docente-campo">
+                  <label for="tarea-ponderacion">Ponderación (%)</label
+                  ><input
+                    id="tarea-ponderacion"
+                    v-model="formulario.ponderacion"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                  />
+                </div>
+              </div>
+              <div class="docente-formulario__acciones">
+                <button type="submit" class="docente-boton" :disabled="guardando || !competenciaCodigo">
+                  {{ guardando ? 'Publicando…' : 'Publicar tarea' }}
+                </button>
+              </div>
+            </form>
+          </section>
+          <aside class="docente-tarjeta">
+            <h2>Seguimiento</h2>
+            <p class="docente-texto-secundario">
+              Cada tarea crea un estado pendiente para las matrículas confirmadas del período. Puedes registrar o
+              revertir su cumplimiento.
+            </p>
+          </aside>
         </div>
-        <div class="docente-formulario">
-          <div class="docente-campo">
-            <label for="tarea-seccion">Mi sección *</label
-            ><select id="tarea-seccion" disabled>
-              <option>Secciones pendientes de vinculación</option>
-            </select>
-          </div>
-          <div class="docente-campo">
-            <label for="tarea-competencia">Competencia *</label
-            ><select id="tarea-competencia" disabled>
-              <option>Selecciona primero una sección asignada</option>
-            </select>
-          </div>
-          <div class="docente-campo">
-            <label for="tarea-titulo">Título de la tarea *</label
-            ><input
-              id="tarea-titulo"
-              v-model="formulario.titulo"
-              maxlength="180"
-              placeholder="Ej. Práctica de fracciones"
-            />
-          </div>
-          <div class="docente-campo">
-            <label for="tarea-descripcion">Descripción *</label
-            ><textarea
-              id="tarea-descripcion"
-              v-model="formulario.descripcion"
-              rows="4"
-              maxlength="5000"
-              placeholder="Describe las actividades y los entregables."
-            />
-          </div>
-          <div class="docente-grid docente-grid--dos">
-            <div class="docente-campo">
-              <label for="tarea-fecha">Fecha límite *</label
-              ><input id="tarea-fecha" v-model="formulario.fechaLimite" type="datetime-local" />
-            </div>
-            <div class="docente-campo">
-              <label for="tarea-ponderacion">Ponderación (%)</label
-              ><input
-                id="tarea-ponderacion"
-                v-model="formulario.ponderacion"
-                type="number"
-                min="0"
-                max="100"
-                step="0.01"
-                placeholder="Opcional"
-              />
-            </div>
-          </div>
-          <div class="docente-formulario__acciones">
-            <button type="button" class="docente-boton" disabled title="Requiere secciones asignadas por la API">
-              Publicar tarea
-            </button>
-          </div>
-        </div>
-      </section>
-      <aside class="docente-tarjeta" aria-labelledby="criterios-tarea-docente">
-        <h2 id="criterios-tarea-docente">Información de la tarea</h2>
-        <p class="docente-texto-secundario">Las entregas se vincularán a estudiantes con matrículas confirmadas.</p>
-        <div class="docente-ficha">
-          <strong>Campos obligatorios</strong><span>Título, descripción y fecha límite.</span>
-        </div>
-        <div class="docente-ficha"><strong>Ponderación</strong><span>Opcional, entre 0 % y 100 %.</span></div>
-        <div class="docente-ficha">
-          <strong>Seguimiento</strong><span>Identificación de entregas pendientes y cumplidas.</span>
-        </div>
-      </aside>
-    </div>
 
-    <section class="docente-tarjeta" aria-labelledby="listado-tarea-docente">
-      <div class="docente-tarjeta__titulo">
-        <h2 id="listado-tarea-docente">Tareas de mis secciones</h2>
-        <button type="button" class="docente-boton docente-boton--secundario" disabled>Actualizar</button>
-      </div>
-      <DocenteEstadoVacio
-        titulo="No se cargaron tareas"
-        descripcion="Cuando el backend proporcione las secciones asignadas al docente, se podrán consultar las tareas reales y marcar las entregas de los estudiantes."
-        icono="/icons/menu-tareas.svg"
-      />
-    </section>
+        <section class="docente-tarjeta" aria-labelledby="listado-tarea-docente">
+          <div class="docente-tarjeta__titulo">
+            <h2 id="listado-tarea-docente">
+              Tareas de {{ claseActual?.areaNombre }} · {{ claseActual ? nombreClase(claseActual) : '' }}
+            </h2>
+          </div>
+          <p v-if="cargandoTareas" role="status">Consultando tareas…</p>
+          <p v-else-if="!tareasOrdenadas.length" class="docente-texto-secundario">
+            Todavía no hay tareas para esta clase.
+          </p>
+          <article v-for="tarea in tareasOrdenadas" :key="tarea.id" class="docente-ficha">
+            <div>
+              <strong>{{ tarea.titulo }}</strong><span
+                >{{ tarea.competencia }} · vence {{ fechaVisible(tarea.fechaLimite) }}</span
+              >
+              <p>{{ tarea.descripcion }}</p>
+            </div>
+            <p>
+              <strong>{{ entregasCumplidas(tarea) }} / {{ tarea.entregas.length }}</strong> entregas cumplidas
+            </p>
+            <details>
+              <summary>Ver entregas de estudiantes</summary>
+              <p v-if="!tarea.entregas.length" class="docente-texto-secundario">No hay matrículas confirmadas.</p>
+              <div v-for="entrega in tarea.entregas" :key="entrega.matriculaId" class="docente-ficha">
+                <span>{{ entrega.estudiante }}</span><strong>{{ entrega.cumplida ? 'Entregada' : 'Pendiente' }}</strong>
+                <small>{{
+                  entrega.fechaCumplimiento ? fechaVisible(entrega.fechaCumplimiento) : 'Sin fecha de entrega'
+                }}</small>
+                <button
+                  type="button"
+                  class="docente-boton docente-boton--secundario"
+                  :disabled="entregaEnProceso === `${tarea.id}-${entrega.matriculaId}`"
+                  @click="cambiarEntrega(tarea, entrega)"
+                >
+                  {{ entrega.cumplida ? 'Revertir' : 'Marcar cumplida' }}
+                </button>
+              </div>
+            </details>
+          </article>
+        </section>
+      </template>
+    </template>
   </main>
 </template>

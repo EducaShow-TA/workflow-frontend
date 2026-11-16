@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import type { ErroresCompromisoPago, FormularioCompromisoPago, SolicitudCompromisoPago } from '~/types/compromisoPago'
+import type { IncidenciaConfirmacionMatricula } from '~/types/matricula'
 import {
   CUOTAS_MAXIMAS,
   LONGITUD_MAXIMA_CONCEPTO,
@@ -12,6 +13,8 @@ import {
   validarCompromiso,
 } from '~/composables/useCompromisoPago'
 import { formatearFecha, obtenerFechaHoyIso } from '~/composables/useFechas'
+import { useApi } from '~/composables/useApi'
+import { obtenerMensajeError } from '~/composables/useMensajesError'
 
 const propiedades = withDefaults(
   defineProps<{
@@ -21,11 +24,13 @@ const propiedades = withDefaults(
     destino?: string
     procesando?: boolean
     error?: string
+    incidencias?: IncidenciaConfirmacionMatricula[]
   }>(),
   {
     destino: '',
     procesando: false,
     error: '',
+    incidencias: () => [],
   },
 )
 
@@ -37,7 +42,12 @@ const emitir = defineEmits<{
 const formulario = reactive<FormularioCompromisoPago>(
   crearFormularioCompromiso(propiedades.anhioEscolar, obtenerFechaHoyIso()),
 )
+const fechaMinima = obtenerFechaHoyIso()
 const errores = ref<ErroresCompromisoPago>({})
+const { solicitar } = useApi()
+const montoPredeterminado = ref<number | null>(null)
+const montoCuota = ref<number | null>(null)
+const errorConfiguracion = ref('')
 
 const cronograma = computed(() => calcularCronograma(formulario))
 const primeraCuota = computed(() => cronograma.value[0])
@@ -49,22 +59,54 @@ const descripcion = computed(() =>
   [`${textoEstudiantes.value} seleccionados`, propiedades.destino].filter(Boolean).join(' · '),
 )
 
+function actualizarMontoTotal(): void {
+  if (montoCuota.value === null || !Number.isFinite(montoCuota.value)) {
+    formulario.montoTotal = null
+    return
+  }
+  formulario.montoTotal = Math.round(montoCuota.value * Number(formulario.numeroCuotas ?? 0) * 100) / 100
+}
+
+watch([montoCuota, () => formulario.numeroCuotas], actualizarMontoTotal)
+
 // Se reinicia al abrir; un error del servidor no cierra la ventana, así se conservan los términos.
 watch(
   () => propiedades.abierta,
   (abierta) => {
     if (abierta) {
       Object.assign(formulario, crearFormularioCompromiso(propiedades.anhioEscolar, obtenerFechaHoyIso()))
+      montoCuota.value = montoPredeterminado.value
+      actualizarMontoTotal()
       errores.value = {}
     }
   },
 )
+
+onMounted(async () => {
+  try {
+    const configuracion = await solicitar<{ montoPensionPredeterminado: number }>('/api/v1/configuracion/finanzas')
+    const monto = Number(configuracion.montoPensionPredeterminado)
+    montoPredeterminado.value = Number.isFinite(monto) && monto > 0 ? monto : null
+    if (montoPredeterminado.value !== null && montoCuota.value === null) montoCuota.value = montoPredeterminado.value
+  } catch (fallo: unknown) {
+    errorConfiguracion.value = obtenerMensajeError(fallo, 'No se pudo cargar el monto sugerido.')
+  }
+})
 
 function limpiarError(campo: keyof FormularioCompromisoPago): void {
   errores.value = { ...errores.value, [campo]: undefined }
 }
 
 function confirmar(): void {
+  if (montoCuota.value === null || !(montoCuota.value >= 0.01)) {
+    errores.value = { montoTotal: 'Ingresa una pensión mensual mayor que cero.' }
+    return
+  }
+  if (Math.round(montoCuota.value * 100) !== montoCuota.value * 100) {
+    errores.value = { montoTotal: 'La pensión mensual admite como máximo dos decimales.' }
+    return
+  }
+  actualizarMontoTotal()
   errores.value = validarCompromiso(formulario, obtenerFechaHoyIso())
 
   if (Object.values(errores.value).some(Boolean)) {
@@ -107,15 +149,22 @@ function confirmar(): void {
 
         <div class="cuadricula-campos">
           <div class="campo">
-            <label for="monto-compromiso">Monto total (S/) <span class="obligatorio">*</span></label>
+            <label for="monto-compromiso">Pensión mensual por estudiante (S/) <span class="obligatorio">*</span></label>
+            <small v-if="montoPredeterminado !== null" class="ayuda">
+              Valor predeterminado: S/ {{ montoPredeterminado.toFixed(2) }} por cuota. Puedes editarlo para aplicar
+              becas.
+            </small>
+            <small v-else-if="errorConfiguracion" class="ayuda"
+              >{{ errorConfiguracion }} Ingresa el monto acordado.</small
+            >
             <input
               id="monto-compromiso"
-              v-model.number="formulario.montoTotal"
+              v-model.number="montoCuota"
               type="number"
               inputmode="decimal"
               min="0.01"
               step="0.01"
-              placeholder="Ej. 3500.00"
+              placeholder="Ej. 500.00"
               :aria-invalid="Boolean(errores.montoTotal)"
               :aria-describedby="errores.montoTotal ? 'error-monto' : undefined"
               @input="limpiarError('montoTotal')"
@@ -148,6 +197,7 @@ function confirmar(): void {
             id="vencimiento-compromiso"
             v-model="formulario.primerVencimiento"
             type="date"
+            :min="fechaMinima"
             :aria-invalid="Boolean(errores.primerVencimiento)"
             :aria-describedby="errores.primerVencimiento ? 'error-vencimiento' : 'ayuda-vencimiento'"
             @input="limpiarError('primerVencimiento')"
@@ -166,6 +216,7 @@ function confirmar(): void {
         </p>
 
         <AvisoMensaje v-if="error" :mensaje="error" tipo="error" />
+        <IncidenciasMatricula :incidencias="incidencias" />
       </form>
 
       <section class="vista-previa" aria-labelledby="titulo-cronograma">
