@@ -201,28 +201,34 @@ function periodoVisible(id: number | null): string {
   return periodo ? `${periodoEtiqueta(periodo)} (ID ${id})` : `Período no encontrado (ID ${id})`
 }
 
-function estudianteVisible(id: number | null): string {
+function estudianteVisible(id: number | null, nombre?: string | null): string {
   if (id === null) {
     return 'Estudiante no especificado'
   }
+
+  if (nombre) return `${nombre} (ID ${id})`
 
   const estudiante = estudiantesPorId.value.get(id)
   if (!estudiante) {
     return `Estudiante no encontrado (ID ${id})`
   }
 
-  const nombre = [estudiante.nombre, estudiante.apellidoPaterno, estudiante.apellidoMaterno].filter(Boolean).join(' ')
-  return `${nombre || 'Estudiante'} (ID ${id})`
+  const nombreCompleto = [estudiante.nombre, estudiante.apellidoPaterno, estudiante.apellidoMaterno]
+    .filter(Boolean)
+    .join(' ')
+  return `${nombreCompleto || 'Estudiante'} (ID ${id})`
 }
 
 function matriculaVisible(id: number | null): string {
   return id === null ? 'Matrícula no especificada' : `Matrícula #${id}`
 }
 
-function competenciaVisible(codigo: string | null): string {
+function competenciaVisible(codigo: string | null, nombre?: string | null, area?: string | null): string {
   if (!codigo) {
     return 'Competencia no especificada'
   }
+
+  if (nombre) return `${nombre}${area ? ` · Área: ${area}` : ''}`
 
   const competencia = competenciasPorCodigo.value.get(codigo)
   return competencia
@@ -377,7 +383,7 @@ onMounted(() => {
               </div>
               <div>
                 <dt>Estudiante</dt>
-                <dd>{{ estudianteVisible(item.estudianteId) }}</dd>
+                <dd>{{ estudianteVisible(item.estudianteId, item.estudianteNombre) }}</dd>
               </div>
               <div>
                 <dt>Matrícula</dt>
@@ -389,7 +395,7 @@ onMounted(() => {
               </div>
               <div>
                 <dt>Competencia</dt>
-                <dd>{{ competenciaVisible(item.competenciaCodigo) }}</dd>
+                <dd>{{ competenciaVisible(item.competenciaCodigo, item.competenciaNombre, item.areaNombre) }}</dd>
               </div>
               <div>
                 <dt>Evaluación relacionada</dt>
