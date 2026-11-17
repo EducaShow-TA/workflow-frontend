@@ -10,8 +10,6 @@ import { useAutenticacionStore } from '~/stores/autenticacion'
 definePageMeta({ layout: 'docente', middleware: 'autenticacion' })
 
 const CLAVE_RECORDADA = 'educashow.docente.calificaciones'
-const CLAVE_UMBRAL = 'educashow.docente.umbral-riesgo'
-const UMBRALES = [1, 2, 3, 4, 5]
 
 type FiltroNota = NotaCualitativa | 'SIN_NOTA' | 'RIESGO' | ''
 
@@ -29,7 +27,6 @@ const notasPorCompetencia = ref<Record<string, Calificacion[]>>({})
 const riesgoAcademico = ref<RiesgoAcademico | null>(null)
 const busqueda = ref('')
 const filtroNota = ref<FiltroNota>('')
-const umbralRiesgo = ref(2)
 const cargando = ref(true)
 const cargandoClase = ref(false)
 const error = ref('')
@@ -165,7 +162,7 @@ async function cargarClase(): Promise<void> {
   try {
     const [lista, riesgo] = await Promise.all([
       listarAlumnos(actual.periodoId),
-      obtenerRiesgo(actual.periodoId, actual.areaCodigo, umbralRiesgo.value),
+      obtenerRiesgo(actual.periodoId, actual.areaCodigo),
     ])
     const porCompetencia = await Promise.all(
       actual.competencias.map((item) => listarNotas(actual.periodoId, item.codigo, riesgo.bimestre)),
@@ -180,22 +177,6 @@ async function cargarClase(): Promise<void> {
     error.value = obtenerMensajeError(fallo, 'No se pudo cargar la lista de alumnos.')
   } finally {
     cargandoClase.value = false
-  }
-}
-
-async function cambiarUmbral(valor: number): Promise<void> {
-  umbralRiesgo.value = valor
-  if (!enRiesgo.value.size && filtroNota.value === 'RIESGO') filtroNota.value = ''
-  try {
-    localStorage.setItem(CLAVE_UMBRAL, String(valor))
-  } catch {
-    /* el navegador puede bloquear el almacenamiento */
-  }
-  if (!clase.value) return
-  try {
-    riesgoAcademico.value = await obtenerRiesgo(clase.value.periodoId, clase.value.areaCodigo, valor)
-  } catch (fallo: unknown) {
-    error.value = obtenerMensajeError(fallo, 'No se pudo actualizar el análisis de riesgo académico.')
   }
 }
 
@@ -227,7 +208,7 @@ function alGuardar(calificacion: Calificacion, siguiente: boolean): void {
   )
   notasPorCompetencia.value = { ...notasPorCompetencia.value, [codigo]: [...lista, calificacion] }
   if (clase.value) {
-    void obtenerRiesgo(clase.value.periodoId, clase.value.areaCodigo, umbralRiesgo.value)
+    void obtenerRiesgo(clase.value.periodoId, clase.value.areaCodigo)
       .then((resultado) => {
         riesgoAcademico.value = resultado
       })
@@ -265,12 +246,6 @@ onMounted(async () => {
   try {
     clases.value = await listarClases()
     const recordada = leerRecordada()
-    try {
-      const guardado = Number(localStorage.getItem(CLAVE_UMBRAL))
-      if (UMBRALES.includes(guardado)) umbralRiesgo.value = guardado
-    } catch {
-      /* el navegador puede bloquear el almacenamiento */
-    }
     const inicial = clases.value.find((item) => claveClase(item) === recordada.clase) ?? clases.value[0]
     if (inicial) await elegirClase(claveClase(inicial), recordada.competencia)
   } catch (fallo: unknown) {
@@ -393,20 +368,12 @@ onMounted(async () => {
                   }}
                 </strong>
                 <span>
-                  Acumulan {{ umbralRiesgo }} o más notas C del bimestre {{ riesgoAcademico?.bimestre ?? 'actual' }} en
-                  las competencias de {{ clase.areaNombre }}. Incluye calificaciones manuales y parciales; no cuenta
-                  tardanzas ni inasistencias.
+                  Acumulan más de {{ riesgoAcademico?.umbral ?? 1 }} notas C del bimestre
+                  {{ riesgoAcademico?.bimestre ?? 'actual' }} en las competencias de {{ clase.areaNombre }}. Incluye
+                  calificaciones manuales y parciales; no cuenta tardanzas ni inasistencias.
                 </span>
               </div>
               <div class="riesgo__acciones">
-                <label for="umbral-riesgo">Umbral de notas C</label>
-                <select
-                  id="umbral-riesgo"
-                  :value="umbralRiesgo"
-                  @change="cambiarUmbral(Number(($event.target as HTMLSelectElement).value))"
-                >
-                  <option v-for="valor in UMBRALES" :key="valor" :value="valor">{{ valor }} o más</option>
-                </select>
                 <button
                   type="button"
                   class="docente-boton docente-boton--secundario"
