@@ -396,6 +396,10 @@ onMounted(() => {
                 <dd>{{ evaluacionVisible(item) }}</dd>
               </div>
               <div>
+                <dt>Bimestre</dt>
+                <dd>{{ item.bimestre ?? 'Sin asignar' }}</dd>
+              </div>
+              <div>
                 <dt>Nota de la competencia</dt>
                 <dd>{{ describirCambioAuditoria(item.notaAnterior, item.notaNueva, 'nota') }}</dd>
               </div>

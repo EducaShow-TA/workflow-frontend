@@ -12,6 +12,7 @@ const propiedades = defineProps<{
   alumno: AlumnoClase | null
   contexto: string
   periodoId: number
+  bimestre: number
   competenciaCodigo: string
   actual: Calificacion | null
   haySiguiente: boolean
@@ -92,6 +93,7 @@ async function guardar(siguiente: boolean): Promise<void> {
     const calificacion = await registrar(
       {
         periodoId: propiedades.periodoId,
+        bimestre: propiedades.bimestre,
         matriculaId: propiedades.alumno.matriculaId,
         competenciaCodigo: propiedades.competenciaCodigo,
         nota: nota.value,
