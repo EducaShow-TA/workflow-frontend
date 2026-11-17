@@ -168,7 +168,7 @@ async function cargarClase(): Promise<void> {
       obtenerRiesgo(actual.periodoId, actual.areaCodigo, umbralRiesgo.value),
     ])
     const porCompetencia = await Promise.all(
-      actual.competencias.map((item) => listarNotas(actual.periodoId, item.codigo)),
+      actual.competencias.map((item) => listarNotas(actual.periodoId, item.codigo, riesgo.bimestre)),
     )
     if (claveClase(actual) !== claseElegida.value) return
     alumnos.value = lista
@@ -393,8 +393,9 @@ onMounted(async () => {
                   }}
                 </strong>
                 <span>
-                  Acumulan {{ umbralRiesgo }} o más notas C en las competencias de {{ clase.areaNombre }}. Solo
-                  considera notas; no cuenta tardanzas ni inasistencias.
+                  Acumulan {{ umbralRiesgo }} o más notas C del bimestre {{ riesgoAcademico?.bimestre ?? 'actual' }} en
+                  las competencias de {{ clase.areaNombre }}. Incluye calificaciones manuales y parciales; no cuenta
+                  tardanzas ni inasistencias.
                 </span>
               </div>
               <div class="riesgo__acciones">
@@ -549,6 +550,7 @@ onMounted(async () => {
       :alumno="alumnoEnEdicion"
       :contexto="contexto"
       :periodo-id="clase.periodoId"
+      :bimestre="riesgoAcademico?.bimestre ?? 1"
       :competencia-codigo="competencia.codigo"
       :actual="alumnoEnEdicion ? (notaPorMatricula.get(alumnoEnEdicion.matriculaId) ?? null) : null"
       :hay-siguiente="haySiguiente"

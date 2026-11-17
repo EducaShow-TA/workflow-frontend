@@ -43,6 +43,7 @@ const estudiantes = ref<EstudianteMatriculable[]>([])
 const areas = ref<AreaCatalogo[]>([])
 const calificaciones = ref<Calificacion[]>([])
 const periodoId = ref<number | null>(null)
+const bimestre = ref(1)
 const competenciaCodigo = ref('')
 const matriculaId = ref<number | null>(null)
 const nota = ref<NotaCualitativa>('A')
@@ -147,7 +148,7 @@ async function cargarCalificaciones(): Promise<void> {
   if (periodoId.value === null || !competenciaCodigo.value) return
   consultando.value = true
   try {
-    const resultado = await listar(periodoId.value, competenciaCodigo.value)
+    const resultado = await listar(periodoId.value, competenciaCodigo.value, bimestre.value)
     if (secuencia === secuenciaConsulta) calificaciones.value = resultado
   } catch (fallo: unknown) {
     if (secuencia === secuenciaConsulta) error.value = obtenerMensajeError(fallo, 'No se pudo cargar el seguimiento.')
@@ -163,7 +164,7 @@ watch(periodoId, () => {
 watch(matriculaId, () => {
   confirmacionRegistro.value = null
 })
-watch([periodoId, competenciaCodigo], () => {
+watch([periodoId, bimestre, competenciaCodigo], () => {
   limpiarAvisos()
   void cargarCalificaciones()
 })
@@ -177,8 +178,7 @@ async function guardar(): Promise<void> {
     return
   }
   if (notaExistente.value) {
-    error.value =
-      'Este estudiante ya tiene una calificación en esta competencia. No se puede registrar otra desde este formulario.'
+    error.value = 'Este estudiante ya tiene una calificación en esta competencia y bimestre.'
     return
   }
   if (observacion.value.trim().length > 1000) {
@@ -207,6 +207,7 @@ async function guardar(): Promise<void> {
     periodoId: periodoId.value,
     matriculaId: matriculaId.value,
     competenciaCodigo: competenciaCodigo.value,
+    bimestre: bimestre.value,
     nota: nota.value,
     observacion: observacion.value.trim(),
     evidenciaUrl: url || null,
@@ -255,7 +256,7 @@ async function descargar(item: Calificacion): Promise<void> {
 
     <section class="tarjeta" aria-labelledby="titulo-filtros">
       <h2 id="titulo-filtros">1. Contexto académico</h2>
-      <p class="ayuda">Selecciona el período y la competencia para registrar o revisar el seguimiento.</p>
+      <p class="ayuda">Selecciona el período, bimestre y competencia para registrar o revisar el seguimiento.</p>
       <p v-if="cargando" role="status">Cargando datos académicos...</p>
       <div v-else class="campos">
         <div class="campo">
@@ -266,6 +267,13 @@ async function descargar(item: Calificacion): Promise<void> {
             </option>
           </select>
           <small v-if="!periodos.length">Primero abre el año escolar desde Grados/Secciones.</small>
+        </div>
+
+        <div class="campo">
+          <label for="bimestre-calificacion">Bimestre</label>
+          <select id="bimestre-calificacion" v-model.number="bimestre">
+            <option v-for="valor in [1, 2, 3, 4]" :key="valor" :value="valor">Bimestre {{ valor }}</option>
+          </select>
         </div>
         <div class="campo">
           <label for="competencia-calificacion">Competencia</label>

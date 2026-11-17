@@ -12,6 +12,7 @@ export interface RegistroAuditoriaCalificacion {
   estudianteId: number | null
   competenciaCodigo: string | null
   evaluacionId: number | null
+  bimestre: number | null
   notaAnterior: string | null
   notaNueva: string | null
   puntajeAnterior: number | null
