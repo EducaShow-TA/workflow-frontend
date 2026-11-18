@@ -42,6 +42,7 @@ const guardando = ref(false)
 const error = ref('')
 const errorGuardar = ref('')
 const resumenGuardado = ref<{ presentes: number; tardanzas: number; ausentes: number } | null>(null)
+const justificando = ref<FilaListaAsistencia | null>(null)
 
 const sesion = computed(() => lista.value?.sesion ?? null)
 const editable = computed(() => modo.value === 'tomar' || modo.value === 'edicion')
@@ -181,6 +182,16 @@ async function guardar(): Promise<void> {
   } finally {
     guardando.value = false
   }
+}
+
+function abrirJustificacion(alumno: FilaListaAsistencia): void {
+  if (modo.value !== 'lectura' || autenticacion.usuario?.rol !== 'DOCENTE') return
+  if (alumno.estado === 'AUSENTE' && alumno.asistenciaId !== null) justificando.value = alumno
+}
+
+async function refrescarTrasJustificacion(): Promise<void> {
+  justificando.value = null
+  await cargar()
 }
 
 onMounted(cargar)
@@ -324,6 +335,16 @@ onMounted(cargar)
                 "
               />
               <InsigniaEstado v-else texto="Sin registro" variante="neutro" />
+              <button
+                v-if="
+                  modo === 'lectura' && !esAdministrador && alumno.estado === 'AUSENTE' && alumno.asistenciaId !== null
+                "
+                type="button"
+                class="justificar-alumno"
+                @click="abrirJustificacion(alumno)"
+              >
+                Justificar ausencia
+              </button>
             </li>
           </ol>
 
@@ -346,6 +367,12 @@ onMounted(cargar)
         </section>
       </template>
     </template>
+
+    <ModalJustificacionDocente
+      :alumno="justificando"
+      @cerrar="justificando = null"
+      @guardada="refrescarTrasJustificacion"
+    />
 
     <VentanaModal
       :abierta="resumenGuardado !== null"
@@ -671,5 +698,22 @@ onMounted(cargar)
   .botones-pie > * {
     flex: 1;
   }
+}
+.justificar-alumno {
+  border: 1px solid #1d4ed8;
+  border-radius: 7px;
+  padding: 9px 11px;
+  background: white;
+  color: #1e40af;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.justificar-alumno:hover {
+  background: #eff6ff;
+}
+.justificar-alumno:focus-visible {
+  outline: 2px solid #1d4ed8;
+  outline-offset: 2px;
 }
 </style>
