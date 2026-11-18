@@ -176,7 +176,20 @@ async function informarNuevoEstudiante(): Promise<void> {
               </td>
 
               <td>
-                <span>—</span>
+                <NuxtLink
+                  class="enlace-apoderados"
+                  :to="{
+                    path: `/estudiantes/${estudiante.estudianteId}/apoderados`,
+                    query: {
+                      nombre: `${estudiante.nombres} ${estudiante.apellidos}`,
+                      documento: estudiante.numeroDocumento,
+                      grado:
+                        estudiante.grado === 'Sin asignar' ? '' : `${estudiante.grado} ${estudiante.seccion}`.trim(),
+                    },
+                  }"
+                >
+                  Apoderados
+                </NuxtLink>
               </td>
             </tr>
 
@@ -463,5 +476,23 @@ td {
   table {
     min-width: 850px;
   }
+}
+.enlace-apoderados {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  padding: 6px 12px;
+  border: 1px solid #c3c6d7;
+  border-radius: 8px;
+  color: #004ac6;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.enlace-apoderados:hover {
+  border-color: #004ac6;
+  background: #eff6ff;
 }
 </style>
