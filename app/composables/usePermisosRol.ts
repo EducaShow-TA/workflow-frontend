@@ -21,6 +21,13 @@ const DESCRIPCIONES_ROL: Record<RolUsuario, string> = {
 
 export const PERMISOS: Permiso[] = [
   {
+    codigo: 'PORTAL_FAMILIA_VER',
+    modulo: 'Portal del apoderado',
+    nombre: 'Ver panel y asistencia de sus hijos',
+    descripcion: 'Consultar el panel y el historial de asistencia de los hijos vinculados a su cuenta.',
+    sensible: false,
+  },
+  {
     codigo: 'LIBRETA_VER',
     modulo: 'Calificaciones',
     nombre: 'Consultar libretas',
@@ -194,13 +201,14 @@ export const PERMISOS_POR_ROL: Record<RolUsuario, string[]> = {
   ADMINISTRADOR: PERMISOS.map((permiso) => permiso.codigo),
   DOCENTE: ['PORTAL_DOCENTE_VER', 'LIBRETA_VER', 'REPORTE_ASISTENCIA_VER'],
   ALUMNO: [],
-  APODERADO: ['LIBRETA_VER'],
+  APODERADO: ['PORTAL_FAMILIA_VER', 'LIBRETA_VER'],
 }
 
 export const REGLAS_RUTA: ReglaRuta[] = [
   { prefijo: '/calificaciones/libretas', permiso: 'LIBRETA_VER' },
   { prefijo: '/docente/libretas', permiso: 'LIBRETA_VER' },
   { prefijo: '/libretas', permiso: 'LIBRETA_VER' },
+  { prefijo: '/familia', permiso: 'PORTAL_FAMILIA_VER' },
   { prefijo: '/docente/reporte-asistencia', permiso: 'REPORTE_ASISTENCIA_VER' },
   { prefijo: '/docente', permiso: 'PORTAL_DOCENTE_VER' },
   { prefijo: '/finanzas', permiso: 'BOLETA_GESTIONAR' },
@@ -231,7 +239,7 @@ export const RUTAS_LIBRES = ['/', '/login', '/acceso-denegado']
 
 /** Pantalla de inicio de cada rol. */
 export function obtenerRutaInicio(rol: RolUsuario): string {
-  return rol === 'DOCENTE' ? '/docente' : rol === 'APODERADO' ? '/libretas' : '/panel'
+  return rol === 'DOCENTE' ? '/docente' : rol === 'APODERADO' ? '/familia' : '/panel'
 }
 
 export function obtenerNombreRol(rol: RolUsuario): string {
