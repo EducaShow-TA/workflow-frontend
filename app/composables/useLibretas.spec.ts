@@ -78,7 +78,8 @@ describe('libretas US-3.3', () => {
   })
 
   it('da acceso al apoderado sin habilitarle la gestión de calificaciones ni los catálogos administrativos', () => {
-    expect(obtenerRutaInicio('APODERADO')).toBe('/libretas')
+    expect(obtenerRutaInicio('APODERADO')).toBe('/familia')
+    expect(puedeAcceder('APODERADO', '/familia/asistencia')).toBe(true)
     expect(puedeAcceder('APODERADO', '/libretas')).toBe(true)
     expect(puedeAcceder('APODERADO', '/calificaciones')).toBe(false)
     expect(puedeAcceder('APODERADO', '/estudiantes')).toBe(false)
