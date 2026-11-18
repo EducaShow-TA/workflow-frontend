@@ -15,11 +15,18 @@ const NOMBRES_ROL: Record<RolUsuario, string> = {
 const DESCRIPCIONES_ROL: Record<RolUsuario, string> = {
   ADMINISTRADOR: 'Gestiona la matrícula, la estructura académica y las cuentas de usuario del colegio.',
   DOCENTE: 'Registrará asistencia y calificaciones de sus secciones (sprints 2 y 3).',
-  ALUMNO: 'Consultará su horario, asistencia y calificaciones (sprints 2 y 3).',
+  ALUMNO: 'Consulta su panel y su asistencia; horario y calificaciones llegarán en próximos sprints.',
   APODERADO: 'Consultará las boletas, pagos y el avance de sus hijos (sprints 2 y 3).',
 }
 
 export const PERMISOS: Permiso[] = [
+  {
+    codigo: 'PORTAL_ESTUDIANTE_VER',
+    modulo: 'Portal del estudiante',
+    nombre: 'Ver su panel y su asistencia',
+    descripcion: 'Consultar su propio panel y su historial de asistencia clase por clase.',
+    sensible: false,
+  },
   {
     codigo: 'PORTAL_FAMILIA_VER',
     modulo: 'Portal del apoderado',
@@ -200,7 +207,7 @@ export const PERMISOS: Permiso[] = [
 export const PERMISOS_POR_ROL: Record<RolUsuario, string[]> = {
   ADMINISTRADOR: PERMISOS.map((permiso) => permiso.codigo),
   DOCENTE: ['PORTAL_DOCENTE_VER', 'LIBRETA_VER', 'REPORTE_ASISTENCIA_VER'],
-  ALUMNO: [],
+  ALUMNO: ['PORTAL_ESTUDIANTE_VER'],
   APODERADO: ['PORTAL_FAMILIA_VER', 'LIBRETA_VER'],
 }
 
@@ -209,6 +216,7 @@ export const REGLAS_RUTA: ReglaRuta[] = [
   { prefijo: '/docente/libretas', permiso: 'LIBRETA_VER' },
   { prefijo: '/libretas', permiso: 'LIBRETA_VER' },
   { prefijo: '/familia', permiso: 'PORTAL_FAMILIA_VER' },
+  { prefijo: '/estudiante', permiso: 'PORTAL_ESTUDIANTE_VER' },
   { prefijo: '/docente/reporte-asistencia', permiso: 'REPORTE_ASISTENCIA_VER' },
   { prefijo: '/docente', permiso: 'PORTAL_DOCENTE_VER' },
   { prefijo: '/finanzas', permiso: 'BOLETA_GESTIONAR' },
@@ -239,7 +247,12 @@ export const RUTAS_LIBRES = ['/', '/login', '/acceso-denegado']
 
 /** Pantalla de inicio de cada rol. */
 export function obtenerRutaInicio(rol: RolUsuario): string {
-  return rol === 'DOCENTE' ? '/docente' : rol === 'APODERADO' ? '/familia' : '/panel'
+  const inicios: Partial<Record<RolUsuario, string>> = {
+    DOCENTE: '/docente',
+    APODERADO: '/familia',
+    ALUMNO: '/estudiante',
+  }
+  return inicios[rol] ?? '/panel'
 }
 
 export function obtenerNombreRol(rol: RolUsuario): string {
