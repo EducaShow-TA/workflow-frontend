@@ -132,14 +132,20 @@ export function usePortalFamilia() {
     return solicitar<HijoVinculado[]>('/api/v1/apoderados/mis-estudiantes')
   }
 
-  function consultarAsistencia(estudianteId: number, desde: string, hasta: string): Promise<RegistroAsistencia[]> {
-    return solicitar<RegistroAsistencia[]>(
+  /** Las clases que el docente aún no marca no son asistencia todavía, así que no se muestran. */
+  async function consultarAsistencia(
+    estudianteId: number,
+    desde: string,
+    hasta: string,
+  ): Promise<RegistroAsistencia[]> {
+    const registros = await solicitar<RegistroAsistencia[]>(
       `/api/v1/asistencias-estudiantes/${estudianteId}/historial?desde=${desde}&hasta=${hasta}`,
     )
+    return registros.filter((registro) => ESTADOS_ASISTENCIA.includes(registro.estado))
   }
 
   /** El documento pide el token de sesión, así que se descarga con fetch y no con un enlace directo. */
-  async function descargarDocumento(registro: RegistroAsistencia): Promise<Blob> {
+  async function descargarDocumento(registro: Pick<RegistroAsistencia, 'asistenciaId'>): Promise<Blob> {
     const base = String(configuracion.public.apiBase || '').replace(/\/+$/, '')
     const respuesta = await fetch(
       `${base}/api/v1/asistencias-estudiantes/${registro.asistenciaId}/justificacion/documento`,

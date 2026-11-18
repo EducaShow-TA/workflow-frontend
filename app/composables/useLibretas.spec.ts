@@ -86,5 +86,8 @@ describe('libretas US-3.3', () => {
     expect(puedeAcceder('ADMINISTRADOR', '/calificaciones/libretas')).toBe(true)
     expect(puedeAcceder('DOCENTE', '/docente/libretas')).toBe(true)
     expect(puedeAcceder('ALUMNO', '/libretas')).toBe(false)
+    expect(obtenerRutaInicio('ALUMNO')).toBe('/estudiante')
+    expect(puedeAcceder('ALUMNO', '/estudiante/asistencia')).toBe(true)
+    expect(puedeAcceder('ALUMNO', '/estudiantes')).toBe(false)
   })
 })
