@@ -21,6 +21,13 @@ const DESCRIPCIONES_ROL: Record<RolUsuario, string> = {
 
 export const PERMISOS: Permiso[] = [
   {
+    codigo: 'HORARIO_PROPIO_VER',
+    modulo: 'Horarios',
+    nombre: 'Consultar horario de mi sección',
+    descripcion: 'Ver el horario de clase del estudiante autenticado o de sus hijos vinculados.',
+    sensible: false,
+  },
+  {
     codigo: 'LIBRETA_VER',
     modulo: 'Calificaciones',
     nombre: 'Consultar libretas',
@@ -193,11 +200,12 @@ export const PERMISOS: Permiso[] = [
 export const PERMISOS_POR_ROL: Record<RolUsuario, string[]> = {
   ADMINISTRADOR: PERMISOS.map((permiso) => permiso.codigo),
   DOCENTE: ['PORTAL_DOCENTE_VER', 'LIBRETA_VER', 'REPORTE_ASISTENCIA_VER'],
-  ALUMNO: [],
-  APODERADO: ['LIBRETA_VER'],
+  ALUMNO: ['HORARIO_PROPIO_VER'],
+  APODERADO: ['LIBRETA_VER', 'HORARIO_PROPIO_VER'],
 }
 
 export const REGLAS_RUTA: ReglaRuta[] = [
+  { prefijo: '/mi-horario', permiso: 'HORARIO_PROPIO_VER' },
   { prefijo: '/calificaciones/libretas', permiso: 'LIBRETA_VER' },
   { prefijo: '/docente/libretas', permiso: 'LIBRETA_VER' },
   { prefijo: '/libretas', permiso: 'LIBRETA_VER' },
@@ -231,7 +239,13 @@ export const RUTAS_LIBRES = ['/', '/login', '/acceso-denegado']
 
 /** Pantalla de inicio de cada rol. */
 export function obtenerRutaInicio(rol: RolUsuario): string {
-  return rol === 'DOCENTE' ? '/docente' : rol === 'APODERADO' ? '/libretas' : '/panel'
+  return rol === 'DOCENTE'
+    ? '/docente'
+    : rol === 'APODERADO'
+      ? '/libretas'
+      : rol === 'ALUMNO'
+        ? '/mi-horario'
+        : '/panel'
 }
 
 export function obtenerNombreRol(rol: RolUsuario): string {

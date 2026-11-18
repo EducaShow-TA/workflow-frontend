@@ -9,9 +9,16 @@ async function salir(): Promise<void> {
 <template>
   <div class="portal-familia">
     <header>
-      <strong>EducaShow · Portal del apoderado</strong><span>{{ autenticacion.usuario?.nombreCompleto }}</span
+      <strong
+        >EducaShow ·
+        {{ autenticacion.usuario?.rol === 'ALUMNO' ? 'Portal del alumno' : 'Portal del apoderado' }}</strong
+      ><span>{{ autenticacion.usuario?.nombreCompleto }}</span
       ><button type="button" @click="salir">Cerrar sesión</button>
     </header>
+    <nav class="navegacion-familia" aria-label="Navegación académica">
+      <NuxtLink v-if="autenticacion.usuario?.rol === 'APODERADO'" to="/libretas">Libretas</NuxtLink>
+      <NuxtLink to="/mi-horario">Horario de clases</NuxtLink>
+    </nav>
     <slot />
   </div>
 </template>
@@ -39,5 +46,23 @@ button {
   padding: 10px 16px;
   background: white;
   cursor: pointer;
+}
+.navegacion-familia {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px 32px 0;
+}
+.navegacion-familia a {
+  color: #1e40af;
+  text-decoration: none;
+  font-weight: 600;
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: white;
+  border: 1px solid #dce3ed;
+}
+.navegacion-familia a.router-link-active {
+  background: #dbeafe;
 }
 </style>

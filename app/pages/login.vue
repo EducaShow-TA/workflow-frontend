@@ -64,7 +64,9 @@ async function procesarInicioSesion(): Promise<void> {
       ? '/docente'
       : autenticacion.usuario?.rol === 'APODERADO'
         ? '/libretas'
-        : '/panel',
+        : autenticacion.usuario?.rol === 'ALUMNO'
+          ? '/mi-horario'
+          : '/panel',
   )
 }
 
