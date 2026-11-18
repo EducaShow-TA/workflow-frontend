@@ -56,6 +56,14 @@ export const PERMISOS: Permiso[] = [
     sensible: true,
   },
   {
+    codigo: 'AUDITORIA_FINANZAS_VER',
+    modulo: 'Finanzas',
+    nombre: 'Ver auditoría de transacciones y pagos',
+    descripcion:
+      'Consultar quién generó compromisos y boletas, registró pagos o marcó moras, con valores anteriores y nuevos.',
+    sensible: true,
+  },
+  {
     codigo: 'REPORTE_COBRANZA_VER',
     modulo: 'Reportes',
     nombre: 'Ver reporte de cobranza',
@@ -220,6 +228,7 @@ export const REGLAS_RUTA: ReglaRuta[] = [
   { prefijo: '/docente/reporte-asistencia', permiso: 'REPORTE_ASISTENCIA_VER' },
   { prefijo: '/docente', permiso: 'PORTAL_DOCENTE_VER' },
   { prefijo: '/finanzas', permiso: 'BOLETA_GESTIONAR' },
+  { prefijo: '/finanzas/auditoria', permiso: 'AUDITORIA_FINANZAS_VER' },
   { prefijo: '/reportes/boletas', permiso: 'REPORTE_COBRANZA_VER' },
   { prefijo: '/reportes/asistencia', permiso: 'REPORTE_ASISTENCIA_VER' },
   { prefijo: '/panel', permiso: 'PANEL_VER' },
