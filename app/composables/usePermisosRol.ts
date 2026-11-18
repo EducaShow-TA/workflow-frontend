@@ -49,6 +49,13 @@ export const PERMISOS: Permiso[] = [
     sensible: false,
   },
   {
+    codigo: 'REPORTE_ASISTENCIA_VER',
+    modulo: 'Reportes',
+    nombre: 'Ver reporte de asistencia',
+    descripcion: 'Consultar y exportar inasistencias y tardanzas de alumnos según la autorización del backend.',
+    sensible: true,
+  },
+  {
     codigo: 'PANEL_VER',
     modulo: 'Panel',
     nombre: 'Ver panel',
@@ -185,7 +192,7 @@ export const PERMISOS: Permiso[] = [
 
 export const PERMISOS_POR_ROL: Record<RolUsuario, string[]> = {
   ADMINISTRADOR: PERMISOS.map((permiso) => permiso.codigo),
-  DOCENTE: ['PORTAL_DOCENTE_VER', 'LIBRETA_VER'],
+  DOCENTE: ['PORTAL_DOCENTE_VER', 'LIBRETA_VER', 'REPORTE_ASISTENCIA_VER'],
   ALUMNO: [],
   APODERADO: ['LIBRETA_VER'],
 }
@@ -194,9 +201,11 @@ export const REGLAS_RUTA: ReglaRuta[] = [
   { prefijo: '/calificaciones/libretas', permiso: 'LIBRETA_VER' },
   { prefijo: '/docente/libretas', permiso: 'LIBRETA_VER' },
   { prefijo: '/libretas', permiso: 'LIBRETA_VER' },
+  { prefijo: '/docente/reporte-asistencia', permiso: 'REPORTE_ASISTENCIA_VER' },
   { prefijo: '/docente', permiso: 'PORTAL_DOCENTE_VER' },
   { prefijo: '/finanzas', permiso: 'BOLETA_GESTIONAR' },
   { prefijo: '/reportes/boletas', permiso: 'REPORTE_COBRANZA_VER' },
+  { prefijo: '/reportes/asistencia', permiso: 'REPORTE_ASISTENCIA_VER' },
   { prefijo: '/panel', permiso: 'PANEL_VER' },
   { prefijo: '/estudiantes', permiso: 'ESTUDIANTE_VER' },
   { prefijo: '/estudiantes/nuevo', permiso: 'ESTUDIANTE_REGISTRAR' },

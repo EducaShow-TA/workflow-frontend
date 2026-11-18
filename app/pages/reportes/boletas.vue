@@ -149,6 +149,7 @@ onMounted(async () => {
       <h1>Boletas pendientes y en mora</h1>
       <p>Consulta la deuda por estudiante y apoderado para dar seguimiento a la cobranza del colegio.</p>
     </header>
+    <PestaniasReportes />
 
     <section class="tarjeta" aria-labelledby="titulo-filtros">
       <h2 id="titulo-filtros">Filtros del reporte</h2>
