@@ -5,11 +5,9 @@ const enlaces = [
   { nombre: 'Panel', destino: '/familia', icono: '/icons/menu-panel.svg' },
   { nombre: 'Progreso académico', destino: '/libretas', icono: '/icons/menu-calificaciones.svg' },
   { nombre: 'Asistencia', destino: '/familia/asistencia', icono: '/icons/menu-estudiantes.svg' },
+  { nombre: 'Pagos', destino: '/familia/pagos', icono: '/icons/menu-finanzas.svg' },
 ]
-const proximos = [
-  { nombre: 'Pagos', icono: '/icons/menu-finanzas.svg' },
-  { nombre: 'Horario', icono: '/icons/menu-horarios.svg' },
-]
+const proximos = [{ nombre: 'Horario', icono: '/icons/menu-horarios.svg' }]
 
 function activo(destino: string): boolean {
   return destino === '/familia' ? ruta.path === destino : ruta.path.startsWith(destino)

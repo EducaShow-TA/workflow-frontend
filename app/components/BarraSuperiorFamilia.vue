@@ -8,6 +8,7 @@ const perfilAbierto = ref(false)
 const titulos: Record<string, string> = {
   '/familia': 'Panel',
   '/familia/asistencia': 'Asistencia',
+  '/familia/pagos': 'Pagos',
   '/libretas': 'Progreso académico',
 }
 const titulo = computed(() => titulos[ruta.path] ?? 'Portal del apoderado')
