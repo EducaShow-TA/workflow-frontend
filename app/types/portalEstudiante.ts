@@ -3,6 +3,20 @@ import type { EstadoAsistenciaHijo, HijoVinculado, RegistroAsistencia } from '~/
 /** Alumno autenticado y sus periodos con matrícula confirmada (API /api/v1/estudiantes/mi-ficha). */
 export type FichaEstudiante = HijoVinculado
 
+/** Bloque semanal de /api/v1/estudiantes/mi-horario. */
+export interface HorarioEstudiante {
+  id: number
+  dia: 'MONDAY' | 'TUESDAY' | 'WEDNESDAY' | 'THURSDAY' | 'FRIDAY'
+  horaInicio: string
+  horaFin: string
+  areaCodigo: string
+  areaNombre: string
+  docenteNombre: string
+  gradoNumero: number
+  seccionCodigo: string
+  aulaCodigo: string
+}
+
 export type EstadoClaseEstudiante = EstadoAsistenciaHijo | 'PENDIENTE_MARCAJE'
 
 /** Clase del historial del alumno; puede seguir sin marcar. */

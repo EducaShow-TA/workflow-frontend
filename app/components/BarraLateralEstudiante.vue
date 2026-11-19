@@ -3,10 +3,10 @@ const ruta = useRoute()
 
 const enlaces = [
   { nombre: 'Panel', destino: '/estudiante', icono: '/icons/menu-panel.svg' },
+  { nombre: 'Horario', destino: '/estudiante/horario', icono: '/icons/menu-horarios.svg' },
   { nombre: 'Asistencia', destino: '/estudiante/asistencia', icono: '/icons/menu-estudiantes.svg' },
 ]
 const proximos = [
-  { nombre: 'Horario', icono: '/icons/menu-horarios.svg' },
   { nombre: 'Calificaciones', icono: '/icons/menu-calificaciones.svg' },
 ]
 

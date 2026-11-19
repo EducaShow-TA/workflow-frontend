@@ -7,6 +7,7 @@ const autenticacion = useAutenticacionStore()
 const perfilAbierto = ref(false)
 const titulos: Record<string, string> = {
   '/estudiante': 'Panel',
+  '/estudiante/horario': 'Mi horario',
   '/estudiante/asistencia': 'Asistencia',
 }
 const titulo = computed(() => titulos[ruta.path] ?? 'Portal del estudiante')

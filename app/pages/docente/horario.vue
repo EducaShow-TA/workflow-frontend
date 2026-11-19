@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import type { BloqueHorarioDocente } from '~/types/horarioDocente'
 import { useApi } from '~/composables/useApi'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
@@ -52,12 +52,38 @@ async function cargar(): Promise<void> {
     cargando.value = false
   }
 }
+
+function exportarAgenda(): void {
+  vista.value = 'SEMANA'
+  nextTick(() => window.print())
+}
+
 watch(anio, () => void cargar())
 onMounted(cargar)
 </script>
 
 <template>
   <main class="docente-vista horario">
+    <header class="agenda-exportacion">
+      <div class="agenda-exportacion__marca">
+        <img src="/icons/logo.svg" alt="" />
+        <span>EducaShow <small>Gestión académica</small></span>
+      </div>
+      <div class="agenda-exportacion__titulo">
+        <p>Agenda académica docente</p>
+        <h1>Horario semanal de clases</h1>
+      </div>
+      <div class="agenda-exportacion__periodo">
+        <span>Año escolar</span>
+        <strong>{{ anio }}</strong>
+        <small>Generado el {{ new Intl.DateTimeFormat('es-PE', { dateStyle: 'long' }).format(new Date()) }}</small>
+      </div>
+      <div class="agenda-exportacion__resumen">
+        <span><strong>{{ sesiones.length }}</strong> bloques semanales</span>
+        <span><strong>{{ cantidadSecciones }}</strong> secciones</span>
+        <span><strong>{{ cantidadAsignaturas }}</strong> asignaturas</span>
+      </div>
+    </header>
     <header class="docente-titulo">
       <div>
         <span class="docente-sobrelinea">Organización académica</span>
@@ -138,6 +164,9 @@ onMounted(cargar)
             Hoy
           </button>
         </div>
+        <button type="button" class="docente-boton docente-boton--secundario" @click="exportarAgenda">
+          Exportar
+        </button>
       </div>
       <p v-if="cargando" role="status">Consultando horario…</p>
       <p v-else-if="!sesiones.length" class="horario-dia-vacio">
@@ -194,6 +223,9 @@ onMounted(cargar)
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+.agenda-exportacion {
+  display: none;
 }
 .horario-informacion {
   padding: 20px 24px;
@@ -545,6 +577,198 @@ onMounted(cargar)
   }
   .horario-indicador {
     min-height: 92px;
+  }
+}
+
+@media print {
+  @page {
+    size: landscape;
+    margin: 12mm;
+  }
+
+  :global(body) {
+    background: #fff !important;
+  }
+
+  :global(.docente-lateral),
+  :global(.docente-superior) {
+    display: none !important;
+  }
+
+  :global(.portal-docente),
+  :global(.portal-docente__contenido) {
+    display: block !important;
+    min-height: 0 !important;
+  }
+
+  :global(.portal-docente__pagina) {
+    padding: 0 !important;
+  }
+
+  .horario {
+    display: block;
+    padding: 0;
+  }
+
+  .agenda-exportacion {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 14px 24px;
+    align-items: center;
+    margin-bottom: 18px;
+    padding: 0 0 14px;
+    border-bottom: 2px solid #1e3a8a;
+    color: #172554;
+  }
+
+  .agenda-exportacion__marca {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 14px;
+    font-weight: 800;
+  }
+
+  .agenda-exportacion__marca img {
+    width: 32px;
+    height: 32px;
+  }
+
+  .agenda-exportacion__marca small,
+  .agenda-exportacion__periodo span,
+  .agenda-exportacion__periodo small {
+    display: block;
+    color: #64748b;
+    font-size: 9px;
+    font-weight: 400;
+  }
+
+  .agenda-exportacion__titulo {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .agenda-exportacion__titulo p {
+    margin: 0 0 3px;
+    color: #475569;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+  }
+
+  .agenda-exportacion__titulo h1 {
+    margin: 0;
+    font-size: 21px;
+  }
+
+  .agenda-exportacion__periodo {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    text-align: right;
+  }
+
+  .agenda-exportacion__periodo strong {
+    display: block;
+    margin: 2px 0 5px;
+    font-size: 22px;
+  }
+
+  .agenda-exportacion__resumen {
+    display: flex;
+    grid-column: 1 / -1;
+    gap: 18px;
+    padding: 8px 11px;
+    border-radius: 6px;
+    background: #eff6ff;
+    color: #1e3a8a;
+    font-size: 10px;
+  }
+
+  .agenda-exportacion__resumen strong {
+    font-size: 12px;
+  }
+
+  .horario > :not(.horario-principal):not(.agenda-exportacion) {
+    display: none !important;
+  }
+
+  .horario-principal {
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .horario-principal__cabecera .docente-controles,
+  .horario-principal__cabecera > button,
+  .horario-principal__pie {
+    display: none !important;
+  }
+
+  .horario-semana {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 7px;
+  }
+
+  .horario-dia {
+    padding: 8px;
+    border: 1px solid #cbd5e1;
+    border-radius: 7px;
+    background: #fff;
+  }
+
+  .horario-dia h3 {
+    margin: 0 0 8px;
+    padding: 0 0 6px;
+    border-bottom: 2px solid #2563eb;
+    color: #1e3a8a;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+
+  .horario-dia-lista__fila,
+  .horario-dia-lista__contenido {
+    break-inside: avoid;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .horario-dia-lista__fila {
+    grid-template-columns: 43px minmax(0, 1fr);
+    gap: 5px;
+    margin-bottom: 7px;
+  }
+
+  .horario-dia-lista__horas {
+    font-size: 8px;
+  }
+
+  .horario-dia-lista__contenido {
+    padding: 6px;
+    border-left-width: 3px;
+    border-radius: 4px;
+  }
+
+  .horario-dia-lista__contenido h4,
+  .horario-dia-lista__contenido h3 {
+    margin: 0;
+    font-size: 9px;
+  }
+
+  .horario-dia-lista__contenido p {
+    margin: 4px 0 2px;
+    font-size: 8px;
+  }
+
+  .horario-dia-lista__contenido small {
+    font-size: 7px;
+  }
+
+  .horario-dia-vacio {
+    padding: 8px 3px;
+    color: #64748b;
+    font-size: 8px;
   }
 }
 </style>

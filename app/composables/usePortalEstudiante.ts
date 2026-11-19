@@ -6,6 +6,7 @@ import type {
   ClaseEstudiante,
   EstadoClaseEstudiante,
   FichaEstudiante,
+  HorarioEstudiante,
   IncidenciaEstudiante,
 } from '~/types/portalEstudiante'
 
@@ -215,11 +216,15 @@ export function usePortalEstudiante() {
     return solicitar<FichaEstudiante>('/api/v1/estudiantes/mi-ficha')
   }
 
+  function consultarHorario(anio: number): Promise<HorarioEstudiante[]> {
+    return solicitar<HorarioEstudiante[]>(`/api/v1/estudiantes/mi-horario?anio=${anio}`)
+  }
+
   function consultarClases(estudianteId: number, desde: string, hasta: string): Promise<ClaseEstudiante[]> {
     return solicitar<ClaseEstudiante[]>(
       `/api/v1/asistencias-estudiantes/${estudianteId}/historial?desde=${desde}&hasta=${hasta}`,
     )
   }
 
-  return { obtenerFicha, consultarClases }
+  return { obtenerFicha, consultarClases, consultarHorario }
 }
