@@ -91,8 +91,7 @@ function moverEntrePestanas(evento: KeyboardEvent): void {
       </div>
 
       <p v-if="modulos.length === 0" class="sin-permisos">
-        Este rol todavía no tiene permisos en el sistema. Sus módulos (asistencia, calificaciones y pagos) llegarán en
-        los sprints 2 y 3.
+        Este rol no tiene permisos asignados. Solicita al administrador del sistema que revise su configuración.
       </p>
 
       <div v-else class="cuadricula-modulos">

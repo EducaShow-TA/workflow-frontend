@@ -20,6 +20,21 @@ const vista = ref<'SEMANA' | 'HOY'>('SEMANA')
 const sesiones = ref<BloqueHorarioDocente[]>([])
 const cargando = ref(false)
 const error = ref('')
+const guardando = ref(false)
+const editorAbierto = ref(false)
+const sesionEditadaId = ref<number | null>(null)
+const formulario = ref({ horarioId: 0, bloqueId: 0, dia: 'MONDAY', areaCodigo: '', aulaId: 0 })
+const bloquesDisponibles = computed(() => {
+  const porId = new Map(
+    sesiones.value
+      .filter((item) => item.horarioId === formulario.value.horarioId)
+      .map((item) => [item.bloqueId, item]),
+  )
+  return [...porId.values()].sort((a, b) => a.horaInicio.localeCompare(b.horaInicio))
+})
+const areasDisponibles = computed(() => [...new Map(sesiones.value.map((item) => [item.areaCodigo, item.areaNombre])).entries()])
+const aulasDisponibles = computed(() => [...new Map(sesiones.value.map((item) => [item.aulaId, item.aulaCodigo])).entries()])
+const horariosDisponibles = computed(() => [...new Map(sesiones.value.map((item) => [item.horarioId, descripcion(item)])).entries()])
 const hoy = new Date().getDay()
 const hoyCodigo = hoy >= 1 && hoy <= 5 ? DIAS[hoy - 1]?.codigo : null
 const nombreHoy = hoyCodigo ? DIAS.find((dia) => dia.codigo === hoyCodigo)?.nombre : ''
@@ -58,6 +73,61 @@ function exportarAgenda(): void {
   nextTick(() => window.print())
 }
 
+function abrirEditor(sesion?: BloqueHorarioDocente): void {
+  sesionEditadaId.value = sesion?.id ?? null
+  formulario.value = sesion
+    ? { horarioId: sesion.horarioId, bloqueId: sesion.bloqueId, dia: sesion.dia, areaCodigo: sesion.areaCodigo, aulaId: sesion.aulaId }
+    : {
+        horarioId: horariosDisponibles.value[0]?.[0] ?? 0,
+        bloqueId: bloquesDisponibles.value[0]?.bloqueId ?? 0,
+        dia: 'MONDAY',
+        areaCodigo: areasDisponibles.value[0]?.[0] ?? '',
+        aulaId: aulasDisponibles.value[0]?.[0] ?? 0,
+      }
+  editorAbierto.value = true
+}
+
+function ajustarBloque(): void {
+  if (!bloquesDisponibles.value.some((bloque) => bloque.bloqueId === formulario.value.bloqueId)) {
+    formulario.value.bloqueId = bloquesDisponibles.value[0]?.bloqueId ?? 0
+  }
+}
+
+async function guardarSesion(): Promise<void> {
+  guardando.value = true
+  error.value = ''
+  try {
+    const cuerpo = {
+      bloqueId: formulario.value.bloqueId,
+      dia: formulario.value.dia,
+      areaCodigo: formulario.value.areaCodigo,
+      aulaId: formulario.value.aulaId,
+    }
+    if (sesionEditadaId.value) {
+      await api.solicitar(`/api/v1/docentes/mi-horario/sesiones/${sesionEditadaId.value}`, { metodo: 'PUT', cuerpo })
+    } else {
+      await api.solicitar(`/api/v1/docentes/mi-horario/${formulario.value.horarioId}/sesiones`, { metodo: 'POST', cuerpo })
+    }
+    editorAbierto.value = false
+    await cargar()
+  } catch (fallo: unknown) {
+    error.value = obtenerMensajeError(fallo, 'No se pudo guardar la sesión del horario.')
+  } finally {
+    guardando.value = false
+  }
+}
+
+async function eliminarSesion(sesion: BloqueHorarioDocente): Promise<void> {
+  if (!window.confirm(`¿Eliminar ${sesion.areaNombre} del horario de ${descripcion(sesion)}?`)) return
+  error.value = ''
+  try {
+    await api.solicitar(`/api/v1/docentes/mi-horario/sesiones/${sesion.id}`, { metodo: 'DELETE' })
+    await cargar()
+  } catch (fallo: unknown) {
+    error.value = obtenerMensajeError(fallo, 'No se pudo eliminar la sesión del horario.')
+  }
+}
+
 watch(anio, () => void cargar())
 onMounted(cargar)
 </script>
@@ -88,7 +158,7 @@ onMounted(cargar)
       <div>
         <span class="docente-sobrelinea">Organización académica</span>
         <h1>Mi horario de clases</h1>
-        <p>Consulta tus asignaturas, secciones, aulas y bloques asignados por administración.</p>
+        <p>Consulta y gestiona tus bloques, asignaturas, secciones y aulas asignadas.</p>
       </div>
       <label class="selector-anio"
         >Año escolar
@@ -105,11 +175,10 @@ onMounted(cargar)
         <span class="horario-etiqueta horario-etiqueta--demo">Sincronizado con el servidor</span>
       </div>
       <p>
-        Solo se muestran bloques asignados a tu cuenta. Si administración modifica la grilla, vuelve a actualizar esta
-        vista.
+        Puedes agregar, modificar o retirar tus sesiones. Las validaciones de disponibilidad y cruces se aplican al guardar.
       </p>
       <div class="horario-informacion__puntos">
-        <span>Horario consolidado de todas tus secciones</span><span>Área, grado, sección y aula en cada bloque</span
+        <span>Horario consolidado de todas tus secciones</span><span>Gestión de tus bloques asignados</span
         ><span>Consulta semanal o del día actual</span>
       </div>
     </section>
@@ -164,9 +233,12 @@ onMounted(cargar)
             Hoy
           </button>
         </div>
-        <button type="button" class="docente-boton docente-boton--secundario" @click="exportarAgenda">
-          Exportar
-        </button>
+        <div class="docente-controles">
+          <button type="button" class="docente-boton docente-boton--secundario" @click="abrirEditor()" :disabled="!sesiones.length">
+            Agregar bloque
+          </button>
+          <button type="button" class="docente-boton docente-boton--secundario" @click="exportarAgenda">Exportar</button>
+        </div>
       </div>
       <p v-if="cargando" role="status">Consultando horario…</p>
       <p v-else-if="!sesiones.length" class="horario-dia-vacio">
@@ -185,6 +257,10 @@ onMounted(cargar)
               <h4>{{ bloque.areaNombre }}</h4>
               <p>{{ descripcion(bloque) }}</p>
               <small>Aula {{ bloque.aulaCodigo }}</small>
+              <div class="horario-acciones">
+                <button type="button" @click="abrirEditor(bloque)">Modificar</button>
+                <button type="button" @click="eliminarSesion(bloque)">Eliminar</button>
+              </div>
             </div>
           </article>
         </section>
@@ -205,6 +281,10 @@ onMounted(cargar)
             <h3>{{ bloque.areaNombre }}</h3>
             <p>{{ descripcion(bloque) }}</p>
             <small>Aula {{ bloque.aulaCodigo }}</small>
+            <div class="horario-acciones">
+              <button type="button" @click="abrirEditor(bloque)">Modificar</button>
+              <button type="button" @click="eliminarSesion(bloque)">Eliminar</button>
+            </div>
           </div>
         </article>
       </div>
@@ -215,6 +295,41 @@ onMounted(cargar)
         </button>
       </div>
     </section>
+    <div v-if="editorAbierto" class="horario-editor-fondo" role="presentation" @click.self="editorAbierto = false">
+      <form class="horario-editor" aria-labelledby="horario-editor-titulo" @submit.prevent="guardarSesion">
+        <h2 id="horario-editor-titulo">{{ sesionEditadaId ? 'Modificar bloque' : 'Agregar bloque' }}</h2>
+        <label v-if="!sesionEditadaId">Sección
+          <select v-model.number="formulario.horarioId" required @change="ajustarBloque">
+            <option v-for="[id, nombre] in horariosDisponibles" :key="id" :value="id">{{ nombre }}</option>
+          </select>
+        </label>
+        <label>Bloque horario
+          <select v-model.number="formulario.bloqueId" required>
+            <option v-for="bloque in bloquesDisponibles" :key="bloque.bloqueId" :value="bloque.bloqueId">{{ hora(bloque.horaInicio) }}–{{ hora(bloque.horaFin) }}</option>
+          </select>
+        </label>
+        <label>Día
+          <select v-model="formulario.dia" required>
+            <option v-for="dia in DIAS" :key="dia.codigo" :value="dia.codigo">{{ dia.nombre }}</option>
+          </select>
+        </label>
+        <label>Área
+          <select v-model="formulario.areaCodigo" required>
+            <option v-for="[codigo, nombre] in areasDisponibles" :key="codigo" :value="codigo">{{ nombre }}</option>
+          </select>
+        </label>
+        <label>Aula
+          <select v-model.number="formulario.aulaId" required>
+            <option v-for="[id, codigo] in aulasDisponibles" :key="id" :value="id">{{ codigo }}</option>
+          </select>
+        </label>
+        <p v-if="!sesiones.length">Primero administración debe publicar un horario de sección para poder agregar bloques.</p>
+        <div class="horario-editor__acciones">
+          <button type="button" class="docente-boton docente-boton--secundario" @click="editorAbierto = false">Cancelar</button>
+          <button type="submit" class="docente-boton" :disabled="guardando || !formulario.horarioId">{{ guardando ? 'Guardando…' : 'Guardar' }}</button>
+        </div>
+      </form>
+    </div>
   </main>
 </template>
 
@@ -224,6 +339,41 @@ onMounted(cargar)
   flex-direction: column;
   gap: 20px;
 }
+.horario-acciones {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.horario-acciones button {
+  padding: 5px 9px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  color: #1e40af;
+  background: #fff;
+  cursor: pointer;
+}
+.horario-editor-fondo {
+  position: fixed;
+  z-index: 50;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: #0f172a88;
+}
+.horario-editor {
+  display: grid;
+  width: min(100%, 440px);
+  gap: 14px;
+  padding: 24px;
+  border-radius: 14px;
+  background: white;
+  box-shadow: 0 20px 60px #0f172a40;
+}
+.horario-editor h2 { margin: 0; }
+.horario-editor label { display: grid; gap: 6px; color: #334155; font-size: 13px; }
+.horario-editor select { width: 100%; padding: 9px; border: 1px solid #cbd5e1; border-radius: 7px; }
+.horario-editor__acciones { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
 .agenda-exportacion {
   display: none;
 }

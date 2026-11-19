@@ -43,7 +43,7 @@ function activo(destino: string): boolean {
 
     <div class="docente-lateral__pie">
       <span>Gestión académica</span>
-      <small>Versión de interfaz · Sprint 2</small>
+      <small>Enseñanza y seguimiento</small>
     </div>
   </aside>
 </template>
