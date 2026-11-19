@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useAutenticacionStore } from '~/stores/autenticacion'
 import { INTENTOS_ANTES_DE_BLOQUEO, MINUTOS_BLOQUEO } from '~/composables/useRecuperacionContrasena'
+import { obtenerRutaInicio } from '~/composables/usePermisosRol'
 definePageMeta({
   layout: 'autenticacion',
 })
@@ -59,13 +60,7 @@ async function procesarInicioSesion(): Promise<void> {
     return
   }
 
-  await navigateTo(
-    autenticacion.usuario?.rol === 'DOCENTE'
-      ? '/docente'
-      : autenticacion.usuario?.rol === 'APODERADO'
-        ? '/libretas'
-        : '/panel',
-  )
+  await navigateTo(obtenerRutaInicio(autenticacion.usuario?.rol ?? 'ADMINISTRADOR'))
 }
 
 function irARecuperacion(): void {

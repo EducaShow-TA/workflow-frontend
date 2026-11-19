@@ -97,6 +97,7 @@ onMounted(async () => {
 
 <template>
   <main class="pagina-finanzas">
+    <NavegacionFinanzas />
     <header class="encabezado-finanzas">
       <div>
         <p class="ruta">Finanzas / Pensiones</p>

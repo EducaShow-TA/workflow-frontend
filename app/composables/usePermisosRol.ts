@@ -15,11 +15,25 @@ const NOMBRES_ROL: Record<RolUsuario, string> = {
 const DESCRIPCIONES_ROL: Record<RolUsuario, string> = {
   ADMINISTRADOR: 'Gestiona la matrícula, la estructura académica y las cuentas de usuario del colegio.',
   DOCENTE: 'Registrará asistencia y calificaciones de sus secciones (sprints 2 y 3).',
-  ALUMNO: 'Consultará su horario, asistencia y calificaciones (sprints 2 y 3).',
+  ALUMNO: 'Consulta su panel y su asistencia; horario y calificaciones llegarán en próximos sprints.',
   APODERADO: 'Consultará las boletas, pagos y el avance de sus hijos (sprints 2 y 3).',
 }
 
 export const PERMISOS: Permiso[] = [
+  {
+    codigo: 'PORTAL_ESTUDIANTE_VER',
+    modulo: 'Portal del estudiante',
+    nombre: 'Ver su panel y su asistencia',
+    descripcion: 'Consultar su propio panel y su historial de asistencia clase por clase.',
+    sensible: false,
+  },
+  {
+    codigo: 'PORTAL_FAMILIA_VER',
+    modulo: 'Portal del apoderado',
+    nombre: 'Ver panel y asistencia de sus hijos',
+    descripcion: 'Consultar el panel y el historial de asistencia de los hijos vinculados a su cuenta.',
+    sensible: false,
+  },
   {
     codigo: 'LIBRETA_VER',
     modulo: 'Calificaciones',
@@ -42,6 +56,14 @@ export const PERMISOS: Permiso[] = [
     sensible: true,
   },
   {
+    codigo: 'AUDITORIA_FINANZAS_VER',
+    modulo: 'Finanzas',
+    nombre: 'Ver auditoría de transacciones y pagos',
+    descripcion:
+      'Consultar quién generó compromisos y boletas, registró pagos o marcó moras, con valores anteriores y nuevos.',
+    sensible: true,
+  },
+  {
     codigo: 'REPORTE_COBRANZA_VER',
     modulo: 'Reportes',
     nombre: 'Ver reporte de cobranza',
@@ -54,6 +76,13 @@ export const PERMISOS: Permiso[] = [
     nombre: 'Ver cuadro de mérito',
     descripcion: 'Consultar y descargar el ranking académico de una sección con actas cerradas.',
     sensible: false,
+  },
+  {
+    codigo: 'REPORTE_ASISTENCIA_VER',
+    modulo: 'Reportes',
+    nombre: 'Ver reporte de asistencia',
+    descripcion: 'Consultar y exportar inasistencias y tardanzas de alumnos según la autorización del backend.',
+    sensible: true,
   },
   {
     codigo: 'PANEL_VER',
@@ -192,19 +221,24 @@ export const PERMISOS: Permiso[] = [
 
 export const PERMISOS_POR_ROL: Record<RolUsuario, string[]> = {
   ADMINISTRADOR: PERMISOS.map((permiso) => permiso.codigo),
-  DOCENTE: ['PORTAL_DOCENTE_VER', 'LIBRETA_VER'],
-  ALUMNO: [],
-  APODERADO: ['LIBRETA_VER'],
+  DOCENTE: ['PORTAL_DOCENTE_VER', 'LIBRETA_VER', 'REPORTE_ASISTENCIA_VER'],
+  ALUMNO: ['PORTAL_ESTUDIANTE_VER'],
+  APODERADO: ['PORTAL_FAMILIA_VER', 'LIBRETA_VER'],
 }
 
 export const REGLAS_RUTA: ReglaRuta[] = [
   { prefijo: '/calificaciones/libretas', permiso: 'LIBRETA_VER' },
   { prefijo: '/docente/libretas', permiso: 'LIBRETA_VER' },
   { prefijo: '/libretas', permiso: 'LIBRETA_VER' },
+  { prefijo: '/familia', permiso: 'PORTAL_FAMILIA_VER' },
+  { prefijo: '/estudiante', permiso: 'PORTAL_ESTUDIANTE_VER' },
+  { prefijo: '/docente/reporte-asistencia', permiso: 'REPORTE_ASISTENCIA_VER' },
   { prefijo: '/docente', permiso: 'PORTAL_DOCENTE_VER' },
   { prefijo: '/finanzas', permiso: 'BOLETA_GESTIONAR' },
+  { prefijo: '/finanzas/auditoria', permiso: 'AUDITORIA_FINANZAS_VER' },
   { prefijo: '/reportes/boletas', permiso: 'REPORTE_COBRANZA_VER' },
   { prefijo: '/reportes/cuadro-merito', permiso: 'REPORTE_CUADRO_MERITO_VER' },
+  { prefijo: '/reportes/asistencia', permiso: 'REPORTE_ASISTENCIA_VER' },
   { prefijo: '/panel', permiso: 'PANEL_VER' },
   { prefijo: '/estudiantes', permiso: 'ESTUDIANTE_VER' },
   { prefijo: '/estudiantes/nuevo', permiso: 'ESTUDIANTE_REGISTRAR' },
@@ -230,7 +264,12 @@ export const RUTAS_LIBRES = ['/', '/login', '/acceso-denegado']
 
 /** Pantalla de inicio de cada rol. */
 export function obtenerRutaInicio(rol: RolUsuario): string {
-  return rol === 'DOCENTE' ? '/docente' : rol === 'APODERADO' ? '/libretas' : '/panel'
+  const inicios: Partial<Record<RolUsuario, string>> = {
+    DOCENTE: '/docente',
+    APODERADO: '/familia',
+    ALUMNO: '/estudiante',
+  }
+  return inicios[rol] ?? '/panel'
 }
 
 export function obtenerNombreRol(rol: RolUsuario): string {

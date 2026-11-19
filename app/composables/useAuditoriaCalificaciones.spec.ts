@@ -14,6 +14,7 @@ const registro: RegistroAuditoriaCalificacion = {
   estudianteId: 1,
   competenciaCodigo: 'COMP-1',
   evaluacionId: null,
+  bimestre: null,
   notaAnterior: null,
   notaNueva: 'A',
   puntajeAnterior: null,

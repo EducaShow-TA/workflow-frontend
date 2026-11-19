@@ -116,6 +116,7 @@ function obtenerPeriodosDelAnhio(anhio: number): PeriodoAcademico[] {
 
 const periodosDelAnhio = computed(() => obtenerPeriodosDelAnhio(anhioActual.value))
 const anhioAbierto = computed(() => periodosDelAnhio.value.length > 0)
+const diasNoLectivosAbierto = ref(false)
 const resumenAnhio = computed(() => resumirAnhio(anhioActual.value, periodosDelAnhio.value, fechaHoy))
 const secciones = computed(() => convertirEnSecciones(periodosDelAnhio.value))
 
@@ -418,6 +419,10 @@ async function confirmarApertura(): Promise<void> {
             >Solo consulta: sus fechas ya no se pueden cambiar.</small
           >
         </p>
+
+        <BotonAccion v-if="anhioAbierto" variante="secundario" @click="diasNoLectivosAbierto = true">
+          Días no lectivos
+        </BotonAccion>
       </section>
 
       <section v-if="!anhioAbierto" class="anhio-sin-abrir" aria-labelledby="titulo-anhio-sin-abrir">
@@ -799,6 +804,12 @@ async function confirmarApertura(): Promise<void> {
         </BotonAccion>
       </template>
     </VentanaModal>
+
+    <ModalDiasNoLectivos
+      :abierta="diasNoLectivosAbierto"
+      :anhio="anhioActual"
+      @cerrar="diasNoLectivosAbierto = false"
+    />
   </main>
 </template>
 

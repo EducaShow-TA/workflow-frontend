@@ -6,6 +6,7 @@ export interface SolicitudCalificacion {
   periodoId: number
   matriculaId: number
   competenciaCodigo: string
+  bimestre: number
   nota: NotaCualitativa
   observacion: string
   evidenciaUrl: string | null
@@ -18,6 +19,7 @@ export interface Calificacion {
   estudianteId: number
   estudiante: string
   competenciaCodigo: string
+  bimestre: number | null
   nota: NotaCualitativa
   observacion: string | null
   evidenciaTipo: 'URL' | 'ARCHIVO'
@@ -57,6 +59,7 @@ export interface AlumnoClase {
 /** Resultado del análisis de riesgo académico para un área y periodo. */
 export interface RiesgoAcademico {
   periodoId: number
+  bimestre: number
   areaCodigo: string
   umbral: number
   totalAlumnos: number

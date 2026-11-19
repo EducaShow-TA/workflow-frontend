@@ -1,6 +1,7 @@
 export type EstadoEstudiante = 'REGISTRADO'
 
 export interface EstudianteListado {
+  estudianteId: number
   codigo: string
   nombres: string
   apellidos: string
