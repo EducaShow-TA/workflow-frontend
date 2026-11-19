@@ -60,6 +60,8 @@ export function describirAccionAuditoria(registro: RegistroAuditoriaCalificacion
   switch (registro.accion) {
     case 'REGISTRAR_O_ACTUALIZAR':
       return `${tipo} ${registro.notaAnterior === null ? 'registrada' : 'actualizada'}`
+    case 'RECTIFICAR':
+      return `Rectificación de la ${tipo.charAt(0).toLowerCase()}${tipo.slice(1)}`
     case 'RECALCULAR_REGLA':
       return 'Logro de la competencia recalculado por un cambio en la regla'
     case 'RECALCULAR_EVALUACION':

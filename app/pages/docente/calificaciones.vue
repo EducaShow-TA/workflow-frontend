@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import type { AlumnoClase, Calificacion, MiClase, NotaCualitativa, RiesgoAcademico } from '~/types/calificacion'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
 import { formatearFecha } from '~/composables/useFechas'
@@ -34,6 +34,10 @@ const aviso = ref('')
 
 const modalAbierto = ref(false)
 const alumnoEnEdicion = ref<AlumnoClase | null>(null)
+const rectificacionAbierta = ref(false)
+const historialAbierto = ref(false)
+const matriculaResaltada = ref<number | null>(null)
+let temporizadorResaltado: ReturnType<typeof setTimeout> | undefined
 
 const areas = computed(() => {
   const mapa = new Map<string, { codigo: string; nombre: string; secciones: number }>()
@@ -193,15 +197,27 @@ function alternarFiltro(valor: FiltroNota): void {
 function abrir(alumno: AlumnoClase): void {
   alumnoEnEdicion.value = alumno
   aviso.value = ''
-  modalAbierto.value = true
+  if (notaPorMatricula.value.has(alumno.matriculaId)) rectificacionAbierta.value = true
+  else modalAbierto.value = true
 }
 
-function calificarPendientes(): void {
-  const primero = pendientes.value[0]
-  if (primero) abrir(primero)
+function verHistorial(alumno: AlumnoClase): void {
+  alumnoEnEdicion.value = alumno
+  aviso.value = ''
+  historialAbierto.value = true
 }
 
-function alGuardar(calificacion: Calificacion, siguiente: boolean): void {
+async function rectificarDesdeHistorial(): Promise<void> {
+  historialAbierto.value = false
+  await nextTick()
+  rectificacionAbierta.value = true
+}
+
+function textoRectificada(cantidad: number): string {
+  return cantidad === 1 ? 'Rectificada · ver historial' : `Rectificada ${cantidad} veces · ver historial`
+}
+
+function actualizarNota(calificacion: Calificacion): void {
   const codigo = competenciaElegida.value
   const lista = (notasPorCompetencia.value[codigo] ?? []).filter(
     (nota) => nota.matriculaId !== calificacion.matriculaId,
@@ -216,6 +232,30 @@ function alGuardar(calificacion: Calificacion, siguiente: boolean): void {
         error.value = obtenerMensajeError(fallo, 'No se pudo actualizar el análisis de riesgo académico.')
       })
   }
+}
+
+function alRectificar(calificacion: Calificacion, notaAnterior: NotaCualitativa): void {
+  actualizarNota(calificacion)
+  const nombre = alumnoEnEdicion.value?.nombreCompleto ?? 'el alumno'
+  aviso.value =
+    notaAnterior === calificacion.nota
+      ? `Calificación de ${nombre} rectificada; se mantiene la nota ${calificacion.nota}.`
+      : `Nota de ${nombre} rectificada de ${notaAnterior} a ${calificacion.nota}.`
+  rectificacionAbierta.value = false
+  matriculaResaltada.value = calificacion.matriculaId
+  clearTimeout(temporizadorResaltado)
+  temporizadorResaltado = setTimeout(() => {
+    matriculaResaltada.value = null
+  }, 3000)
+}
+
+function calificarPendientes(): void {
+  const primero = pendientes.value[0]
+  if (primero) abrir(primero)
+}
+
+function alGuardar(calificacion: Calificacion, siguiente: boolean): void {
+  actualizarNota(calificacion)
   aviso.value = `Nota ${calificacion.nota} guardada para ${alumnoEnEdicion.value?.nombreCompleto ?? 'el alumno'}.`
 
   const proximo = siguiente ? pendientes.value[0] : undefined
@@ -237,6 +277,8 @@ async function descargar(calificacion: Calificacion): Promise<void> {
     error.value = obtenerMensajeError(fallo, 'No se pudo descargar la evidencia.')
   }
 }
+
+onBeforeUnmount(() => clearTimeout(temporizadorResaltado))
 
 onMounted(async () => {
   if (!esDocente.value) {
@@ -260,9 +302,9 @@ onMounted(async () => {
   <main class="docente-vista">
     <header class="docente-titulo">
       <div>
-        <span class="docente-sobrelinea">US-3.2 · US-3.8</span>
+        <span class="docente-sobrelinea">US-3.2 · US-3.6 · US-3.8</span>
         <h1>Calificaciones</h1>
-        <p>Elige tu clase y la competencia; registra la nota de cada alumno con su evidencia.</p>
+        <p>Elige tu clase y la competencia; registra o rectifica la nota de cada alumno con su evidencia.</p>
       </div>
       <span class="docente-insignia">Escala AD · A · B · C</span>
     </header>
@@ -434,7 +476,7 @@ onMounted(async () => {
                     <th scope="col">Alumno</th>
                     <th scope="col">Nota</th>
                     <th scope="col">Evidencia</th>
-                    <th scope="col">Registrada</th>
+                    <th scope="col">Última modificación</th>
                     <th scope="col"><span class="solo-lectores">Acción</span></th>
                   </tr>
                 </thead>
@@ -447,12 +489,23 @@ onMounted(async () => {
                   <tr
                     v-for="alumno in alumnosFiltrados"
                     :key="alumno.matriculaId"
-                    :class="{ 'fila-riesgo': enRiesgo.has(alumno.matriculaId) }"
+                    :class="{
+                      'fila-riesgo': enRiesgo.has(alumno.matriculaId),
+                      'fila-rectificada': matriculaResaltada === alumno.matriculaId,
+                    }"
                   >
                     <td class="numero">{{ alumnos.indexOf(alumno) + 1 }}</td>
                     <td>
                       <strong class="nombre">{{ alumno.nombreCompleto }}</strong>
                       <small class="dni">DNI {{ alumno.dni }}</small>
+                      <button
+                        v-if="(notaPorMatricula.get(alumno.matriculaId)?.rectificaciones ?? 0) > 0"
+                        type="button"
+                        class="ver-historial solo-movil"
+                        @click="verHistorial(alumno)"
+                      >
+                        {{ textoRectificada(notaPorMatricula.get(alumno.matriculaId)!.rectificaciones) }}
+                      </button>
                       <span v-if="enRiesgo.has(alumno.matriculaId)" class="marca-riesgo">
                         En riesgo · {{ riesgoPorMatricula.get(alumno.matriculaId)?.notasC ?? 0 }} C
                       </span>
@@ -483,6 +536,14 @@ onMounted(async () => {
                       </td>
                       <td class="fecha">
                         {{ formatearFecha(notaPorMatricula.get(alumno.matriculaId)!.fechaRegistro.slice(0, 10)) }}
+                        <button
+                          v-if="notaPorMatricula.get(alumno.matriculaId)!.rectificaciones > 0"
+                          type="button"
+                          class="ver-historial"
+                          @click="verHistorial(alumno)"
+                        >
+                          {{ textoRectificada(notaPorMatricula.get(alumno.matriculaId)!.rectificaciones) }}
+                        </button>
                       </td>
                     </template>
                     <template v-else>
@@ -491,7 +552,14 @@ onMounted(async () => {
                       <td class="tenue">—</td>
                     </template>
                     <td class="accion">
+                      <span
+                        v-if="notaPorMatricula.get(alumno.matriculaId)?.consolidada"
+                        class="tenue"
+                        title="La nota se calcula a partir de las evaluaciones parciales"
+                        >Calculada</span
+                      >
                       <button
+                        v-else
                         type="button"
                         :class="[
                           'docente-boton',
@@ -499,7 +567,7 @@ onMounted(async () => {
                         ]"
                         @click="abrir(alumno)"
                       >
-                        {{ notaPorMatricula.has(alumno.matriculaId) ? 'Editar' : 'Registrar' }}
+                        {{ notaPorMatricula.has(alumno.matriculaId) ? 'Rectificar' : 'Registrar' }}
                       </button>
                     </td>
                   </tr>
@@ -519,10 +587,34 @@ onMounted(async () => {
       :periodo-id="clase.periodoId"
       :bimestre="riesgoAcademico?.bimestre ?? 1"
       :competencia-codigo="competencia.codigo"
-      :actual="alumnoEnEdicion ? (notaPorMatricula.get(alumnoEnEdicion.matriculaId) ?? null) : null"
+      :actual="null"
       :hay-siguiente="haySiguiente"
       @cerrar="modalAbierto = false"
       @guardada="alGuardar"
+    />
+
+    <ModalRectificarCalificacion
+      v-if="clase && competencia"
+      :abierta="rectificacionAbierta"
+      :alumno="alumnoEnEdicion"
+      :contexto="contexto"
+      :periodo-id="clase.periodoId"
+      :bimestre="riesgoAcademico?.bimestre ?? 1"
+      :competencia-codigo="competencia.codigo"
+      :actual="alumnoEnEdicion ? (notaPorMatricula.get(alumnoEnEdicion.matriculaId) ?? null) : null"
+      @cerrar="rectificacionAbierta = false"
+      @guardada="alRectificar"
+    />
+
+    <ModalHistorialCalificacion
+      v-if="clase && competencia"
+      :abierta="historialAbierto"
+      :alumno="alumnoEnEdicion"
+      :contexto="contexto"
+      :bimestre="riesgoAcademico?.bimestre ?? 1"
+      :actual="alumnoEnEdicion ? (notaPorMatricula.get(alumnoEnEdicion.matriculaId) ?? null) : null"
+      @cerrar="historialAbierto = false"
+      @rectificar="rectificarDesdeHistorial"
     />
   </main>
 </template>
@@ -793,6 +885,41 @@ onMounted(async () => {
   box-shadow: inset 3px 0 0 #b91c1c;
 }
 
+.docente-tabla tr td {
+  transition: background-color 0.6s ease;
+}
+
+.fila-rectificada td {
+  background: #f0fdf4;
+}
+
+.fila-rectificada td:first-child {
+  box-shadow: inset 4px 0 0 #16a34a;
+}
+
+.ver-historial {
+  display: block;
+  margin-top: 3px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #1e40af;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.ver-historial:focus-visible {
+  outline: 2px solid #004ac6;
+  outline-offset: 2px;
+}
+
+.solo-movil {
+  display: none;
+}
+
 .marca-riesgo {
   display: inline-block;
   margin-top: 4px;
@@ -949,6 +1076,10 @@ onMounted(async () => {
 
   .docente-tabla :is(th, td):is(:nth-child(1), :nth-child(4), :nth-child(5)):not(.docente-tabla__vacia) {
     display: none;
+  }
+
+  .solo-movil {
+    display: block;
   }
 }
 </style>
