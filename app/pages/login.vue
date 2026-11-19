@@ -2,6 +2,7 @@
 import { obtenerRutaInicio } from '~/composables/usePermisosRol'
 import { useAutenticacionStore } from '~/stores/autenticacion'
 import { INTENTOS_ANTES_DE_BLOQUEO, MINUTOS_BLOQUEO } from '~/composables/useRecuperacionContrasena'
+
 definePageMeta({
   layout: 'autenticacion',
 })
@@ -60,7 +61,7 @@ async function procesarInicioSesion(): Promise<void> {
     return
   }
 
-  await navigateTo(autenticacion.usuario ? obtenerRutaInicio(autenticacion.usuario.rol) : '/panel')
+  await navigateTo(obtenerRutaInicio(autenticacion.usuario?.rol ?? 'ADMINISTRADOR'))
 }
 
 function irARecuperacion(): void {

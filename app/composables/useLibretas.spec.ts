@@ -31,9 +31,7 @@ describe('libretas US-3.3', () => {
     }
     solicitar.mockResolvedValueOnce(libreta)
     expect(await useLibretas().consultar(7, 12, 2)).toBe(libreta)
-    expect(solicitar).toHaveBeenCalledExactlyOnceWith(
-      '/api/v1/estudiantes/7/libreta?periodoId=12&bimestre=2'
-    )
+    expect(solicitar).toHaveBeenCalledExactlyOnceWith('/api/v1/estudiantes/7/libreta?periodoId=12&bimestre=2')
   })
 
   it('impide construir consultas con IDs vacíos, negativos, fraccionarios o no seguros', () => {
@@ -80,12 +78,16 @@ describe('libretas US-3.3', () => {
   })
 
   it('da acceso al apoderado sin habilitarle la gestión de calificaciones ni los catálogos administrativos', () => {
-    expect(obtenerRutaInicio('APODERADO')).toBe('/libretas')
+    expect(obtenerRutaInicio('APODERADO')).toBe('/familia')
+    expect(puedeAcceder('APODERADO', '/familia/asistencia')).toBe(true)
     expect(puedeAcceder('APODERADO', '/libretas')).toBe(true)
     expect(puedeAcceder('APODERADO', '/calificaciones')).toBe(false)
     expect(puedeAcceder('APODERADO', '/estudiantes')).toBe(false)
     expect(puedeAcceder('ADMINISTRADOR', '/calificaciones/libretas')).toBe(true)
     expect(puedeAcceder('DOCENTE', '/docente/libretas')).toBe(true)
     expect(puedeAcceder('ALUMNO', '/libretas')).toBe(false)
+    expect(obtenerRutaInicio('ALUMNO')).toBe('/estudiante')
+    expect(puedeAcceder('ALUMNO', '/estudiante/asistencia')).toBe(true)
+    expect(puedeAcceder('ALUMNO', '/estudiantes')).toBe(false)
   })
 })

@@ -12,6 +12,7 @@ import { obtenerNombreTurno, recortarHora } from '~/composables/usePlantillasHor
 
 definePageMeta({ middleware: 'autenticacion' })
 
+const ruta = useRoute()
 const api = useHorarioSeccion()
 const { listarAreas, listarDocentes } = useSesionesClase()
 const anhioActual = new Date().getFullYear()
@@ -87,6 +88,10 @@ async function cargarCatalogos(): Promise<void> {
     aulas.value = [...listaAulas].sort((a, b) => a.codigo.localeCompare(b.codigo, 'es'))
     areas.value = listaAreas
     docentes.value = listaDocentes
+    const anhioPedido = Number(ruta.query.anhio)
+    if (ANHIOS.includes(anhioPedido)) anhio.value = anhioPedido
+    const seccionPedida = Number(ruta.query.seccionId)
+    if (secciones.value.some((item) => item.id === seccionPedida)) seccionId.value = seccionPedida
     if (!seccionId.value && secciones.value[0]) seccionId.value = secciones.value[0].id
   } catch (fallo: unknown) {
     error.value = obtenerMensajeError(fallo, 'No se pudieron cargar secciones, aulas y docentes.')

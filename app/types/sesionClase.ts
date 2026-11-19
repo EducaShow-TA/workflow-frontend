@@ -66,9 +66,9 @@ export interface SolicitudSesionClase {
 
 export type ErroresSesionClase = Partial<Record<keyof SolicitudSesionClase, string>>
 
+/** id = docentes.id: es el docenteId que esperan horarios, sesiones de clase y asistencia docente. */
 export interface DocenteOpcion {
   id: number
-  cuentaId: number
   username: string
   nombreCompleto: string
   dni: string
@@ -85,3 +85,23 @@ export interface AreaOpcion {
  * por abrir o cerrada sin registro.
  */
 export type SituacionSesion = 'REGISTRADA' | 'ABIERTA' | 'POR_ABRIR' | 'CERRADA'
+
+/** Resultado de POST /api/v1/sesiones-clase/generar para un periodo (grado y sección de un año). */
+export interface GeneracionSesiones {
+  periodoId: number
+  creadas: number
+  canceladasPorCalendario: number
+  omitidasNoLectivas: number
+}
+
+/** Día sin clases de todo el colegio (API /api/v1/calendario-escolar/dias-no-lectivos). */
+export interface DiaNoLectivo {
+  id: number
+  fecha: string
+  descripcion: string
+}
+
+export interface SolicitudDiaNoLectivo {
+  fecha: string
+  descripcion: string
+}

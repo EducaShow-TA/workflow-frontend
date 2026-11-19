@@ -10,9 +10,9 @@ export function useCalificaciones() {
   const autenticacion = useAutenticacionStore()
   const configuracion = useRuntimeConfig()
 
-  function listar(periodoId: number, competenciaCodigo: string): Promise<Calificacion[]> {
+  function listar(periodoId: number, competenciaCodigo: string, bimestre: number): Promise<Calificacion[]> {
     return solicitar<Calificacion[]>(
-      `/api/v1/seguimiento/competencias/${encodeURIComponent(competenciaCodigo)}?periodoId=${periodoId}`,
+      `/api/v1/seguimiento/competencias/${encodeURIComponent(competenciaCodigo)}?periodoId=${periodoId}&bimestre=${bimestre}`,
     )
   }
 

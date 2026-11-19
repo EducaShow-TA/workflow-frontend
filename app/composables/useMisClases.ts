@@ -31,8 +31,8 @@ export function useMisClases() {
     return solicitar<AlumnoClase[]>(`${RUTA}/${periodoId}/alumnos`)
   }
 
-  function obtenerRiesgo(periodoId: number, areaCodigo: string, umbral: number): Promise<RiesgoAcademico> {
-    const parametros = new URLSearchParams({ areaCodigo, umbral: String(umbral) })
+  function obtenerRiesgo(periodoId: number, areaCodigo: string): Promise<RiesgoAcademico> {
+    const parametros = new URLSearchParams({ areaCodigo })
     return solicitar<RiesgoAcademico>(`${RUTA}/${periodoId}/riesgo-academico?${parametros}`)
   }
 
