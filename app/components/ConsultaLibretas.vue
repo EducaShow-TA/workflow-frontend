@@ -212,12 +212,20 @@ onMounted(cargarCatalogos)
 </script>
 
 <template>
-  <main class="libretas">
-    <NavegacionCalificaciones v-if="esAdministrador || esDocente" :docente="esDocente" />
-    <header>
+  <main class="libretas" :class="{ 'libretas--docente': esDocente }">
+    <NavegacionCalificaciones v-if="esAdministrador" />
+    <header v-if="esDocente" class="docente-titulo">
+      <div>
+        <span class="docente-sobrelinea">Seguimiento académico</span>
+        <h1>Libretas e informes de progreso</h1>
+        <p>Consulta los avances por área y competencia y descarga el documento generado por el colegio.</p>
+      </div>
+    </header>
+    <header v-else>
       <h1>Libretas e informes de progreso</h1>
       <p>Consulta los avances por área y competencia y descarga el documento generado por el colegio.</p>
     </header>
+    <NavegacionCalificaciones v-if="esDocente" :docente="true" />
     <section class="tarjeta" aria-labelledby="titulo-consulta">
       <h2 id="titulo-consulta">Consultar libreta</h2>
       <p v-if="esDocente" class="ayuda">
@@ -393,6 +401,9 @@ onMounted(cargarCatalogos)
   margin: auto;
   padding: 32px;
   color: #172b42;
+}
+.libretas--docente {
+  padding: 0;
 }
 header {
   margin-bottom: 24px;
