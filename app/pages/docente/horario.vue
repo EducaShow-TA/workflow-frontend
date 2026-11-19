@@ -60,7 +60,7 @@ onMounted(cargar)
   <main class="docente-vista horario">
     <header class="docente-titulo">
       <div>
-        <span class="docente-sobrelinea">US-4.6 · Organización académica</span>
+        <span class="docente-sobrelinea">Organización académica</span>
         <h1>Mi horario de clases</h1>
         <p>Consulta tus asignaturas, secciones, aulas y bloques asignados por administración.</p>
       </div>

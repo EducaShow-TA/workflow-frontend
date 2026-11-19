@@ -225,7 +225,7 @@ onMounted(cargarCatalogos)
 
     <section v-else-if="sinHorario" class="tarjeta crear" aria-labelledby="titulo-crear">
       <h2 id="titulo-crear">{{ seccion ? nombreSeccion(seccion) : 'La sección' }} aún no tiene horario {{ anhio }}</h2>
-      <p>Elige la plantilla de bloques (US-4.3) que usará la grilla.</p>
+      <p>Elige la plantilla de bloques horarios que usará la grilla.</p>
       <div class="fila-crear">
         <select v-model.number="plantillaId" aria-label="Plantilla de bloques">
           <option v-if="!plantillasActivas.length" value="">No hay plantillas activas</option>
@@ -289,7 +289,7 @@ onMounted(cargarCatalogos)
 
     <section class="tarjeta" aria-labelledby="titulo-aulas">
       <h2 id="titulo-aulas">Aulas y aforo</h2>
-      <p class="ayuda">El aforo se compara con los alumnos matriculados de la sección al asignar una clase (US-4.4).</p>
+      <p class="ayuda">Al asignar una clase, el aforo del aula debe cubrir a todos los alumnos matriculados en la sección.</p>
       <ul v-if="aulas.length" class="aulas">
         <li v-for="aula in aulas" :key="aula.id" :class="{ inactiva: !aula.activo }">
           <strong>{{ aula.codigo }}</strong>

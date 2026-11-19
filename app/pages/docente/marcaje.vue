@@ -67,7 +67,7 @@ onMounted(cargar)
   <main class="docente-vista marcaje">
     <header class="docente-titulo">
       <div>
-        <span class="docente-sobrelinea">US-2.3 · Control de asistencia</span>
+        <span class="docente-sobrelinea">Asistencia del personal</span>
         <h1>Mi marcaje</h1>
         <p>Registra tu entrada y salida. El servidor valida el horario y conserva la hora oficial.</p>
       </div>

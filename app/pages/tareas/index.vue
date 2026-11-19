@@ -189,7 +189,7 @@ onMounted(cargarCatalogos)
         <h1>Gestión de tareas</h1>
         <p>Registra actividades y controla las entregas de cada sección.</p>
       </div>
-      <span class="etiqueta">US-3.7 · Seguimiento académico</span>
+      <span class="etiqueta">Actividades y entregas</span>
     </header>
 
     <p v-if="error" class="mensaje error" role="alert">{{ error }}</p>

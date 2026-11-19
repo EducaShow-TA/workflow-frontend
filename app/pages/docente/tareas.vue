@@ -146,7 +146,7 @@ onMounted(cargarClases)
   <main class="docente-vista">
     <header class="docente-titulo">
       <div>
-        <span class="docente-sobrelinea">US-3.7 · Seguimiento académico</span>
+        <span class="docente-sobrelinea">Actividades y entregas</span>
         <h1>Mis tareas</h1>
         <p>Publica actividades para tus clases y registra el cumplimiento de las entregas.</p>
       </div>
