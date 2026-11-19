@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { obtenerFechaHoyIso } from '~/composables/useFechas'
+import { obtenerRecordatoriosPago } from '~/composables/useRecordatoriosPago'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
 import {
   NOMBRES_ESTADO,
@@ -52,6 +53,10 @@ const autenticacion = useAutenticacionStore()
 const { listarHijos, consultarAsistencia } = usePortalFamilia()
 const { listarPagos } = usePagosFamilia()
 const DEUDAS_VISIBLES = 3
+const configuracion = useRuntimeConfig()
+const fechaRecordatorio = ref(obtenerFechaHoyIso())
+let actualizacionPagos = 0
+let temporizador: ReturnType<typeof setInterval> | undefined
 
 const fechaHoy = obtenerFechaHoyIso()
 const tarjetas = ref<TarjetaHijo[]>([])
@@ -62,6 +67,9 @@ const errorPagos = ref('')
 
 const deudas = computed(() => deudaFamiliar(pagos.value))
 const totalDeuda = computed(() => sumarDeuda(deudas.value))
+const recordatorios = computed(() =>
+  obtenerRecordatoriosPago(deudas.value, fechaRecordatorio.value, Number(configuracion.public.recordatorioPagoDias)),
+)
 const deudasEnMora = computed(() => deudas.value.filter((deuda) => deuda.boleta.estadoPago === 'EN_MORA').length)
 const hayCompromisos = computed(() => pagos.value.some((hijo) => hijo.compromisos.length > 0))
 const proximaEmision = computed(
@@ -117,15 +125,34 @@ async function cargar(): Promise<void> {
 }
 
 async function cargarPagos(): Promise<void> {
+  const actual = ++actualizacionPagos
   errorPagos.value = ''
   try {
-    pagos.value = await listarPagos()
+    const resultado = await listarPagos()
+    if (actual === actualizacionPagos) pagos.value = resultado
   } catch (fallo: unknown) {
-    errorPagos.value = obtenerMensajeError(fallo, 'No se pudo cargar el resumen de pagos.')
+    if (actual === actualizacionPagos) {
+      errorPagos.value = obtenerMensajeError(fallo, 'No se pudo cargar el resumen de pagos.')
+    }
   }
 }
 
-onMounted(cargar)
+function actualizarRecordatorios(): void {
+  fechaRecordatorio.value = obtenerFechaHoyIso()
+  if (document.visibilityState === 'visible' && !cargando.value) void cargarPagos()
+}
+
+onMounted(() => {
+  void cargar()
+  window.addEventListener('focus', actualizarRecordatorios)
+  temporizador = setInterval(actualizarRecordatorios, 60_000)
+})
+
+onUnmounted(() => {
+  actualizacionPagos++
+  window.removeEventListener('focus', actualizarRecordatorios)
+  clearInterval(temporizador)
+})
 </script>
 
 <template>
@@ -146,6 +173,31 @@ onMounted(cargar)
     />
 
     <template v-else>
+      <section
+        v-if="!errorPagos && recordatorios.length"
+        class="recordatorio-pagos"
+        aria-labelledby="titulo-recordatorios"
+        role="status"
+      >
+        <h2 id="titulo-recordatorios">Pagos próximos a vencer</h2>
+        <ul>
+          <li v-for="recordatorio in recordatorios" :key="recordatorio.boleta.boletaId">
+            <strong>{{ recordatorio.nombreHijo }}</strong> · {{ nombrarMesBoleta(recordatorio.boleta.mesCobro) }} ·
+            <strong>{{ formatearSolesFamilia(recordatorio.boleta.montoTotal) }}</strong>
+            <span>
+              {{
+                recordatorio.diasRestantes === 0
+                  ? 'Vence hoy'
+                  : recordatorio.diasRestantes === 1
+                    ? 'Vence mañana'
+                    : `Vence en ${recordatorio.diasRestantes} días`
+              }}. Fecha límite: {{ fechaPago(recordatorio.boleta.fechaVencimiento) }}.
+            </span>
+          </li>
+        </ul>
+        <NuxtLink to="/familia/pagos" class="ver-pagos">Ver pagos</NuxtLink>
+      </section>
+
       <AvisoMensaje v-if="errorPagos" :mensaje="errorPagos" tipo="advertencia" />
 
       <section v-else-if="hayCompromisos && deudas.length" class="docente-tarjeta franja-pagos" aria-label="Pagos">
@@ -245,6 +297,32 @@ onMounted(cargar)
 </template>
 
 <style scoped>
+.recordatorio-pagos {
+  padding: 20px;
+  border: 1px solid #e8be52;
+  border-radius: 12px;
+  background: #fff8e6;
+  color: #713f12;
+}
+
+.recordatorio-pagos h2 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+
+.recordatorio-pagos ul {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+}
+
+.recordatorio-pagos li span {
+  display: block;
+  margin-top: 4px;
+}
+
 .docente-titulo p {
   margin: 0;
   color: #64748b;
