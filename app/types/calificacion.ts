@@ -10,6 +10,7 @@ export interface SolicitudCalificacion {
   nota: NotaCualitativa
   observacion: string
   evidenciaUrl: string | null
+  motivo?: string | null
 }
 
 /** Respuesta de /api/v1/seguimiento/competencias/{codigo}. */
@@ -26,7 +27,22 @@ export interface Calificacion {
   evidenciaNombre: string | null
   evidenciaUrl: string | null
   evidenciaTamanio: number | null
+  puntajeConsolidado?: number | null
+  consolidada?: boolean
   fechaRegistro: string
+  rectificaciones: number
+}
+
+/** Movimiento del historial de una calificación (US-3.6). */
+export interface MovimientoCalificacion {
+  id: number
+  fechaHora: string
+  usuario: string
+  rolUsuario: string
+  accion: 'REGISTRAR_O_ACTUALIZAR' | 'RECTIFICAR'
+  notaAnterior: NotaCualitativa | null
+  notaNueva: NotaCualitativa | null
+  motivo: string | null
 }
 
 /** Competencia activa del área de una clase del docente. */
