@@ -15,6 +15,7 @@ export interface PeriodoAcademico {
   vacantesDisponibles: number
   hayVacantes: boolean
   estado: EstadoPeriodoAcademico
+  actasCerradas: boolean
 }
 
 export interface SolicitudAperturaAnhio {

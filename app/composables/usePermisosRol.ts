@@ -49,6 +49,13 @@ export const PERMISOS: Permiso[] = [
     sensible: false,
   },
   {
+    codigo: 'REPORTE_CUADRO_MERITO_VER',
+    modulo: 'Reportes',
+    nombre: 'Ver cuadro de mérito',
+    descripcion: 'Consultar y descargar el ranking académico de una sección con actas cerradas.',
+    sensible: false,
+  },
+  {
     codigo: 'PANEL_VER',
     modulo: 'Panel',
     nombre: 'Ver panel',
@@ -197,6 +204,7 @@ export const REGLAS_RUTA: ReglaRuta[] = [
   { prefijo: '/docente', permiso: 'PORTAL_DOCENTE_VER' },
   { prefijo: '/finanzas', permiso: 'BOLETA_GESTIONAR' },
   { prefijo: '/reportes/boletas', permiso: 'REPORTE_COBRANZA_VER' },
+  { prefijo: '/reportes/cuadro-merito', permiso: 'REPORTE_CUADRO_MERITO_VER' },
   { prefijo: '/panel', permiso: 'PANEL_VER' },
   { prefijo: '/estudiantes', permiso: 'ESTUDIANTE_VER' },
   { prefijo: '/estudiantes/nuevo', permiso: 'ESTUDIANTE_REGISTRAR' },
