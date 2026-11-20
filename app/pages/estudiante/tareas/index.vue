@@ -206,7 +206,12 @@ onBeforeUnmount(() => clearInterval(reloj))
                 >Entregada {{ tarea.fechaEntrega ? formatearFechaTarea(tarea.fechaEntrega, ahora) : '' }}</template
               >
             </span>
-            <span class="pastilla pastilla--ok">✓ Entregada</span>
+            <span v-if="tarea.nota || tarea.notaJustificada" class="pastilla pastilla--nota">
+              {{ tarea.notaJustificada ? 'Justificada' : `Nota: ${tarea.nota}` }}
+              <span v-if="tarea.comentario" title="Con comentario de tu docente">💬</span>
+            </span>
+            <span v-else-if="tarea.cuentaParaNota" class="pastilla pastilla--por-calificar">Por calificar</span>
+            <span v-else class="pastilla pastilla--ok">✓ Entregada</span>
           </li>
         </ul>
       </section>
@@ -225,7 +230,11 @@ onBeforeUnmount(() => clearInterval(reloj))
               <small>{{ etiquetaArea(tarea) }}</small>
             </span>
             <span class="fila__fecha">Venció {{ formatearFechaTarea(tarea.fechaLimite, ahora) }}</span>
-            <span class="pastilla pastilla--vencida">Vencida</span>
+            <span v-if="tarea.nota || tarea.notaJustificada" class="pastilla pastilla--nota">
+              {{ tarea.notaJustificada ? 'Justificada' : `Nota: ${tarea.nota}` }}
+              <span v-if="tarea.comentario" title="Con comentario de tu docente">💬</span>
+            </span>
+            <span v-else class="pastilla pastilla--vencida">Vencida</span>
           </li>
         </ul>
       </section>
@@ -506,6 +515,17 @@ onBeforeUnmount(() => clearInterval(reloj))
 .pastilla--ok {
   background: #dcfce7;
   color: #166534;
+}
+
+.pastilla--nota {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+.pastilla--por-calificar {
+  background: #f1f5f9;
+  color: #475569;
+  font-weight: 600;
 }
 
 .pastilla--vencida {

@@ -9,6 +9,11 @@ export interface EntregaTarea {
   archivoNombre?: string | null
   archivoTamanio?: number | null
   archivoFecha?: string | null
+  calificacionId?: number | null
+  nota?: 'AD' | 'A' | 'B' | 'C' | null
+  justificada?: boolean
+  comentario?: string | null
+  fechaCalificacion?: string | null
 }
 
 /** Respuesta de /api/v1/tareas. */
@@ -21,6 +26,9 @@ export interface Tarea {
   descripcion: string
   fechaLimite: string
   ponderacion: number | null
+  evaluacionParcialId?: number | null
+  evaluacionTitulo?: string | null
+  bimestre?: number | null
   entregas: EntregaTarea[]
 }
 
@@ -32,4 +40,13 @@ export interface SolicitudTarea {
   descripcion: string
   fechaLimite: string
   ponderacion: number | null
+  evaluacionParcialId?: number | null
+}
+
+/** Cuerpo de PUT /api/v1/tareas/{id}/entregas/{matriculaId}/calificacion. */
+export interface SolicitudCalificacionTarea {
+  nota: 'AD' | 'A' | 'B' | 'C' | null
+  justificada: boolean
+  motivo?: string | null
+  comentario?: string | null
 }

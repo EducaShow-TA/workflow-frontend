@@ -4,6 +4,8 @@ import type { AlumnoClase, Calificacion, MiClase, NotaCualitativa, RiesgoAcademi
 import { obtenerMensajeError } from '~/composables/useMensajesError'
 import { formatearFecha } from '~/composables/useFechas'
 import { useCalificaciones } from '~/composables/useCalificaciones'
+import { useEvaluacionesParciales } from '~/composables/useEvaluacionesParciales'
+import type { EvaluacionParcial, NotaEvaluacionParcial } from '~/types/evaluacionParcial'
 import { NOTAS, claveClase, nombreClase, useMisClases } from '~/composables/useMisClases'
 import { useAutenticacionStore } from '~/stores/autenticacion'
 
@@ -16,6 +18,7 @@ type FiltroNota = NotaCualitativa | 'SIN_NOTA' | 'RIESGO' | ''
 const autenticacion = useAutenticacionStore()
 const { listar: listarClases, listarAlumnos, obtenerRiesgo } = useMisClases()
 const { listar: listarNotas, descargarEvidencia } = useCalificaciones()
+const { listar: listarEvaluaciones, listarNotas: listarNotasParciales } = useEvaluacionesParciales()
 const ruta = useRoute()
 const esDocente = computed(() => autenticacion.usuario?.rol === 'DOCENTE')
 
@@ -38,6 +41,11 @@ const alumnoEnEdicion = ref<AlumnoClase | null>(null)
 const rectificacionAbierta = ref(false)
 const historialAbierto = ref(false)
 const matriculaResaltada = ref<number | null>(null)
+const evaluacionesCompetencia = ref<EvaluacionParcial[]>([])
+const notasParciales = ref<Record<number, NotaEvaluacionParcial[]>>({})
+const cargandoParciales = ref(false)
+const ventanaParcial = ref<{ evaluacion: EvaluacionParcial; alumno: AlumnoClase } | null>(null)
+let solicitudParciales = 0
 let temporizadorResaltado: ReturnType<typeof setTimeout> | undefined
 
 const areas = computed(() => {
@@ -55,6 +63,13 @@ const competencia = computed(
   () => clase.value?.competencias.find((item) => item.codigo === competenciaElegida.value) ?? null,
 )
 const notas = computed(() => notasPorCompetencia.value[competenciaElegida.value] ?? [])
+const evaluacionesBimestre = computed(() =>
+  evaluacionesCompetencia.value.filter((item) => item.bimestre === riesgoAcademico.value?.bimestre),
+)
+const modoParcial = computed(() => evaluacionesBimestre.value.length > 0)
+const ponderacionBimestre = computed(() =>
+  evaluacionesBimestre.value.map((item) => `${Number(item.ponderacion)} %`).join(' + '),
+)
 const notaPorMatricula = computed(() => new Map(notas.value.map((nota) => [nota.matriculaId, nota])))
 
 const conteo = computed(() => {
@@ -98,6 +113,69 @@ const contexto = computed(() =>
 const haySiguiente = computed(() =>
   pendientes.value.some((alumno) => alumno.matriculaId !== alumnoEnEdicion.value?.matriculaId),
 )
+
+function notaParcial(evaluacionId: number, matriculaId: number): NotaEvaluacionParcial | null {
+  return (
+    (notasParciales.value[evaluacionId] ?? []).find(
+      (nota) => nota.matriculaId === matriculaId && (nota.nota || nota.justificada),
+    ) ?? null
+  )
+}
+
+function porcentajeFaltante(matriculaId: number): number {
+  return evaluacionesBimestre.value
+    .filter((evaluacion) => !notaParcial(evaluacion.id, matriculaId))
+    .reduce((suma, evaluacion) => suma + Number(evaluacion.ponderacion), 0)
+}
+
+async function cargarParciales(): Promise<void> {
+  const actual = clase.value
+  const codigo = competenciaElegida.value
+  const turno = ++solicitudParciales
+  evaluacionesCompetencia.value = []
+  notasParciales.value = {}
+  if (!actual || !codigo) return
+  cargandoParciales.value = true
+  try {
+    const lista = await listarEvaluaciones(actual.periodoId, codigo)
+    const bimestre = riesgoAcademico.value?.bimestre
+    const delBimestre = lista.filter((item) => item.bimestre === bimestre)
+    const notas = await Promise.all(delBimestre.map((item) => listarNotasParciales(item.id)))
+    if (turno !== solicitudParciales) return
+    evaluacionesCompetencia.value = lista
+    notasParciales.value = Object.fromEntries(delBimestre.map((item, indice) => [item.id, notas[indice] ?? []]))
+  } catch (fallo: unknown) {
+    if (turno === solicitudParciales) {
+      error.value = obtenerMensajeError(fallo, 'No se pudieron cargar las evaluaciones parciales.')
+    }
+  } finally {
+    if (turno === solicitudParciales) cargandoParciales.value = false
+  }
+}
+
+function abrirParcial(evaluacion: EvaluacionParcial, alumno: AlumnoClase): void {
+  aviso.value = ''
+  ventanaParcial.value = { evaluacion, alumno }
+}
+
+async function alGuardarParcial(): Promise<void> {
+  const ventana = ventanaParcial.value
+  ventanaParcial.value = null
+  const actual = clase.value
+  if (!ventana || !actual) return
+  aviso.value = `Nota de ${ventana.alumno.nombreCompleto} guardada en “${ventana.evaluacion.titulo}”.`
+  try {
+    const [notasEvaluacion, logros] = await Promise.all([
+      listarNotasParciales(ventana.evaluacion.id),
+      listarNotas(actual.periodoId, competenciaElegida.value, riesgoAcademico.value?.bimestre ?? 1),
+    ])
+    notasParciales.value = { ...notasParciales.value, [ventana.evaluacion.id]: notasEvaluacion }
+    notasPorCompetencia.value = { ...notasPorCompetencia.value, [competenciaElegida.value]: logros }
+    riesgoAcademico.value = await obtenerRiesgo(actual.periodoId, actual.areaCodigo)
+  } catch (fallo: unknown) {
+    error.value = obtenerMensajeError(fallo, 'No se pudo actualizar el logro del bimestre.')
+  }
+}
 
 function normalizar(texto: string): string {
   return texto.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
@@ -168,6 +246,7 @@ function elegirCompetencia(codigo: string): void {
   competenciaElegida.value = codigo
   filtroNota.value = ''
   recordar()
+  void cargarParciales()
 }
 
 async function cargarClase(): Promise<void> {
@@ -192,6 +271,7 @@ async function cargarClase(): Promise<void> {
     notasPorCompetencia.value = Object.fromEntries(
       actual.competencias.map((item, indice) => [item.codigo, porCompetencia[indice] ?? []]),
     )
+    void cargarParciales()
   } catch (fallo: unknown) {
     error.value = obtenerMensajeError(fallo, 'No se pudo cargar la lista de alumnos.')
   } finally {
@@ -386,6 +466,7 @@ onMounted(async () => {
         <div class="docente-tarjeta__titulo docente-tarjeta__titulo--wrap">
           <h2 id="titulo-clase">{{ clase.areaNombre }} · {{ nombreClase(clase) }} · {{ clase.anhio }}</h2>
           <button
+            v-if="!modoParcial"
             type="button"
             class="docente-boton"
             :disabled="cargandoClase || !competencia || !pendientes.length"
@@ -490,7 +571,92 @@ onMounted(async () => {
 
             <AvisoMensaje v-if="aviso" :mensaje="aviso" tipo="exito" />
 
-            <div class="docente-tabla-contenedor tabla-desplazable">
+            <p v-if="cargandoParciales" class="docente-texto-secundario" role="status">
+              Consultando evaluaciones parciales…
+            </p>
+
+            <template v-else-if="modoParcial">
+              <AvisoMensaje
+                tipo="advertencia"
+                :mensaje="`Esta competencia se calcula con las evaluaciones parciales del bimestre ${riesgoAcademico?.bimestre} que definió el administrador (${ponderacionBimestre}). Califica cada evaluación; el logro del bimestre se obtiene automáticamente.`"
+              />
+              <div class="docente-tabla-contenedor tabla-desplazable">
+                <table class="docente-tabla tabla-parciales">
+                  <thead>
+                    <tr>
+                      <th scope="col">N.°</th>
+                      <th scope="col">Alumno</th>
+                      <th v-for="evaluacion in evaluacionesBimestre" :key="evaluacion.id" scope="col">
+                        {{ evaluacion.titulo }}
+                        <small class="columna-detalle">
+                          {{ Number(evaluacion.ponderacion) }} %
+                          <span v-if="evaluacion.tareaId" class="marca-tarea">Tarea</span>
+                        </small>
+                      </th>
+                      <th scope="col">Logro del bimestre</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-if="!alumnosFiltrados.length">
+                      <td :colspan="evaluacionesBimestre.length + 3" class="docente-tabla__vacia">
+                        {{ alumnos.length ? 'Ningún alumno coincide con el filtro.' : 'La sección no tiene alumnos.' }}
+                      </td>
+                    </tr>
+                    <tr v-for="alumno in alumnosFiltrados" :key="alumno.matriculaId">
+                      <td class="numero">{{ alumnos.indexOf(alumno) + 1 }}</td>
+                      <td>
+                        <strong class="nombre">{{ alumno.nombreCompleto }}</strong>
+                        <small class="dni">DNI {{ alumno.dni }}</small>
+                      </td>
+                      <td v-for="evaluacion in evaluacionesBimestre" :key="evaluacion.id">
+                        <button
+                          v-if="notaParcial(evaluacion.id, alumno.matriculaId) || evaluacion.tareaId"
+                          type="button"
+                          class="celda-nota"
+                          :aria-label="`${evaluacion.titulo} de ${alumno.nombreCompleto}`"
+                          @click="abrirParcial(evaluacion, alumno)"
+                        >
+                          {{
+                            notaParcial(evaluacion.id, alumno.matriculaId)?.justificada
+                              ? 'Just.'
+                              : (notaParcial(evaluacion.id, alumno.matriculaId)?.nota ?? '—')
+                          }}
+                          <span
+                            v-if="notaParcial(evaluacion.id, alumno.matriculaId)?.comentario"
+                            title="Tiene comentario"
+                            aria-hidden="true"
+                            >💬</span
+                          >
+                        </button>
+                        <button
+                          v-else
+                          type="button"
+                          class="docente-boton boton-calificar"
+                          @click="abrirParcial(evaluacion, alumno)"
+                        >
+                          Calificar
+                        </button>
+                      </td>
+                      <td>
+                        <strong class="logro">{{ notaPorMatricula.get(alumno.matriculaId)?.nota ?? '—' }}</strong>
+                        <small
+                          v-if="notaPorMatricula.get(alumno.matriculaId) && porcentajeFaltante(alumno.matriculaId) > 0"
+                          class="provisional"
+                        >
+                          provisional · faltan {{ porcentajeFaltante(alumno.matriculaId) }} %
+                        </small>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p class="docente-texto-secundario nota-pie">
+                Las columnas de tareas también se pueden calificar desde Tareas: es la misma nota. Mientras falten
+                notas, el logro es provisional; al cerrar actas, las que faltan pasan a C.
+              </p>
+            </template>
+
+            <div v-else class="docente-tabla-contenedor tabla-desplazable">
               <table class="docente-tabla">
                 <thead>
                   <tr>
@@ -628,6 +794,19 @@ onMounted(async () => {
       @guardada="alRectificar"
     />
 
+    <ModalNotaParcial
+      v-if="ventanaParcial"
+      :abierta="Boolean(ventanaParcial)"
+      :titulo="`Calificar · ${ventanaParcial.evaluacion.titulo}`"
+      :descripcion="`${ventanaParcial.alumno.nombreCompleto} · ${competencia?.nombre ?? ''} · bimestre ${ventanaParcial.evaluacion.bimestre} · ${Number(ventanaParcial.evaluacion.ponderacion)} %`"
+      :evaluacion-id="ventanaParcial.evaluacion.id"
+      :matricula-id="ventanaParcial.alumno.matriculaId"
+      :tarea-id="ventanaParcial.evaluacion.tareaId ?? null"
+      :actual="notaParcial(ventanaParcial.evaluacion.id, ventanaParcial.alumno.matriculaId)"
+      @cerrar="ventanaParcial = null"
+      @guardada="alGuardarParcial"
+    />
+
     <ModalHistorialCalificacion
       v-if="clase && competencia"
       :abierta="historialAbierto"
@@ -642,6 +821,75 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.tabla-parciales th {
+  vertical-align: bottom;
+}
+
+.columna-detalle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+.marca-tarea {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #ede9fe;
+  color: #5b21b6;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.celda-nota {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 44px;
+  justify-content: center;
+  padding: 4px 10px;
+  border: 1px solid #c3c6d7;
+  border-radius: 8px;
+  background: white;
+  color: #0f172a;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.celda-nota:hover {
+  border-color: #004ac6;
+  background: #eff6ff;
+}
+
+.celda-nota:focus-visible {
+  outline: 3px solid #93c5fd;
+  outline-offset: 2px;
+}
+
+.boton-calificar {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.logro {
+  font-size: 15px;
+}
+
+.provisional {
+  display: block;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.nota-pie {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+}
+
 .selector {
   display: flex;
   flex-direction: column;

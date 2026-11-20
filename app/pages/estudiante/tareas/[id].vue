@@ -39,6 +39,24 @@ const subiendo = computed(() => progreso.value !== null)
 const muestraSubida = computed(
   () => !!tarea.value && tarea.value.puedeEntregar && (tarea.value.estado !== 'ENTREGADA' || reemplazando.value),
 )
+const DIAS_SEMANA = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
+const calificada = computed(() => Boolean(tarea.value?.nota || tarea.value?.notaJustificada))
+const fechaCalificada = computed(() => {
+  const fecha = tarea.value?.fechaCalificacion
+  if (!fecha) return ''
+  const [anio, mes, dia] = fecha.slice(0, 10).split('-').map(Number) as [number, number, number]
+  return `${DIAS_SEMANA[new Date(anio, mes - 1, dia).getDay()]} ${fecha.slice(8, 10)}/${fecha.slice(5, 7)}`
+})
+const inicialesDocente = computed(() =>
+  (tarea.value?.docente ?? '')
+    .replace(/,/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((parte) => parte[0]?.toUpperCase() ?? '')
+    .join(''),
+)
+
 const textoEstado = computed(() => {
   if (!tarea.value || !cuenta.value) return ''
   if (tarea.value.estado === 'ENTREGADA') return '✓ Entregada'
@@ -158,7 +176,10 @@ onBeforeUnmount(() => clearInterval(reloj))
           </div>
           <div>
             <dt>Peso en la nota</dt>
-            <dd>{{ tarea.ponderacion != null ? `${Number(tarea.ponderacion)} %` : 'Sin ponderación' }}</dd>
+            <dd v-if="tarea.cuentaParaNota">
+              {{ Number(tarea.ponderacion) }} %<span class="secundario"> · bimestre {{ tarea.bimestre }}</span>
+            </dd>
+            <dd v-else>No cuenta para la nota</dd>
           </div>
           <div class="ancho">
             <dt>Competencia</dt>
@@ -170,112 +191,151 @@ onBeforeUnmount(() => clearInterval(reloj))
         <p class="descripcion">{{ tarea.descripcion }}</p>
       </article>
 
-      <aside class="docente-tarjeta entrega" aria-labelledby="titulo-entrega">
-        <h2 id="titulo-entrega">Tu entrega</h2>
+      <div class="lateral">
+        <aside class="docente-tarjeta entrega" aria-labelledby="titulo-entrega">
+          <h2 id="titulo-entrega">Tu entrega</h2>
 
-        <template v-if="tarea.estado === 'ENTREGADA' && !reemplazando">
-          <div class="recibo" role="status">
-            <strong>✓ {{ recienEntregada ? '¡Tarea entregada!' : 'Tarea entregada' }}</strong>
-            <span v-if="tarea.origen === 'DOCENTE'">Tu docente registró tu entrega.</span>
-            <span v-else-if="tarea.fechaEntrega">El {{ formatearFechaLargaTarea(tarea.fechaEntrega) }}.</span>
-          </div>
-          <div v-if="tarea.archivoNombre && tarea.origen === 'ALUMNO'" class="archivo">
-            <span class="archivo__tipo">{{ extensionArchivoTarea(tarea.archivoNombre) }}</span>
-            <span class="archivo__datos">
-              <strong>{{ tarea.archivoNombre }}</strong>
-              <small>{{ formatearTamanioArchivo(tarea.archivoTamanio) }}</small>
-            </span>
-            <button type="button" class="enlace" :disabled="descargando" @click="descargar">
-              {{ descargando ? 'Descargando…' : 'Descargar' }}
-            </button>
-          </div>
-          <template v-if="tarea.puedeEntregar && tarea.origen === 'ALUMNO'">
+          <template v-if="tarea.estado === 'ENTREGADA' && !reemplazando">
+            <div class="recibo" role="status">
+              <strong>✓ {{ recienEntregada ? '¡Tarea entregada!' : 'Tarea entregada' }}</strong>
+              <span v-if="tarea.origen === 'DOCENTE'">Tu docente registró tu entrega.</span>
+              <span v-else-if="tarea.fechaEntrega">El {{ formatearFechaLargaTarea(tarea.fechaEntrega) }}.</span>
+            </div>
+            <div v-if="tarea.archivoNombre && tarea.origen === 'ALUMNO'" class="archivo">
+              <span class="archivo__tipo">{{ extensionArchivoTarea(tarea.archivoNombre) }}</span>
+              <span class="archivo__datos">
+                <strong>{{ tarea.archivoNombre }}</strong>
+                <small>{{ formatearTamanioArchivo(tarea.archivoTamanio) }}</small>
+              </span>
+              <button type="button" class="enlace" :disabled="descargando" @click="descargar">
+                {{ descargando ? 'Descargando…' : 'Descargar' }}
+              </button>
+            </div>
+            <template v-if="tarea.puedeEntregar && tarea.origen === 'ALUMNO'">
+              <button
+                type="button"
+                class="docente-boton docente-boton--secundario ancho-total"
+                @click="reemplazando = true"
+              >
+                Reemplazar archivo
+              </button>
+              <small class="nota"
+                >Puedes reemplazarlo hasta el {{ formatearFechaTarea(tarea.fechaLimite, ahora) }}.</small
+              >
+            </template>
+            <small v-else-if="calificada && tarea.origen === 'ALUMNO'" class="nota">
+              Tu docente ya calificó esta entrega, así que el archivo ya no se puede reemplazar.
+            </small>
+          </template>
+
+          <AvisoMensaje
+            v-else-if="calificada"
+            mensaje="Tu docente ya calificó esta tarea, así que ya no se puede entregar por el sistema."
+          />
+
+          <template v-else-if="tarea.estado === 'VENCIDA' || !tarea.puedeEntregar">
+            <AvisoMensaje
+              mensaje="No se registró tu entrega y la fecha límite ya pasó. Si tuviste un motivo, conversa con tu docente: puede registrarla por ti."
+            />
+          </template>
+
+          <template v-if="muestraSubida">
+            <p v-if="tarea.archivoNombre && tarea.estado === 'PENDIENTE'" class="nota">
+              Tu docente revirtió la entrega de "{{ tarea.archivoNombre }}". Vuelve a entregarla.
+            </p>
+            <div
+              v-if="!archivo"
+              :class="['zona', { 'zona--activa': arrastrando }]"
+              @dragover.prevent="arrastrando = true"
+              @dragleave="arrastrando = false"
+              @drop.prevent="alSoltar"
+            >
+              <span aria-hidden="true">📎</span>
+              <strong>Arrastra tu archivo aquí</strong>
+              <span>
+                o
+                <button type="button" class="enlace" @click="entrada?.click()">elígelo de tu equipo</button>
+              </span>
+              <small>{{ TIPOS_ARCHIVO_TAREA }} · máximo 10 MB</small>
+              <input
+                ref="entrada"
+                type="file"
+                class="solo-lectores"
+                aria-label="Elegir archivo de la tarea"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.zip"
+                @change="alElegir"
+              />
+            </div>
+            <div v-else :class="['archivo', { 'archivo--error': errorArchivo }]">
+              <span class="archivo__tipo">{{ extensionArchivoTarea(archivo.name) }}</span>
+              <span class="archivo__datos">
+                <strong>{{ archivo.name }}</strong>
+                <small>{{
+                  subiendo
+                    ? progreso! >= 100
+                      ? 'Guardando tu entrega…'
+                      : `Subiendo… ${progreso} %`
+                    : formatearTamanioArchivo(archivo.size)
+                }}</small>
+              </span>
+              <button v-if="!subiendo" type="button" class="enlace" @click="quitar">Quitar</button>
+            </div>
+            <div
+              v-if="subiendo"
+              class="progreso"
+              role="progressbar"
+              :aria-valuenow="progreso ?? 0"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              aria-label="Progreso de la entrega"
+            >
+              <span :style="{ width: `${progreso}%` }" />
+            </div>
+            <p v-if="errorArchivo" class="error" role="alert">{{ errorArchivo }}</p>
             <button
               type="button"
-              class="docente-boton docente-boton--secundario ancho-total"
-              @click="reemplazando = true"
+              class="docente-boton ancho-total enviar"
+              :disabled="!archivo || !!errorArchivo || subiendo"
+              @click="enviar"
             >
-              Reemplazar archivo
+              {{ subiendo ? 'Entregando…' : reemplazando ? 'Reemplazar entrega' : 'Entregar tarea' }}
             </button>
-            <small class="nota"
-              >Puedes reemplazarlo hasta el {{ formatearFechaTarea(tarea.fechaLimite, ahora) }}.</small
-            >
+            <button v-if="reemplazando && !subiendo" type="button" class="enlace centrado" @click="cancelarReemplazo">
+              Mantener mi entrega actual
+            </button>
+            <small v-else-if="!subiendo" class="nota">Puedes reemplazar tu archivo hasta la fecha límite.</small>
           </template>
-        </template>
+        </aside>
 
-        <template v-else-if="tarea.estado === 'VENCIDA' || !tarea.puedeEntregar">
-          <AvisoMensaje
-            mensaje="No se registró tu entrega y la fecha límite ya pasó. Si tuviste un motivo, conversa con tu docente: puede registrarla por ti."
-          />
-        </template>
-
-        <template v-if="muestraSubida">
-          <p v-if="tarea.archivoNombre && tarea.estado === 'PENDIENTE'" class="nota">
-            Tu docente revirtió la entrega de "{{ tarea.archivoNombre }}". Vuelve a entregarla.
-          </p>
-          <div
-            v-if="!archivo"
-            :class="['zona', { 'zona--activa': arrastrando }]"
-            @dragover.prevent="arrastrando = true"
-            @dragleave="arrastrando = false"
-            @drop.prevent="alSoltar"
-          >
-            <span aria-hidden="true">📎</span>
-            <strong>Arrastra tu archivo aquí</strong>
-            <span>
-              o
-              <button type="button" class="enlace" @click="entrada?.click()">elígelo de tu equipo</button>
-            </span>
-            <small>{{ TIPOS_ARCHIVO_TAREA }} · máximo 10 MB</small>
-            <input
-              ref="entrada"
-              type="file"
-              class="solo-lectores"
-              aria-label="Elegir archivo de la tarea"
-              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.zip"
-              @change="alElegir"
-            />
-          </div>
-          <div v-else :class="['archivo', { 'archivo--error': errorArchivo }]">
-            <span class="archivo__tipo">{{ extensionArchivoTarea(archivo.name) }}</span>
-            <span class="archivo__datos">
-              <strong>{{ archivo.name }}</strong>
-              <small>{{
-                subiendo
-                  ? progreso! >= 100
-                    ? 'Guardando tu entrega…'
-                    : `Subiendo… ${progreso} %`
-                  : formatearTamanioArchivo(archivo.size)
-              }}</small>
-            </span>
-            <button v-if="!subiendo" type="button" class="enlace" @click="quitar">Quitar</button>
-          </div>
-          <div
-            v-if="subiendo"
-            class="progreso"
-            role="progressbar"
-            :aria-valuenow="progreso ?? 0"
-            aria-valuemin="0"
-            aria-valuemax="100"
-            aria-label="Progreso de la entrega"
-          >
-            <span :style="{ width: `${progreso}%` }" />
-          </div>
-          <p v-if="errorArchivo" class="error" role="alert">{{ errorArchivo }}</p>
-          <button
-            type="button"
-            class="docente-boton ancho-total enviar"
-            :disabled="!archivo || !!errorArchivo || subiendo"
-            @click="enviar"
-          >
-            {{ subiendo ? 'Entregando…' : reemplazando ? 'Reemplazar entrega' : 'Entregar tarea' }}
-          </button>
-          <button v-if="reemplazando && !subiendo" type="button" class="enlace centrado" @click="cancelarReemplazo">
-            Mantener mi entrega actual
-          </button>
-          <small v-else-if="!subiendo" class="nota">Puedes reemplazar tu archivo hasta la fecha límite.</small>
-        </template>
-      </aside>
+        <section v-if="tarea.cuentaParaNota" class="docente-tarjeta calificacion" aria-labelledby="titulo-calificacion">
+          <h2 id="titulo-calificacion">Calificación</h2>
+          <template v-if="calificada">
+            <div class="calificacion__nota">
+              <span class="insignia">{{ tarea.notaJustificada ? 'J' : tarea.nota }}</span>
+              <span>
+                <strong>{{
+                  tarea.notaJustificada ? 'Evaluación justificada' : `Calificada el ${fechaCalificada}`
+                }}</strong>
+                <small>
+                  {{
+                    tarea.notaJustificada
+                      ? 'No cuenta en tu nota del bimestre.'
+                      : `Suma a tu nota del bimestre ${tarea.bimestre}`
+                  }}
+                </small>
+              </span>
+            </div>
+            <blockquote v-if="tarea.comentario" class="comentario">
+              <span class="comentario__autor">
+                <span class="iniciales" aria-hidden="true">{{ inicialesDocente }}</span>
+                {{ tarea.docente ? `Prof. ${tarea.docente}` : 'Tu docente' }}
+              </span>
+              <p>{{ tarea.comentario }}</p>
+            </blockquote>
+          </template>
+          <p v-else class="sin-calificar">Aún sin calificar.</p>
+        </section>
+      </div>
     </div>
   </main>
 </template>
@@ -312,9 +372,102 @@ onBeforeUnmount(() => clearInterval(reloj))
   gap: 12px;
 }
 
-.entrega {
+.lateral {
   position: sticky;
   top: 16px;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.secundario {
+  color: #64748b;
+  font-weight: 500;
+}
+
+.calificacion {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.calificacion h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.calificacion__nota {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.calificacion__nota strong {
+  display: block;
+  color: #0f172a;
+  font-size: 15px;
+}
+
+.calificacion__nota small {
+  color: #475569;
+  font-size: 12.5px;
+}
+
+.insignia {
+  display: grid;
+  flex: none;
+  width: 56px;
+  height: 56px;
+  place-items: center;
+  border-radius: 14px;
+  background: #eff4ff;
+  color: #1e40af;
+  font-size: 26px;
+  font-weight: 800;
+}
+
+.comentario {
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 3px solid #93b4fa;
+  border-radius: 0 10px 10px 0;
+  background: #f8fafc;
+}
+
+.comentario__autor {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.iniciales {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 50%;
+  background: #dbeafe;
+  color: #1e40af;
+  font-size: 10.5px;
+  font-weight: 800;
+}
+
+.comentario p {
+  margin: 0;
+  color: #0f172a;
+  font-size: 13.5px;
+  white-space: pre-line;
+}
+
+.sin-calificar {
+  margin: 0;
+  color: #64748b;
+  font-size: 13.5px;
 }
 
 .area {
@@ -578,7 +731,7 @@ h2 {
     grid-template-columns: 1fr;
   }
 
-  .entrega {
+  .lateral {
     position: static;
   }
 }
