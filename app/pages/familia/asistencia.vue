@@ -43,7 +43,9 @@ const cargando = ref(false)
 const errorHijos = ref('')
 const error = ref('')
 const errorDocumento = ref('')
+const mensajeJustificacion = ref('')
 const descargandoId = ref<number | null>(null)
+const asistenciaActivaId = ref<number | null>(null)
 let consultaActual = 0
 
 const rangoInvalido = computed(() => Boolean(desde.value && hasta.value && desde.value > hasta.value))
@@ -144,6 +146,18 @@ async function abrirDocumento(registro: RegistroAsistencia): Promise<void> {
   }
 }
 
+function abrirFormularioJustificacion(asistenciaId: number): void {
+  asistenciaActivaId.value = asistenciaId
+  errorDocumento.value = ''
+  mensajeJustificacion.value = ''
+}
+
+async function alJustificar(): Promise<void> {
+  asistenciaActivaId.value = null
+  mensajeJustificacion.value = 'La inasistencia quedó justificada y el documento fue adjuntado.'
+  await consultar()
+}
+
 watch([estudianteId, desde, hasta], () => {
   filtroEstado.value = null
   void consultar()
@@ -178,6 +192,7 @@ onMounted(cargarHijos)
     />
 
     <template v-else>
+      <AvisoMensaje v-if="mensajeJustificacion" :mensaje="mensajeJustificacion" tipo="exito" />
       <section class="docente-tarjeta filtros" aria-label="Filtros">
         <div class="campos">
           <div class="campo">
@@ -283,6 +298,22 @@ onMounted(cargarHijos)
                   :texto="NOMBRES_ESTADO[registro.estado]"
                   :variante="VARIANTES_ESTADO[registro.estado]"
                 />
+                <div v-if="registro.estado === 'AUSENTE'" class="acciones-justificacion">
+                  <FormularioJustificacionAsistencia
+                    v-if="asistenciaActivaId === registro.asistenciaId"
+                    :asistencia-id="registro.asistenciaId"
+                    @cancelar="asistenciaActivaId = null"
+                    @justificada="alJustificar"
+                  />
+                  <button
+                    v-else
+                    type="button"
+                    class="enlace"
+                    @click="abrirFormularioJustificacion(registro.asistenciaId)"
+                  >
+                    Justificar inasistencia
+                  </button>
+                </div>
               </li>
             </ul>
           </template>
@@ -335,6 +366,22 @@ onMounted(cargarHijos)
                     :texto="NOMBRES_ESTADO[registro.estado]"
                     :variante="VARIANTES_ESTADO[registro.estado]"
                   />
+                  <div v-if="registro.estado === 'AUSENTE'" class="acciones-justificacion">
+                    <FormularioJustificacionAsistencia
+                      v-if="asistenciaActivaId === registro.asistenciaId"
+                      :asistencia-id="registro.asistenciaId"
+                      @cancelar="asistenciaActivaId = null"
+                      @justificada="alJustificar"
+                    />
+                    <button
+                      v-else
+                      type="button"
+                      class="enlace"
+                      @click="abrirFormularioJustificacion(registro.asistenciaId)"
+                    >
+                      Justificar inasistencia
+                    </button>
+                  </div>
                 </li>
               </ul>
             </details>
@@ -598,9 +645,14 @@ button.indicador:hover:not(:disabled) {
 .clases li {
   display: flex;
   align-items: flex-start;
+  flex-wrap: wrap;
   gap: 14px;
   padding: 10px 16px;
   font-size: 14px;
+}
+
+.acciones-justificacion {
+  flex: 1 0 100%;
 }
 
 .clases li + li {

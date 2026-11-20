@@ -33,6 +33,17 @@ export interface RegistroAsistencia {
   documentoUrl: string | null
 }
 
+export interface RespuestaJustificacionAsistencia {
+  asistenciaId: number
+  estudianteId: number
+  estado: 'JUSTIFICADA'
+  motivo: string
+  documentoNombre: string
+  documentoTipo: string | null
+  documentoTamanio: number
+  documentoUrl: string
+}
+
 export interface ResumenAsistencia {
   total: number
   PRESENTE: number
