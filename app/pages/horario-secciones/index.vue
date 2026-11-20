@@ -289,7 +289,9 @@ onMounted(cargarCatalogos)
 
     <section class="tarjeta" aria-labelledby="titulo-aulas">
       <h2 id="titulo-aulas">Aulas y aforo</h2>
-      <p class="ayuda">Al asignar una clase, el aforo del aula debe cubrir a todos los alumnos matriculados en la sección.</p>
+      <p class="ayuda">
+        Al asignar una clase, el aforo del aula debe cubrir a todos los alumnos matriculados en la sección.
+      </p>
       <ul v-if="aulas.length" class="aulas">
         <li v-for="aula in aulas" :key="aula.id" :class="{ inactiva: !aula.activo }">
           <strong>{{ aula.codigo }}</strong>

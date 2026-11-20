@@ -39,8 +39,7 @@ const periodoAnio = computed(
     ficha.value?.periodos
       .filter(
         (periodo) =>
-          Number(periodo.fechaInicio.slice(0, 4)) <= anio.value &&
-          anio.value <= Number(periodo.fechaFin.slice(0, 4)),
+          Number(periodo.fechaInicio.slice(0, 4)) <= anio.value && anio.value <= Number(periodo.fechaFin.slice(0, 4)),
       )
       .sort((a, b) => b.fechaInicio.localeCompare(a.fechaInicio))[0] ?? null,
 )

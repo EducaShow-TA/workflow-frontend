@@ -76,10 +76,8 @@ function estaActivo(enlace: EnlaceMenu): boolean {
           </span>
           <span>{{ enlace.nombre }}</span>
         </NuxtLink>
-
       </template>
     </nav>
-
   </aside>
 </template>
 

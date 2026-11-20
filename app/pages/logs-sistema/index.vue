@@ -392,7 +392,8 @@ const datosDetalle = computed(() => {
             <h3>Detalles del error</h3>
             <pre v-if="detalle.stackTrace">{{ detalle.stackTrace }}</pre>
             <p v-else class="sin-traza">
-              No hay detalles adicionales. El sistema controló el caso mediante una validación, un permiso o una regla de negocio.
+              No hay detalles adicionales. El sistema controló el caso mediante una validación, un permiso o una regla
+              de negocio.
             </p>
           </div>
         </div>

@@ -38,9 +38,7 @@ export function useCuadroMerito() {
     }
 
     const tipoEsperado =
-      formato === 'pdf'
-        ? 'application/pdf'
-        : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      formato === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     if (!respuesta.headers.get('content-type')?.toLowerCase().includes(tipoEsperado)) {
       throw new Error(`El servidor no devolvió un archivo ${formato.toUpperCase()} válido.`)
     }

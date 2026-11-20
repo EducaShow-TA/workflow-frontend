@@ -69,7 +69,9 @@ onMounted(cargar)
       <div>
         <span class="docente-sobrelinea">Asistencia del personal</span>
         <h1>Mi marcaje</h1>
-        <p>Registra tu entrada y salida dentro del horario habilitado. La fecha y hora quedan registradas oficialmente.</p>
+        <p>
+          Registra tu entrada y salida dentro del horario habilitado. La fecha y hora quedan registradas oficialmente.
+        </p>
       </div>
       <button type="button" class="docente-boton docente-boton--secundario" :disabled="cargando" @click="cargar">
         Actualizar
