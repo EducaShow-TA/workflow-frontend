@@ -16,7 +16,7 @@ const secciones = computed(() =>
   propiedades.docente
     ? [
         { titulo: 'Registro de calificaciones', destino: '/docente/calificaciones' },
-        { titulo: 'Libretas e informes', destino: '/calificaciones/libretas' },
+        { titulo: 'Libretas e informes', destino: '/docente/libretas' },
       ]
     : [
         { titulo: 'Registro de calificaciones', destino: '/calificaciones' },
