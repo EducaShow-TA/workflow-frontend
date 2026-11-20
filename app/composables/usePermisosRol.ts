@@ -21,6 +21,13 @@ const DESCRIPCIONES_ROL: Record<RolUsuario, string> = {
 
 export const PERMISOS: Permiso[] = [
   {
+    codigo: 'ASISTENCIA_HISTORIAL_VER',
+    modulo: 'Asistencia',
+    nombre: 'Consultar historial de asistencia',
+    descripcion: 'Consultar los registros propios o los de estudiantes vinculados.',
+    sensible: false,
+  },
+  {
     codigo: 'PORTAL_ESTUDIANTE_VER',
     modulo: 'Portal del estudiante',
     nombre: 'Ver su panel y su asistencia',
@@ -222,11 +229,12 @@ export const PERMISOS: Permiso[] = [
 export const PERMISOS_POR_ROL: Record<RolUsuario, string[]> = {
   ADMINISTRADOR: PERMISOS.map((permiso) => permiso.codigo),
   DOCENTE: ['PORTAL_DOCENTE_VER', 'LIBRETA_VER', 'REPORTE_ASISTENCIA_VER'],
-  ALUMNO: ['PORTAL_ESTUDIANTE_VER'],
-  APODERADO: ['PORTAL_FAMILIA_VER', 'LIBRETA_VER'],
+  ALUMNO: ['PORTAL_ESTUDIANTE_VER', 'ASISTENCIA_HISTORIAL_VER'],
+  APODERADO: ['PORTAL_FAMILIA_VER', 'LIBRETA_VER', 'ASISTENCIA_HISTORIAL_VER'],
 }
 
 export const REGLAS_RUTA: ReglaRuta[] = [
+  { prefijo: '/asistencia', permiso: 'ASISTENCIA_HISTORIAL_VER' },
   { prefijo: '/calificaciones/libretas', permiso: 'LIBRETA_VER' },
   { prefijo: '/docente/libretas', permiso: 'LIBRETA_VER' },
   { prefijo: '/libretas', permiso: 'LIBRETA_VER' },

@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import { obtenerRutaInicio } from '~/composables/usePermisosRol'
 import { useAutenticacionStore } from '~/stores/autenticacion'
 import { INTENTOS_ANTES_DE_BLOQUEO, MINUTOS_BLOQUEO } from '~/composables/useRecuperacionContrasena'
-import { obtenerRutaInicio } from '~/composables/usePermisosRol'
+
 definePageMeta({
   layout: 'autenticacion',
 })
