@@ -289,6 +289,8 @@ onMounted(cargarCatalogos)
               {{ evaluacion.bimestre === null ? 'Sin bimestre asignado' : `Bimestre ${evaluacion.bimestre}` }}
               · Ponderación {{ evaluacion.ponderacion }}%
             </small>
+            <span v-if="evaluacion.tareaId" class="tarea-vinculada">Tarea · “{{ evaluacion.tareaTitulo }}”</span>
+            <small v-else class="sin-tarea">Se califica en Calificaciones</small>
           </div>
           <BotonAccion variante="secundario" :deshabilitado="guardando" @click="editar(evaluacion)">
             {{ evaluacion.bimestre === null ? 'Asignar bimestre' : 'Editar' }}
@@ -383,6 +385,22 @@ h2 {
 }
 
 .encabezado-lista p,
+.tarea-vinculada {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: #ede9fe;
+  color: #5b21b6;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.sin-tarea {
+  display: block;
+  margin-top: 4px;
+}
+
 .evaluacion p {
   margin: 5px 0 0;
   color: #737686;

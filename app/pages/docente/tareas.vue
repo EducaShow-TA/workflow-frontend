@@ -2,15 +2,36 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import type { AlumnoClase, MiClase } from '~/types/calificacion'
 import type { EntregaTarea, SolicitudTarea, Tarea } from '~/types/tarea'
+import type { EvaluacionParcial } from '~/types/evaluacionParcial'
 import { useTareas } from '~/composables/useTareas'
+import { useEvaluacionesParciales } from '~/composables/useEvaluacionesParciales'
 import { claveClase, nombreClase, useMisClases } from '~/composables/useMisClases'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
 import { cuentaRegresivaTarea, formatearFechaTarea } from '~/composables/useTareasEstudiante'
 
 definePageMeta({ layout: 'docente', middleware: 'autenticacion' })
 
+type OpcionNota = 'AD' | 'A' | 'B' | 'C' | 'JUST'
+
+interface VentanaNota {
+  tarea: Tarea
+  entrega: EntregaTarea
+  titulo: string
+  notaInicial: OpcionNota | null
+  soloComentario: boolean
+}
+
+const OPCIONES_NOTA: { valor: OpcionNota; texto: string }[] = [
+  { valor: 'AD', texto: 'AD' },
+  { valor: 'A', texto: 'A' },
+  { valor: 'B', texto: 'B' },
+  { valor: 'C', texto: 'C' },
+  { valor: 'JUST', texto: 'Just.' },
+]
+
 const api = useTareas()
-const { listar: listarClases, listarAlumnos } = useMisClases()
+const { listar: listarEvaluaciones } = useEvaluacionesParciales()
+const { listar: listarClases, listarAlumnos, obtenerRiesgo } = useMisClases()
 const clases = ref<MiClase[]>([])
 const claseElegida = ref('')
 const competenciaCodigo = ref('')
@@ -22,7 +43,12 @@ const guardando = ref(false)
 const entregaEnProceso = ref('')
 const error = ref('')
 const aviso = ref('')
-const formulario = reactive({ titulo: '', descripcion: '', fechaLimite: '', ponderacion: '' })
+const formulario = reactive({ titulo: '', descripcion: '', fechaLimite: '', ponderacion: '', evaluacionId: '' })
+const evaluacionesLibres = ref<EvaluacionParcial[]>([])
+const cargandoEvaluaciones = ref(false)
+const bimestreActual = ref<number | null>(null)
+const borradores = ref<Record<string, OpcionNota>>({})
+const ventanaNota = ref<VentanaNota | null>(null)
 const claseActual = computed(() => clases.value.find((item) => claveClase(item) === claseElegida.value) ?? null)
 const competencias = computed(() => claseActual.value?.competencias ?? [])
 const ruta = useRoute()
@@ -53,6 +79,9 @@ const tareasVencidas = computed(() =>
 )
 const tareasVisibles = computed(() => (vista.value === 'vigentes' ? tareasVigentes.value : tareasVencidas.value))
 const cantidadAlumnos = computed(() => (alumnos.value.length || claseActual.value?.totalAlumnos) ?? 0)
+const evaluacionElegida = computed(
+  () => evaluacionesLibres.value.find((item) => String(item.id) === formulario.evaluacionId) ?? null,
+)
 
 function limpiarAvisos(): void {
   error.value = ''
@@ -163,8 +192,35 @@ function consignaLarga(tarea: Tarea): boolean {
 function abrirNuevaTarea(): void {
   limpiarAvisos()
   competenciaCodigo.value = competenciaCodigo.value || (competencias.value[0]?.codigo ?? '')
+  formulario.evaluacionId = ''
   modalAbierto.value = true
 }
+
+async function cargarEvaluacionesLibres(): Promise<void> {
+  const clase = claseActual.value
+  const codigo = competenciaCodigo.value
+  evaluacionesLibres.value = []
+  formulario.evaluacionId = ''
+  if (!clase || !codigo) return
+  cargandoEvaluaciones.value = true
+  try {
+    const [lista, riesgo] = await Promise.all([
+      listarEvaluaciones(clase.periodoId, codigo),
+      obtenerRiesgo(clase.periodoId, clase.areaCodigo),
+    ])
+    if (competenciaCodigo.value !== codigo || claveClase(clase) !== claseElegida.value) return
+    bimestreActual.value = riesgo.bimestre
+    evaluacionesLibres.value = lista.filter((item) => !item.tareaId && item.bimestre === riesgo.bimestre)
+  } catch {
+    evaluacionesLibres.value = []
+  } finally {
+    cargandoEvaluaciones.value = false
+  }
+}
+
+watch([modalAbierto, competenciaCodigo], ([abierto]) => {
+  if (abierto) void cargarEvaluacionesLibres()
+})
 
 async function crearTarea(): Promise<void> {
   limpiarAvisos()
@@ -177,7 +233,12 @@ async function crearTarea(): Promise<void> {
     error.value = 'Completa el título, la descripción y la fecha límite.'
     return
   }
-  const ponderacion = String(formulario.ponderacion ?? '').trim() ? Number(formulario.ponderacion) : null
+  const elegida = evaluacionElegida.value
+  const ponderacion = elegida
+    ? elegida.ponderacion
+    : String(formulario.ponderacion ?? '').trim()
+      ? Number(formulario.ponderacion)
+      : null
   if (ponderacion !== null && (!Number.isFinite(ponderacion) || ponderacion < 0 || ponderacion > 100)) {
     error.value = 'La ponderación debe estar entre 0 y 100.'
     return
@@ -189,11 +250,12 @@ async function crearTarea(): Promise<void> {
     descripcion: formulario.descripcion.trim(),
     fechaLimite: formulario.fechaLimite.length === 16 ? `${formulario.fechaLimite}:00` : formulario.fechaLimite,
     ponderacion,
+    evaluacionParcialId: elegida?.id ?? null,
   }
   guardando.value = true
   try {
     await api.registrar(solicitud)
-    Object.assign(formulario, { titulo: '', descripcion: '', fechaLimite: '', ponderacion: '' })
+    Object.assign(formulario, { titulo: '', descripcion: '', fechaLimite: '', ponderacion: '', evaluacionId: '' })
     modalAbierto.value = false
     vista.value = 'vigentes'
     await cargarTareas()
@@ -222,6 +284,88 @@ async function cambiarEntrega(tarea: Tarea, entrega: EntregaTarea): Promise<void
 
 function entregasCumplidas(tarea: Tarea): number {
   return tarea.entregas.filter((item) => item.cumplida).length
+}
+
+function entregasCalificadas(tarea: Tarea): number {
+  return tarea.entregas.filter((item) => item.nota || item.justificada).length
+}
+
+function claveNota(tarea: Tarea, entrega: EntregaTarea): string {
+  return `${tarea.id}-${entrega.matriculaId}`
+}
+
+function opcionRegistrada(entrega: EntregaTarea): OpcionNota | null {
+  if (entrega.justificada) return 'JUST'
+  return entrega.nota ?? null
+}
+
+function opcionVisible(tarea: Tarea, entrega: EntregaTarea): OpcionNota | null {
+  return borradores.value[claveNota(tarea, entrega)] ?? opcionRegistrada(entrega)
+}
+
+function elegirNota(tarea: Tarea, entrega: EntregaTarea, opcion: OpcionNota): void {
+  const registrada = opcionRegistrada(entrega)
+  if (registrada === opcion) return
+  if (registrada) {
+    ventanaNota.value = {
+      tarea,
+      entrega,
+      titulo: `Rectificar nota de ${entrega.estudiante}`,
+      notaInicial: opcion,
+      soloComentario: false,
+    }
+    return
+  }
+  borradores.value = { ...borradores.value, [claveNota(tarea, entrega)]: opcion }
+}
+
+function abrirComentario(tarea: Tarea, entrega: EntregaTarea): void {
+  ventanaNota.value = {
+    tarea,
+    entrega,
+    titulo: `Comentario para ${entrega.estudiante}`,
+    notaInicial: null,
+    soloComentario: true,
+  }
+}
+
+function reemplazarTarea(actualizada: Tarea): void {
+  tareas.value = tareas.value.map((item) => (item.id === actualizada.id ? actualizada : item))
+}
+
+async function guardarNota(tarea: Tarea, entrega: EntregaTarea): Promise<void> {
+  const llave = claveNota(tarea, entrega)
+  const opcion = borradores.value[llave]
+  if (!opcion) return
+  entregaEnProceso.value = llave
+  limpiarAvisos()
+  try {
+    reemplazarTarea(
+      await api.calificarEntrega(tarea.id, entrega.matriculaId, {
+        nota: opcion === 'JUST' ? null : opcion,
+        justificada: opcion === 'JUST',
+      }),
+    )
+    borradores.value = Object.fromEntries(
+      Object.entries(borradores.value).filter(([clave]) => clave !== llave),
+    ) as Record<string, OpcionNota>
+    aviso.value = `Nota guardada para ${entrega.estudiante}.`
+  } catch (fallo: unknown) {
+    error.value = obtenerMensajeError(fallo, 'No se pudo guardar la nota.')
+  } finally {
+    entregaEnProceso.value = ''
+  }
+}
+
+function alGuardarVentana(resultado: { tarea: Tarea | null }): void {
+  const ventana = ventanaNota.value
+  if (resultado.tarea) reemplazarTarea(resultado.tarea)
+  if (ventana) {
+    aviso.value = ventana.soloComentario
+      ? `Comentario guardado para ${ventana.entrega.estudiante}.`
+      : `Nota de ${ventana.entrega.estudiante} rectificada.`
+  }
+  ventanaNota.value = null
 }
 
 onMounted(() => {
@@ -337,7 +481,12 @@ onBeforeUnmount(() => clearInterval(reloj))
                   >
                     Hoy
                   </span>
-                  <template v-if="tarea.ponderacion != null"> · {{ Number(tarea.ponderacion) }} %</template>
+                  <span v-if="tarea.evaluacionParcialId" class="pastilla pastilla--nota">
+                    Cuenta para la nota · {{ Number(tarea.ponderacion) }} %
+                  </span>
+                  <template v-else-if="tarea.ponderacion != null">
+                    · {{ Number(tarea.ponderacion) }} % referencial</template
+                  >
                 </p>
                 <p :class="['tarea__consigna', { 'tarea__consigna--completa': consignasCompletas.has(tarea.id) }]">
                   {{ tarea.descripcion }}
@@ -358,6 +507,8 @@ onBeforeUnmount(() => clearInterval(reloj))
                     v-if="tarea.entregas.length - entregasCumplidas(tarea) > 0"
                   >
                     · faltan {{ tarea.entregas.length - entregasCumplidas(tarea) }}</template
+                  ><template v-if="tarea.evaluacionParcialId">
+                    · <strong>{{ entregasCalificadas(tarea) }}</strong> calificadas</template
                   >
                 </small>
                 <span
@@ -384,7 +535,7 @@ onBeforeUnmount(() => clearInterval(reloj))
               @click="alternar('entregas', tarea.id)"
             >
               <span aria-hidden="true">{{ entregasAbiertas.has(tarea.id) ? '▾' : '▸' }}</span>
-              Entregas de los alumnos
+              {{ tarea.evaluacionParcialId ? 'Entregas y notas' : 'Entregas de los alumnos' }}
               <span class="contador">{{ entregasCumplidas(tarea) }} / {{ tarea.entregas.length }}</span>
             </button>
             <div v-if="entregasAbiertas.has(tarea.id)" :id="`entregas-${tarea.id}`" class="entregas">
@@ -395,6 +546,7 @@ onBeforeUnmount(() => clearInterval(reloj))
                     <th scope="col">Alumno</th>
                     <th scope="col">Estado</th>
                     <th scope="col">Entrega</th>
+                    <th v-if="tarea.evaluacionParcialId" scope="col" class="columna-nota">Nota</th>
                     <th scope="col"><span class="solo-lectores">Acción</span></th>
                   </tr>
                 </thead>
@@ -412,6 +564,45 @@ onBeforeUnmount(() => clearInterval(reloj))
                         {{ formatearFechaTarea(entrega.fechaCumplimiento, ahora) }}
                       </small>
                       <span v-if="!entrega.cumplida && !entrega.archivoNombre" class="fecha">—</span>
+                    </td>
+                    <td v-if="tarea.evaluacionParcialId" class="columna-nota">
+                      <div class="selector-nota" role="radiogroup" :aria-label="`Nota de ${entrega.estudiante}`">
+                        <button
+                          v-for="opcion in OPCIONES_NOTA"
+                          :key="opcion.valor"
+                          type="button"
+                          role="radio"
+                          :aria-checked="opcionVisible(tarea, entrega) === opcion.valor"
+                          :class="{ activa: opcionVisible(tarea, entrega) === opcion.valor }"
+                          :disabled="entregaEnProceso === claveNota(tarea, entrega)"
+                          @click="elegirNota(tarea, entrega, opcion.valor)"
+                        >
+                          {{ opcion.texto }}
+                        </button>
+                      </div>
+                      <small v-if="entrega.fechaCalificacion" class="fecha">
+                        Registrada {{ formatearFechaTarea(entrega.fechaCalificacion, ahora) }}
+                      </small>
+                      <small v-else-if="!borradores[claveNota(tarea, entrega)]" class="fecha">
+                        {{ entrega.cumplida ? 'Sin nota' : 'Puedes calificar aunque no haya entregado' }}
+                      </small>
+                      <button
+                        v-if="entrega.fechaCalificacion"
+                        type="button"
+                        :class="['enlace-comentario', { 'enlace-comentario--con': entrega.comentario }]"
+                        @click="abrirComentario(tarea, entrega)"
+                      >
+                        {{ entrega.comentario ? '💬 Ver comentario' : '+ Agregar comentario' }}
+                      </button>
+                      <button
+                        v-if="borradores[claveNota(tarea, entrega)]"
+                        type="button"
+                        class="docente-boton boton-chico"
+                        :disabled="entregaEnProceso === claveNota(tarea, entrega)"
+                        @click="guardarNota(tarea, entrega)"
+                      >
+                        Guardar nota
+                      </button>
                     </td>
                     <td class="accion">
                       <button
@@ -472,23 +663,65 @@ onBeforeUnmount(() => clearInterval(reloj))
             placeholder="Qué deben hacer, formato y extensión"
           />
         </div>
-        <div class="docente-grid docente-grid--dos">
+        <div class="docente-campo">
+          <label for="tarea-fecha">Fecha límite *</label>
+          <input id="tarea-fecha" v-model="formulario.fechaLimite" type="datetime-local" />
+        </div>
+        <div class="cuenta-nota">
           <div class="docente-campo">
-            <label for="tarea-fecha">Fecha límite *</label>
-            <input id="tarea-fecha" v-model="formulario.fechaLimite" type="datetime-local" />
+            <label for="tarea-evaluacion">¿Cuenta para la nota?</label>
+            <select id="tarea-evaluacion" v-model="formulario.evaluacionId" :disabled="cargandoEvaluaciones">
+              <option value="">No, solo seguimiento de entrega</option>
+              <option v-for="evaluacion in evaluacionesLibres" :key="evaluacion.id" :value="String(evaluacion.id)">
+                Sí · {{ evaluacion.titulo }} — bimestre {{ evaluacion.bimestre }} ·
+                {{ Number(evaluacion.ponderacion) }} %
+              </option>
+            </select>
+            <small v-if="cargandoEvaluaciones" class="ayuda">Consultando las evaluaciones del plan…</small>
+            <small v-else-if="!evaluacionesLibres.length" class="ayuda">
+              No hay evaluaciones del bimestre {{ bimestreActual ?? 'actual' }} libres en el plan de esta competencia.
+              Para que cuente para la nota, pide al administrador registrarla.
+            </small>
+            <small v-else class="ayuda">
+              Solo aparecen las evaluaciones del bimestre {{ bimestreActual }} de esta competencia que aún no tienen
+              tarea.
+            </small>
           </div>
-          <div class="docente-campo">
-            <label for="tarea-ponderacion">Ponderación (%)</label>
-            <input
-              id="tarea-ponderacion"
-              v-model="formulario.ponderacion"
-              type="number"
-              min="0"
-              max="100"
-              step="0.01"
-              placeholder="Opcional"
-            />
+          <div class="docente-grid docente-grid--dos">
+            <div class="docente-campo">
+              <label for="tarea-ponderacion">{{
+                evaluacionElegida ? 'Ponderación' : 'Ponderación referencial (%)'
+              }}</label>
+              <input
+                v-if="evaluacionElegida"
+                id="tarea-ponderacion"
+                :value="`${Number(evaluacionElegida.ponderacion)} %`"
+                disabled
+              />
+              <input
+                v-else
+                id="tarea-ponderacion"
+                v-model="formulario.ponderacion"
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                placeholder="Opcional"
+              />
+              <small class="ayuda">
+                {{ evaluacionElegida ? 'Viene de la evaluación del plan.' : 'No cuenta para la nota.' }}
+              </small>
+            </div>
+            <div v-if="evaluacionElegida" class="docente-campo">
+              <label for="tarea-bimestre">Bimestre</label>
+              <input id="tarea-bimestre" :value="evaluacionElegida.bimestre" disabled />
+            </div>
           </div>
+          <AvisoMensaje
+            v-if="evaluacionElegida"
+            tipo="informacion"
+            :mensaje="`Las notas que pongas en esta tarea cuentan en la libreta como “${evaluacionElegida.titulo}”.`"
+          />
         </div>
       </form>
       <template #pie>
@@ -505,6 +738,27 @@ onBeforeUnmount(() => clearInterval(reloj))
         </button>
       </template>
     </VentanaModal>
+
+    <ModalNotaParcial
+      v-if="ventanaNota && ventanaNota.tarea.evaluacionParcialId"
+      :abierta="Boolean(ventanaNota)"
+      :titulo="ventanaNota.titulo"
+      :descripcion="`${ventanaNota.tarea.evaluacionTitulo ?? ventanaNota.tarea.titulo} · ${
+        ventanaNota.entrega.nota ? `nota ${ventanaNota.entrega.nota}` : 'justificada'
+      }`"
+      :evaluacion-id="ventanaNota.tarea.evaluacionParcialId"
+      :matricula-id="ventanaNota.entrega.matriculaId"
+      :tarea-id="ventanaNota.tarea.id"
+      :actual="{
+        nota: ventanaNota.entrega.nota ?? null,
+        justificada: Boolean(ventanaNota.entrega.justificada),
+        comentario: ventanaNota.entrega.comentario ?? null,
+      }"
+      :nota-inicial="ventanaNota.notaInicial"
+      :solo-comentario="ventanaNota.soloComentario"
+      @cerrar="ventanaNota = null"
+      @guardada="alGuardarVentana"
+    />
   </main>
 </template>
 
@@ -782,6 +1036,86 @@ onBeforeUnmount(() => clearInterval(reloj))
 .accion {
   text-align: right;
   white-space: nowrap;
+}
+
+.pastilla--nota {
+  margin-left: 6px;
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+.columna-nota {
+  min-width: 15rem;
+}
+
+.selector-nota {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid #c3c6d7;
+  border-radius: 8px;
+}
+
+.selector-nota button {
+  padding: 5px 9px;
+  border: 0;
+  border-right: 1px solid #c3c6d7;
+  background: white;
+  color: #475569;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.selector-nota button:last-child {
+  border-right: 0;
+}
+
+.selector-nota button.activa {
+  background: #004ac6;
+  color: white;
+}
+
+.selector-nota button:focus-visible {
+  outline: 3px solid #93c5fd;
+  outline-offset: -3px;
+}
+
+.enlace-comentario {
+  display: block;
+  margin-top: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #004ac6;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.enlace-comentario--con {
+  color: #166534;
+}
+
+.columna-nota .boton-chico {
+  display: block;
+  margin-top: 6px;
+}
+
+.cuenta-nota {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.ayuda {
+  color: #64748b;
+  font-size: 12px;
 }
 
 .boton-chico {

@@ -1,6 +1,6 @@
 import { useApi } from '~/composables/useApi'
 import { useAutenticacionStore } from '~/stores/autenticacion'
-import type { SolicitudTarea, Tarea } from '~/types/tarea'
+import type { SolicitudCalificacionTarea, SolicitudTarea, Tarea } from '~/types/tarea'
 
 const RUTA_TAREAS = '/api/v1/tareas'
 
@@ -25,6 +25,17 @@ export function useTareas() {
     })
   }
 
+  function calificarEntrega(
+    tareaId: number,
+    matriculaId: number,
+    solicitud: SolicitudCalificacionTarea,
+  ): Promise<Tarea> {
+    return solicitar<Tarea>(`${RUTA_TAREAS}/${tareaId}/entregas/${matriculaId}/calificacion`, {
+      metodo: 'PUT',
+      cuerpo: solicitud,
+    })
+  }
+
   /** US-3.10: descarga el archivo que entregó el alumno. */
   async function descargarArchivoEntrega(tareaId: number, matriculaId: number, nombre: string): Promise<void> {
     const base = String(configuracion.public.apiBase || '').replace(/\/+$/, '')
@@ -43,5 +54,5 @@ export function useTareas() {
     URL.revokeObjectURL(enlace.href)
   }
 
-  return { listarPorPeriodo, registrar, marcarEntrega, descargarArchivoEntrega }
+  return { listarPorPeriodo, registrar, marcarEntrega, calificarEntrega, descargarArchivoEntrega }
 }

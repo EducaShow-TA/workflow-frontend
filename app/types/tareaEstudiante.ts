@@ -23,6 +23,12 @@ export interface TareaEstudiante {
   archivoNombre: string | null
   archivoTamanio: number | null
   puedeEntregar: boolean
+  cuentaParaNota?: boolean
+  bimestre?: number | null
+  nota?: 'AD' | 'A' | 'B' | 'C' | null
+  notaJustificada?: boolean
+  comentario?: string | null
+  fechaCalificacion?: string | null
 }
 
 export type CercaniaTareaEstudiante = 'hoy' | 'semana' | 'adelante'
