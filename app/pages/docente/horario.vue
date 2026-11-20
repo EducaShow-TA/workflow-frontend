@@ -172,7 +172,7 @@ onMounted(cargar)
     <section class="horario-informacion" aria-labelledby="horario-aviso-titulo">
       <div class="horario-informacion__encabezado">
         <h2 id="horario-aviso-titulo">Horario personal</h2>
-        <span class="horario-etiqueta horario-etiqueta--demo">Sincronizado con el servidor</span>
+        <span class="horario-etiqueta horario-etiqueta--demo">Horario actualizado</span>
       </div>
       <p>
         Puedes agregar, modificar o retirar tus sesiones. Las validaciones de disponibilidad y cruces se aplican al guardar.

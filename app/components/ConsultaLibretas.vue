@@ -229,7 +229,7 @@ onMounted(cargarCatalogos)
     <section class="tarjeta" aria-labelledby="titulo-consulta">
       <h2 id="titulo-consulta">Consultar libreta</h2>
       <p v-if="esDocente" class="ayuda">
-        Solo se consultan tus clases y alumnos. El servidor limita las competencias a las áreas que dictas.
+        Solo puedes consultar los alumnos y las competencias de las clases que tienes asignadas.
       </p>
       <p v-if="esApoderado" class="ayuda">
         Selecciona a uno de tus hijos y su período académico. Solo se muestran estudiantes vinculados a tu cuenta.

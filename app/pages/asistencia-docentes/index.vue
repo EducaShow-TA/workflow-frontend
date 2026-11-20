@@ -183,7 +183,11 @@ onMounted(cargar)
     <EncabezadoPagina
       titulo="Asistencia docente"
       descripcion="Consulta los marcajes de los docentes y registra o ajusta los que tengan incidencias, indicando el motivo."
-    />
+    >
+      <template #acciones>
+        <NuxtLink class="enlace-configuracion" to="/asistencia-docentes/configuracion"> Configurar marcaje </NuxtLink>
+      </template>
+    </EncabezadoPagina>
 
     <AvisoMensaje v-if="aviso" :mensaje="aviso" tipo="exito" cerrable @cerrar="aviso = ''" />
 
@@ -362,6 +366,25 @@ onMounted(cargar)
   gap: 20px;
   margin: 0 auto;
   padding: 32px;
+}
+
+.enlace-configuracion {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 14px;
+  border: 1px solid #3159a8;
+  border-radius: 8px;
+  color: #234486;
+  background: white;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.enlace-configuracion:hover {
+  background: #f2f5fc;
 }
 
 .totales {

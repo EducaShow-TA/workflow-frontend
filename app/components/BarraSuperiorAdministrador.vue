@@ -35,7 +35,7 @@ function buscar(): void {
     return
   }
 
-  avisoBusqueda.value = 'La búsqueda estará disponible cuando se integre el servicio de estudiantes y cursos.'
+  avisoBusqueda.value = 'La búsqueda global no está disponible en este momento. Consulta Estudiantes desde el menú.'
 }
 
 function alternarNotificaciones(): void {
@@ -111,7 +111,7 @@ async function cerrarSesion(): Promise<void> {
         <div v-if="notificacionesAbiertas" id="panel-notificaciones" class="menu-emergente" role="status">
           <strong>Notificaciones</strong>
 
-          <p>Las notificaciones estarán disponibles cuando se integre el backend.</p>
+          <p>Las notificaciones no están disponibles en este momento.</p>
         </div>
 
         <div v-if="perfilAbierto" id="menu-perfil" class="menu-emergente" role="menu" aria-label="Opciones de usuario">

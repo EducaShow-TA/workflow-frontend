@@ -203,7 +203,7 @@ async function informarNuevoEstudiante(): Promise<void> {
       <footer class="pie-tabla">
         {{
           cargando
-            ? 'Consultando el servidor…'
+            ? 'Cargando estudiantes…'
             : `Mostrando ${estudiantesFiltrados.length} de ${estudiantes.length} estudiantes`
         }}
       </footer>
