@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { AlumnoClase, Calificacion, MiClase, NotaCualitativa, RiesgoAcademico } from '~/types/calificacion'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
 import { formatearFecha } from '~/composables/useFechas'
@@ -16,6 +16,7 @@ type FiltroNota = NotaCualitativa | 'SIN_NOTA' | 'RIESGO' | ''
 const autenticacion = useAutenticacionStore()
 const { listar: listarClases, listarAlumnos, obtenerRiesgo } = useMisClases()
 const { listar: listarNotas, descargarEvidencia } = useCalificaciones()
+const ruta = useRoute()
 const esDocente = computed(() => autenticacion.usuario?.rol === 'DOCENTE')
 
 const clases = ref<MiClase[]>([])
@@ -148,6 +149,20 @@ async function elegirClase(clave: string, competenciaPreferida = ''): Promise<vo
   recordar()
   await cargarClase()
 }
+
+function aplicarConsulta(): void {
+  if (typeof ruta.query.alumno === 'string') busqueda.value = ruta.query.alumno
+  if (ruta.query.filtro === 'riesgo') filtroNota.value = 'RIESGO'
+}
+
+watch(
+  () => ruta.query,
+  async (consulta) => {
+    if (!clases.value.length || typeof consulta.clase !== 'string') return
+    if (consulta.clase !== claseElegida.value) await elegirClase(consulta.clase)
+    aplicarConsulta()
+  },
+)
 
 function elegirCompetencia(codigo: string): void {
   competenciaElegida.value = codigo
@@ -288,8 +303,15 @@ onMounted(async () => {
   try {
     clases.value = await listarClases()
     const recordada = leerRecordada()
-    const inicial = clases.value.find((item) => claveClase(item) === recordada.clase) ?? clases.value[0]
-    if (inicial) await elegirClase(claveClase(inicial), recordada.competencia)
+    const pedida = typeof ruta.query.clase === 'string' ? ruta.query.clase : ''
+    const inicial =
+      clases.value.find((item) => claveClase(item) === pedida) ??
+      clases.value.find((item) => claveClase(item) === recordada.clase) ??
+      clases.value[0]
+    if (inicial) {
+      await elegirClase(claveClase(inicial), pedida ? '' : recordada.competencia)
+      aplicarConsulta()
+    }
   } catch (fallo: unknown) {
     error.value = obtenerMensajeError(fallo, 'No se pudieron cargar tus clases.')
   } finally {

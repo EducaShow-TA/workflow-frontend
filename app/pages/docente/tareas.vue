@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import type { AlumnoClase, MiClase } from '~/types/calificacion'
 import type { EntregaTarea, SolicitudTarea, Tarea } from '~/types/tarea'
 import { useTareas } from '~/composables/useTareas'
@@ -25,6 +25,8 @@ const aviso = ref('')
 const formulario = reactive({ titulo: '', descripcion: '', fechaLimite: '', ponderacion: '' })
 const claseActual = computed(() => clases.value.find((item) => claveClase(item) === claseElegida.value) ?? null)
 const competencias = computed(() => claseActual.value?.competencias ?? [])
+const ruta = useRoute()
+const tareaResaltada = ref<number | null>(null)
 const cursoElegido = ref('')
 const vista = ref<'vigentes' | 'vencidas'>('vigentes')
 const modalAbierto = ref(false)
@@ -84,8 +86,11 @@ async function cargarClases(): Promise<void> {
   error.value = ''
   try {
     clases.value = await listarClases()
+    const pedida = clases.value.find((clase) => claveClase(clase) === ruta.query.clase)
     const primerCurso = cursos.value[0]
-    if (primerCurso) {
+    if (pedida) {
+      await abrirClase(claveClase(pedida))
+    } else if (primerCurso) {
       cursoElegido.value = primerCurso[0]
       const primera = clasesDelCurso.value[0]!
       claseElegida.value = claveClase(primera)
@@ -98,6 +103,37 @@ async function cargarClases(): Promise<void> {
     cargando.value = false
   }
 }
+
+async function abrirClase(clave: string): Promise<void> {
+  const clase = clases.value.find((item) => claveClase(item) === clave)
+  if (!clase) return
+  cursoElegido.value = clase.areaCodigo
+  claseElegida.value = clave
+  competenciaCodigo.value = clase.competencias[0]?.codigo ?? ''
+  entregasAbiertas.value = new Set()
+  consignasCompletas.value = new Set()
+  await cargarTareas()
+  await resaltarTarea()
+}
+
+async function resaltarTarea(): Promise<void> {
+  const id = Number(ruta.query.tarea)
+  const tarea = tareas.value.find((item) => item.id === id)
+  tareaResaltada.value = tarea ? id : null
+  if (!tarea) return
+  vista.value = vencida(tarea) ? 'vencidas' : 'vigentes'
+  await nextTick()
+  document.getElementById(`tarea-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+}
+
+watch(
+  () => ruta.query,
+  async (consulta) => {
+    if (typeof consulta.clase !== 'string' || !clases.value.length) return
+    if (consulta.clase !== claseElegida.value) await abrirClase(consulta.clase)
+    else await resaltarTarea()
+  },
+)
 
 function alCambiarClase(): void {
   competenciaCodigo.value = competencias.value[0]?.codigo ?? ''
@@ -283,7 +319,12 @@ onBeforeUnmount(() => clearInterval(reloj))
                 : 'No hay tareas vencidas para esta clase.'
             }}
           </p>
-          <article v-for="tarea in tareasVisibles" :key="tarea.id" class="tarea">
+          <article
+            v-for="tarea in tareasVisibles"
+            :id="`tarea-${tarea.id}`"
+            :key="tarea.id"
+            :class="['tarea', { 'tarea--resaltada': tarea.id === tareaResaltada }]"
+          >
             <div class="tarea__cuerpo">
               <div class="tarea__texto">
                 <h3>{{ tarea.titulo }}</h3>
@@ -553,6 +594,11 @@ onBeforeUnmount(() => clearInterval(reloj))
   border: 1px solid #c3c6d7;
   border-radius: 12px;
   background: white;
+}
+
+.tarea--resaltada {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px #dbeafe;
 }
 
 .tarea__cuerpo {
