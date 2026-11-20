@@ -5,7 +5,7 @@
 
       <p>Sistema de Información Web para la Gestión Integral de un Colegio de Educación Secundaria.</p>
 
-      <p class="mensaje-estado">Frontend Nuxt 4 configurado correctamente.</p>
+      <p class="mensaje-estado">Organiza la gestión académica de tu institución desde un solo lugar.</p>
     </section>
   </main>
 </template>

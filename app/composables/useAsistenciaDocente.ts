@@ -3,6 +3,7 @@ import { esFechaIsoValida } from '~/composables/useFechas'
 import type { VarianteInsignia } from '~/types/interfaz'
 import type {
   AsistenciaDocente,
+  ConfiguracionMarcajeDocente,
   ErroresMarcaje,
   EstadoAjustable,
   EstadoAsistenciaDocente,
@@ -12,6 +13,7 @@ import type {
 } from '~/types/asistenciaDocente'
 
 const RUTA = '/api/v1/asistencias-docentes'
+const RUTA_CONFIGURACION = '/api/v1/configuracion/marcaje-docente'
 export const LONGITUD_MAXIMA_MOTIVO = 500
 
 export const ESTADOS_AJUSTABLES: { estado: EstadoAjustable; etiqueta: string }[] = [
@@ -98,5 +100,18 @@ export function useAsistenciaDocente() {
     return solicitar<AsistenciaDocente>(`${RUTA}/${id}`, { metodo: 'PATCH', cuerpo: solicitud })
   }
 
-  return { listar, registrar, ajustar }
+  function obtenerConfiguracionMarcaje(): Promise<ConfiguracionMarcajeDocente> {
+    return solicitar<ConfiguracionMarcajeDocente>(RUTA_CONFIGURACION)
+  }
+
+  function actualizarConfiguracionMarcaje(
+    configuracion: ConfiguracionMarcajeDocente,
+  ): Promise<ConfiguracionMarcajeDocente> {
+    return solicitar<ConfiguracionMarcajeDocente>(RUTA_CONFIGURACION, {
+      metodo: 'PATCH',
+      cuerpo: configuracion,
+    })
+  }
+
+  return { listar, registrar, ajustar, obtenerConfiguracionMarcaje, actualizarConfiguracionMarcaje }
 }

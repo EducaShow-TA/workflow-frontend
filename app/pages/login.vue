@@ -119,11 +119,6 @@ function irARecuperacion(): void {
       </CampoFormulario>
 
       <div class="opciones">
-        <label class="recordar-sesion" title="Disponible al conectar el servicio REST">
-          <input type="checkbox" disabled />
-          <span>Recordar sesión</span>
-        </label>
-
         <button type="button" class="enlace-recuperacion" @click="irARecuperacion">¿Olvidaste tu contraseña?</button>
       </div>
 

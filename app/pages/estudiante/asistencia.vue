@@ -51,7 +51,9 @@ const cargando = ref(false)
 const errorFicha = ref('')
 const error = ref('')
 const errorDocumento = ref('')
+const mensajeJustificacion = ref('')
 const descargandoId = ref<number | null>(null)
+const asistenciaActivaId = ref<number | null>(null)
 let consultaActual = 0
 
 const meses = computed(() => (ficha.value ? mesesDeLaFicha(ficha.value) : []))
@@ -170,6 +172,18 @@ async function abrirDocumento(clase: ClaseEstudiante): Promise<void> {
   }
 }
 
+function abrirFormularioJustificacion(asistenciaId: number): void {
+  asistenciaActivaId.value = asistenciaId
+  errorDocumento.value = ''
+  mensajeJustificacion.value = ''
+}
+
+async function alJustificar(): Promise<void> {
+  asistenciaActivaId.value = null
+  mensajeJustificacion.value = 'La inasistencia quedó justificada y el documento fue adjuntado.'
+  await consultar()
+}
+
 watch(mes, () => {
   diaSeleccionado.value = null
   void consultar()
@@ -220,6 +234,7 @@ onMounted(cargarFicha)
       </section>
 
       <AvisoMensaje v-if="errorDocumento" :mensaje="errorDocumento" tipo="error" />
+      <AvisoMensaje v-if="mensajeJustificacion" :mensaje="mensajeJustificacion" tipo="exito" />
 
       <div class="rejilla">
         <section class="docente-tarjeta calendario" aria-label="Calendario del mes">
@@ -371,6 +386,24 @@ onMounted(cargarFicha)
                 {{ horaDeClaseFamilia(incidencia.clases[0].horaFin) }} · {{ incidencia.clases[0].docenteNombre }}
                 <template v-if="incidencia.estado === 'AUSENTE'"> · Sin justificar</template>
               </p>
+              <FormularioJustificacionAsistencia
+                v-if="
+                  incidencia.estado === 'AUSENTE' &&
+                  incidencia.clases[0] &&
+                  asistenciaActivaId === incidencia.clases[0].asistenciaId
+                "
+                :asistencia-id="incidencia.clases[0].asistenciaId"
+                @cancelar="asistenciaActivaId = null"
+                @justificada="alJustificar"
+              />
+              <button
+                v-else-if="incidencia.estado === 'AUSENTE' && incidencia.clases[0]"
+                type="button"
+                class="enlace"
+                @click="abrirFormularioJustificacion(incidencia.clases[0].asistenciaId)"
+              >
+                Justificar inasistencia
+              </button>
             </li>
           </ul>
         </section>

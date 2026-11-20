@@ -302,9 +302,9 @@ onMounted(async () => {
   <main class="docente-vista">
     <header class="docente-titulo">
       <div>
-        <span class="docente-sobrelinea">US-3.2 · US-3.6 · US-3.8</span>
+        <span class="docente-sobrelinea">Evaluación por competencias</span>
         <h1>Calificaciones</h1>
-        <p>Elige tu clase y la competencia; registra o rectifica la nota de cada alumno con su evidencia.</p>
+        <p>Elige tu clase y la competencia; registra la nota de cada alumno con su evidencia.</p>
       </div>
       <span class="docente-insignia">Escala AD · A · B · C</span>
     </header>
@@ -476,7 +476,7 @@ onMounted(async () => {
                     <th scope="col">Alumno</th>
                     <th scope="col">Nota</th>
                     <th scope="col">Evidencia</th>
-                    <th scope="col">Última modificación</th>
+                    <th scope="col">Registrada</th>
                     <th scope="col"><span class="solo-lectores">Acción</span></th>
                   </tr>
                 </thead>

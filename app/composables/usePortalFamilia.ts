@@ -6,6 +6,7 @@ import type {
   EstadoAsistenciaHijo,
   HijoVinculado,
   PeriodoVinculado,
+  RespuestaJustificacionAsistencia,
   RegistroAsistencia,
   ResumenAsistencia,
 } from '~/types/familia'
@@ -144,6 +145,16 @@ export function usePortalFamilia() {
     return registros.filter((registro) => ESTADOS_ASISTENCIA.includes(registro.estado))
   }
 
+  function justificarAsistencia(asistenciaId: number, motivo: string, documento: File) {
+    const formulario = new FormData()
+    formulario.append('motivo', motivo)
+    formulario.append('documento', documento, documento.name)
+    return solicitar<RespuestaJustificacionAsistencia>(
+      `/api/v1/asistencias-estudiantes/${asistenciaId}/justificacion`,
+      { metodo: 'PATCH', cuerpo: formulario },
+    )
+  }
+
   /** El documento pide el token de sesión, así que se descarga con fetch y no con un enlace directo. */
   async function descargarDocumento(registro: Pick<RegistroAsistencia, 'asistenciaId'>): Promise<Blob> {
     const base = String(configuracion.public.apiBase || '').replace(/\/+$/, '')
@@ -163,5 +174,5 @@ export function usePortalFamilia() {
     return respuesta.blob()
   }
 
-  return { listarHijos, consultarAsistencia, descargarDocumento }
+  return { listarHijos, consultarAsistencia, justificarAsistencia, descargarDocumento }
 }
