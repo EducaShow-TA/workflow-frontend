@@ -347,7 +347,10 @@ onMounted(cargarCatalogos)
                           entrega.cumplida ? 'Entregada' : 'Pendiente'
                         }}</span>
                       </td>
-                      <td>{{ entrega.fechaCumplimiento ? formatearFecha(entrega.fechaCumplimiento) : '—' }}</td>
+                      <td>
+                        {{ entrega.fechaCumplimiento ? formatearFecha(entrega.fechaCumplimiento) : '—' }}
+                        <ArchivoEntregaTarea :tarea-id="tarea.id" :entrega="entrega" />
+                      </td>
                       <td>
                         <button
                           type="button"

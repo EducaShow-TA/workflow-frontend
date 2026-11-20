@@ -5,6 +5,7 @@ const enlaces = [
   { nombre: 'Panel', destino: '/estudiante', icono: '/icons/menu-panel.svg' },
   { nombre: 'Horario', destino: '/estudiante/horario', icono: '/icons/menu-horarios.svg' },
   { nombre: 'Asistencia', destino: '/estudiante/asistencia', icono: '/icons/menu-estudiantes.svg' },
+  { nombre: 'Tareas', destino: '/estudiante/tareas', icono: '/icons/menu-tareas.svg' },
 ]
 function activo(destino: string): boolean {
   return destino === '/estudiante' ? ruta.path === destino : ruta.path.startsWith(destino)

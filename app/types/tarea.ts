@@ -5,6 +5,10 @@ export interface EntregaTarea {
   estudiante: string
   cumplida: boolean
   fechaCumplimiento: string | null
+  origen?: 'ALUMNO' | 'DOCENTE' | null
+  archivoNombre?: string | null
+  archivoTamanio?: number | null
+  archivoFecha?: string | null
 }
 
 /** Respuesta de /api/v1/tareas. */
