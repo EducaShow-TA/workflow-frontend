@@ -1,32 +1,23 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { useApi } from '~/composables/useApi'
+import type { RegistroAuditoriaHorario } from '~/types/auditoriaHorario'
+import {
+  describirRangoVigencia,
+  describirResponsable,
+  formatearFechaHora,
+  nombreVigencia,
+  useAuditoriaHorarios,
+} from '~/composables/useAuditoriaHorarios'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
 
 definePageMeta({ middleware: 'autenticacion' })
 
-interface RegistroAuditoria {
-  id: number
-  horarioId: number
-  seccion: string
-  accion: string
-  fechaHora: string
-  usuarioCuentaId: number
-  usuarioNombre: string
-  detalle: string
-  valoresAnteriores: string | null
-  valoresNuevos: string | null
-  vigenciaTipo: string
-  vigenteDesde: string | null
-  vigenteHasta: string | null
-}
-
-const { solicitar } = useApi()
+const { listar } = useAuditoriaHorarios()
 const fechaLocal = new Date()
 const hoy = `${fechaLocal.getFullYear()}-${String(fechaLocal.getMonth() + 1).padStart(2, '0')}-${String(fechaLocal.getDate()).padStart(2, '0')}`
 const desde = ref(`${hoy.slice(0, 4)}-01-01`)
 const hasta = ref(hoy)
-const registros = ref<RegistroAuditoria[]>([])
+const registros = ref<RegistroAuditoriaHorario[]>([])
 const cargando = ref(false)
 const error = ref('')
 
@@ -34,18 +25,12 @@ async function cargar(): Promise<void> {
   cargando.value = true
   error.value = ''
   try {
-    registros.value = await solicitar<RegistroAuditoria[]>(
-      `/api/v1/horarios/auditoria?desde=${desde.value}&hasta=${hasta.value}`,
-    )
+    registros.value = await listar({ desde: desde.value, hasta: hasta.value })
   } catch (fallo: unknown) {
     error.value = obtenerMensajeError(fallo, 'No se pudo cargar la auditoría de horarios.')
   } finally {
     cargando.value = false
   }
-}
-
-function fecha(valor: string): string {
-  return new Intl.DateTimeFormat('es-PE', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(valor))
 }
 
 onMounted(cargar)
@@ -86,21 +71,19 @@ onMounted(cargar)
         </thead>
         <tbody>
           <tr v-for="registro in registros" :key="registro.id">
-            <td>{{ fecha(registro.fechaHora) }}</td>
+            <td>{{ formatearFechaHora(registro.fechaHora) }}</td>
             <td>
               {{ registro.seccion }}<small>Horario #{{ registro.horarioId }}</small>
             </td>
             <td>
-              {{ registro.usuarioNombre }}<small>Cuenta #{{ registro.usuarioCuentaId }}</small>
+              {{ registro.usuarioNombre }}<small>{{ describirResponsable(registro) }}</small>
             </td>
             <td>
               <strong>{{ registro.accion }}</strong><small>{{ registro.detalle }}</small>
             </td>
             <td>
-              {{ registro.vigenciaTipo
-              }}<small v-if="registro.vigenteDesde"
-                >{{ registro.vigenteDesde }} – {{ registro.vigenteHasta ?? 'sin fin' }}</small
-              >
+              {{ nombreVigencia(registro.vigenciaTipo)
+              }}<small v-if="registro.vigenteDesde">{{ describirRangoVigencia(registro) }}</small>
             </td>
             <td>{{ registro.valoresAnteriores ?? '—' }}</td>
             <td>{{ registro.valoresNuevos ?? '—' }}</td>
