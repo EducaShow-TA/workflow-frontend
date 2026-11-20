@@ -12,6 +12,8 @@ import {
   obtenerSituacion,
   useSesionesClase,
 } from '~/composables/useSesionesClase'
+import { resumirResultadoCarga, useCargaMasivaAsistencia } from '~/composables/useCargaMasivaAsistencia'
+import type { ResultadoCargaAsistencia } from '~/types/cargaMasivaAsistencia'
 import { useAutenticacionStore } from '~/stores/autenticacion'
 
 type Modo = 'tomar' | 'lectura' | 'edicion' | 'por-abrir' | 'cerrada'
@@ -30,6 +32,7 @@ const propiedades = defineProps<{
 
 const autenticacion = useAutenticacionStore()
 const { obtenerLista, guardarAsistencias } = useSesionesClase()
+const cargaMasiva = useCargaMasivaAsistencia()
 
 const esAdministrador = computed(() => autenticacion.usuario?.rol === 'ADMINISTRADOR')
 
@@ -41,6 +44,8 @@ const cargando = ref(true)
 const guardando = ref(false)
 const error = ref('')
 const errorGuardar = ref('')
+const cargaAbierta = ref(false)
+const avisoCarga = ref('')
 const resumenGuardado = ref<{ presentes: number; tardanzas: number; ausentes: number } | null>(null)
 
 const sesion = computed(() => lista.value?.sesion ?? null)
@@ -126,6 +131,12 @@ async function cargar(): Promise<void> {
   }
 }
 
+async function alGuardarCarga(resultado: ResultadoCargaAsistencia): Promise<void> {
+  cargaAbierta.value = false
+  avisoCarga.value = resumirResultadoCarga(resultado)
+  await cargar()
+}
+
 function marcar(estudianteId: number, estado: EstadoMarcable): void {
   marcas.value = { ...marcas.value, [estudianteId]: estado }
   errorGuardar.value = ''
@@ -198,6 +209,9 @@ onMounted(cargar)
         :descripcion="`${formatearFecha(sesion.fecha)} · ${formatearHora(sesion.horaInicio)} – ${formatearHora(sesion.horaFin)} · ${sesion.totalAlumnos} alumnos · ${sesion.docenteNombre}`"
       >
         <template #acciones>
+          <BotonAccion v-if="modo === 'tomar' || modo === 'lectura'" variante="secundario" @click="cargaAbierta = true">
+            ⬆ Cargar CSV
+          </BotonAccion>
           <BotonAccion v-if="modo === 'lectura'" variante="secundario" @click="editar">✎ Editar asistencia</BotonAccion>
           <InsigniaEstado
             v-else-if="modo === 'tomar' && sesion.ventanaAbierta"
@@ -207,6 +221,7 @@ onMounted(cargar)
         </template>
       </EncabezadoPagina>
 
+      <AvisoMensaje v-if="avisoCarga" :mensaje="avisoCarga" tipo="exito" cerrable @cerrar="avisoCarga = ''" />
       <AvisoMensaje v-if="modo === 'lectura' && textoAuditoria" :mensaje="`✓ ${textoAuditoria}.`" tipo="exito" />
       <AvisoMensaje
         v-else-if="modo === 'edicion'"
@@ -374,6 +389,18 @@ onMounted(cargar)
         </BotonAccion>
       </template>
     </VentanaModal>
+
+    <ModalCargaMasivaAsistencia
+      :abierta="cargaAbierta"
+      titulo="Cargar asistencia desde CSV"
+      descripcion="Descarga la plantilla con los alumnos de esta sesión, completa el estado y súbela. Se valida antes de guardar."
+      columnas="Columnas: dni_alumno y estado (PRESENTE, TARDANZA o AUSENTE)."
+      :enviar="(archivo, soloValidar) => cargaMasiva.cargarAlumnos(sesionId, archivo, soloValidar)"
+      :obtener-plantilla="() => cargaMasiva.obtenerPlantillaAlumnos(sesionId)"
+      nombre-plantilla="plantilla-asistencia.csv"
+      @cerrar="cargaAbierta = false"
+      @guardado="alGuardarCarga"
+    />
   </section>
 </template>
 

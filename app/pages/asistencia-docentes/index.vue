@@ -5,6 +5,8 @@ import type { DocenteOpcion } from '~/types/sesionClase'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
 import { formatearFecha, obtenerFechaHoyIso } from '~/composables/useFechas'
 import { useSesionesClase } from '~/composables/useSesionesClase'
+import { resumirResultadoCarga, useCargaMasivaAsistencia } from '~/composables/useCargaMasivaAsistencia'
+import type { ResultadoCargaAsistencia } from '~/types/cargaMasivaAsistencia'
 import {
   ESTADOS_AJUSTABLES,
   LONGITUD_MAXIMA_MOTIVO,
@@ -28,6 +30,7 @@ interface FilaDocente {
 
 const { listar, registrar, ajustar } = useAsistenciaDocente()
 const { listarDocentes } = useSesionesClase()
+const cargaMasiva = useCargaMasivaAsistencia()
 
 const fecha = ref(obtenerFechaHoyIso())
 const busqueda = ref('')
@@ -37,6 +40,7 @@ const cargando = ref(true)
 const error = ref('')
 const aviso = ref('')
 
+const cargaAbierta = ref(false)
 const modalAbierto = ref(false)
 const asistenciaEnAjuste = ref<AsistenciaDocente | null>(null)
 const guardando = ref(false)
@@ -90,6 +94,12 @@ const totales = computed(() => {
 
 function hora(valor: string | null): string {
   return valor ? valor.slice(0, 5) : '—'
+}
+
+async function alGuardarCarga(resultado: ResultadoCargaAsistencia): Promise<void> {
+  cargaAbierta.value = false
+  aviso.value = resumirResultadoCarga(resultado)
+  await cargar()
 }
 
 async function cargar(): Promise<void> {
@@ -228,6 +238,7 @@ onMounted(cargar)
           />
         </div>
         <BotonAccion variante="secundario" :deshabilitado="cargando" @click="cargar">Actualizar</BotonAccion>
+        <BotonAccion variante="secundario" @click="cargaAbierta = true">Carga masiva (CSV)</BotonAccion>
       </div>
 
       <PanelEstadoCarga v-if="cargando || error" :cargando="cargando" :error="error" @reintentar="cargar" />
@@ -354,6 +365,17 @@ onMounted(cargar)
         </BotonAccion>
       </template>
     </VentanaModal>
+    <ModalCargaMasivaAsistencia
+      :abierta="cargaAbierta"
+      titulo="Carga masiva de asistencia docente"
+      descripcion="Sube un CSV con la jornada de varios docentes. Se valida todo el archivo antes de guardar."
+      columnas="Columnas: dni_docente y fecha (obligatorias); hora_entrada, hora_salida, estado y motivo (opcionales)."
+      :enviar="cargaMasiva.cargarDocentes"
+      :obtener-plantilla="cargaMasiva.obtenerPlantillaDocentes"
+      nombre-plantilla="plantilla-asistencia-docentes.csv"
+      @cerrar="cargaAbierta = false"
+      @guardado="alGuardarCarga"
+    />
   </main>
 </template>
 
