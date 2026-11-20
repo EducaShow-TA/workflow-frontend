@@ -127,3 +127,15 @@ export interface ComprobantePagoFamilia {
   medioPago: 'PRESENCIAL' | 'VIRTUAL'
   numeroComprobante: string
 }
+
+/** Alertas calculadas por el backend solo para los hijos del apoderado autenticado. */
+export interface AlertaRiesgoFamilia {
+  estudianteId: number
+  periodoId: number
+  bimestre: number
+  areaCodigo: string
+  areaNombre: string
+  notasC: number
+  umbral: number
+  competencias: { codigo: string; nombre: string; notasC: number }[]
+}

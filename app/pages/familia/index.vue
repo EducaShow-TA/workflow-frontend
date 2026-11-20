@@ -23,7 +23,13 @@ import {
   usePagosFamilia,
 } from '~/composables/usePagosFamilia'
 import { useAutenticacionStore } from '~/stores/autenticacion'
-import type { HijoVinculado, PagosHijo, RegistroAsistencia, ResumenAsistencia } from '~/types/familia'
+import type {
+  AlertaRiesgoFamilia,
+  HijoVinculado,
+  PagosHijo,
+  RegistroAsistencia,
+  ResumenAsistencia,
+} from '~/types/familia'
 
 definePageMeta({ middleware: 'autenticacion', layout: 'familia' })
 
@@ -50,7 +56,7 @@ const MESES = [
 ]
 
 const autenticacion = useAutenticacionStore()
-const { listarHijos, consultarAsistencia } = usePortalFamilia()
+const { listarHijos, consultarAsistencia, consultarRiesgos } = usePortalFamilia()
 const { listarPagos } = usePagosFamilia()
 const DEUDAS_VISIBLES = 3
 const configuracion = useRuntimeConfig()
@@ -64,6 +70,9 @@ const cargando = ref(true)
 const error = ref('')
 const pagos = ref<PagosHijo[]>([])
 const errorPagos = ref('')
+const riesgos = ref<AlertaRiesgoFamilia[]>([])
+const errorRiesgos = ref('')
+let actualizacionRiesgos = 0
 
 const deudas = computed(() => deudaFamiliar(pagos.value))
 const totalDeuda = computed(() => sumarDeuda(deudas.value))
@@ -115,7 +124,7 @@ async function cargar(): Promise<void> {
   error.value = ''
 
   try {
-    const [hijos] = await Promise.all([listarHijos(), cargarPagos()])
+    const [hijos] = await Promise.all([listarHijos(), cargarPagos(), cargarRiesgos()])
     tarjetas.value = await Promise.all(hijos.map(armarTarjeta))
   } catch (fallo: unknown) {
     error.value = obtenerMensajeError(fallo, 'No se pudo cargar el resumen de tus hijos.')
@@ -137,9 +146,28 @@ async function cargarPagos(): Promise<void> {
   }
 }
 
+async function cargarRiesgos(): Promise<void> {
+  const actual = ++actualizacionRiesgos
+  try {
+    const resultado = await consultarRiesgos()
+    if (actual === actualizacionRiesgos) {
+      riesgos.value = resultado
+      errorRiesgos.value = ''
+    }
+  } catch (fallo: unknown) {
+    if (actual === actualizacionRiesgos) {
+      riesgos.value = []
+      errorRiesgos.value = obtenerMensajeError(fallo, 'No se pudo consultar el riesgo académico de tus hijos.')
+    }
+  }
+}
+
 function actualizarRecordatorios(): void {
   fechaRecordatorio.value = obtenerFechaHoyIso()
-  if (document.visibilityState === 'visible' && !cargando.value) void cargarPagos()
+  if (document.visibilityState === 'visible' && !cargando.value) {
+    void cargarPagos()
+    void cargarRiesgos()
+  }
 }
 
 onMounted(() => {
@@ -150,6 +178,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   actualizacionPagos++
+  actualizacionRiesgos++
   window.removeEventListener('focus', actualizarRecordatorios)
   clearInterval(temporizador)
 })
@@ -243,12 +272,38 @@ onUnmounted(() => {
         <NuxtLink to="/familia/pagos" class="ver-pagos">Ver pagos</NuxtLink>
       </section>
 
+      <div v-if="errorRiesgos" role="alert">
+        <p>{{ errorRiesgos }}</p>
+        <button type="button" class="reintentar-riesgo" @click="cargarRiesgos">Reintentar consulta académica</button>
+      </div>
+
       <section class="hijos" aria-label="Resumen por hijo">
         <article v-for="tarjeta in tarjetas" :key="tarjeta.hijo.estudianteId" class="docente-tarjeta hijo">
           <header>
             <h2>{{ tarjeta.hijo.nombreCompleto }}</h2>
             <p>{{ describirSeccionHijo(periodoVigente(tarjeta.hijo, fechaHoy)) }}</p>
           </header>
+
+          <section
+            v-for="alerta in riesgos.filter((item) => item.estudianteId === tarjeta.hijo.estudianteId)"
+            :key="`${alerta.periodoId}-${alerta.areaCodigo}`"
+            class="alerta-riesgo"
+            role="status"
+            :aria-label="`Riesgo académico en ${alerta.areaNombre}`"
+          >
+            <h3>Riesgo académico en {{ alerta.areaNombre }}</h3>
+            <p>
+              Bimestre {{ alerta.bimestre }}: {{ alerta.notasC }} calificaciones C superan el umbral configurado de
+              {{ alerta.umbral }}. Coordina con el docente acciones de apoyo.
+            </p>
+            <ul>
+              <li v-for="competencia in alerta.competencias" :key="competencia.codigo">
+                {{ competencia.nombre }} · {{ competencia.notasC }}
+                {{ competencia.notasC === 1 ? 'calificación C' : 'calificaciones C' }}
+              </li>
+            </ul>
+            <NuxtLink to="/libretas">Ver progreso académico</NuxtLink>
+          </section>
 
           <h3>Asistencia de {{ mes }}</h3>
 
@@ -297,6 +352,41 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+.alerta-riesgo {
+  padding: 16px;
+  border: 1px solid #f0b4aa;
+  border-radius: 10px;
+  background: #fff1ee;
+  color: #8c291d;
+}
+
+.alerta-riesgo p {
+  margin: 8px 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.alerta-riesgo ul {
+  margin: 8px 0 12px;
+  padding-left: 20px;
+  font-size: 14px;
+}
+
+.alerta-riesgo a,
+.reintentar-riesgo {
+  color: #2444b0;
+  font: inherit;
+  font-weight: 600;
+}
+
+.reintentar-riesgo {
+  padding: 8px 12px;
+  border: 1px solid #c9d4e5;
+  border-radius: 6px;
+  background: white;
+  cursor: pointer;
+}
+
 .recordatorio-pagos {
   padding: 20px;
   border: 1px solid #e8be52;

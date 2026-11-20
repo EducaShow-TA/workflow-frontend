@@ -1,6 +1,7 @@
 import { useApi } from '~/composables/useApi'
 import { useAutenticacionStore } from '~/stores/autenticacion'
 import type {
+  AlertaRiesgoFamilia,
   AtajoRango,
   DiaAsistencia,
   EstadoAsistenciaHijo,
@@ -129,6 +130,10 @@ export function usePortalFamilia() {
   const autenticacion = useAutenticacionStore()
   const configuracion = useRuntimeConfig()
 
+  function consultarRiesgos(): Promise<AlertaRiesgoFamilia[]> {
+    return solicitar<AlertaRiesgoFamilia[]>('/api/v1/apoderados/alertas-riesgo-academico')
+  }
+
   function listarHijos(): Promise<HijoVinculado[]> {
     return solicitar<HijoVinculado[]>('/api/v1/apoderados/mis-estudiantes')
   }
@@ -174,5 +179,5 @@ export function usePortalFamilia() {
     return respuesta.blob()
   }
 
-  return { listarHijos, consultarAsistencia, justificarAsistencia, descargarDocumento }
+  return { listarHijos, consultarAsistencia, justificarAsistencia, descargarDocumento, consultarRiesgos }
 }
