@@ -32,6 +32,7 @@ const error = ref('')
 const errorDescarga = ref('')
 const descargandoId = ref<number | null>(null)
 const modalAbierto = ref(false)
+const avisoPago = ref('')
 
 const hijo = computed(() => hijos.value.find((item) => item.estudianteId === estudianteId.value) ?? null)
 const compromiso = computed(
@@ -125,6 +126,11 @@ async function descargar(boleta: BoletaFamilia): Promise<void> {
   }
 }
 
+async function alPagar(cantidad: number): Promise<void> {
+  avisoPago.value = cantidad === 1 ? 'Se registró el pago de 1 boleta.' : `Se registró el pago de ${cantidad} boletas.`
+  await cargar()
+}
+
 watch(estudianteId, () => {
   compromisoId.value = null
   verTodoHistorial.value = false
@@ -168,6 +174,7 @@ onMounted(cargar)
         </button>
       </div>
 
+      <AvisoMensaje v-if="avisoPago" :mensaje="avisoPago" tipo="exito" cerrable @cerrar="avisoPago = ''" />
       <AvisoMensaje v-if="errorDescarga" :mensaje="errorDescarga" tipo="error" />
 
       <AvisoMensaje
@@ -306,13 +313,13 @@ onMounted(cargar)
                   :disabled="!seleccionadas.length"
                   @click="modalAbierto = true"
                 >
-                  Consultar medios de pago
+                  {{ seleccionadas.length === porPagar.length ? 'Pagar todas' : 'Pagar seleccionadas' }}
                 </button>
               </footer>
             </div>
             <p class="nota">
-              Las boletas se muestran de la más antigua a la más reciente. Consulta los medios de pago habilitados antes
-              de realizar el pago.
+              De la más antigua a la más reciente. Se pagan juntas en una sola operación: si una falla, no se cobra
+              ninguna.
             </p>
           </template>
         </section>
@@ -380,6 +387,7 @@ onMounted(cargar)
       :deudas="deudasSeleccionadas"
       :titular="autenticacion.usuario?.nombreCompleto"
       @cerrar="modalAbierto = false"
+      @pagadas="alPagar($event.length)"
     />
   </main>
 </template>

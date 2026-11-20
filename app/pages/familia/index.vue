@@ -22,23 +22,60 @@ import {
   NOMBRES_ESTADO_BOLETA,
   usePagosFamilia,
 } from '~/composables/usePagosFamilia'
+import { useLibretas } from '~/composables/useLibretas'
 import { useAutenticacionStore } from '~/stores/autenticacion'
+import type { LibretaNotas } from '~/types/libreta'
+import type { HorarioEstudiante } from '~/types/portalEstudiante'
 import type {
   AlertaRiesgoFamilia,
   HijoVinculado,
   PagosHijo,
+  PeriodoVinculado,
   RegistroAsistencia,
   ResumenAsistencia,
 } from '~/types/familia'
 
 definePageMeta({ middleware: 'autenticacion', layout: 'familia' })
 
+type NotaLogro = 'AD' | 'A' | 'B' | 'C'
+
+interface ClaseHoy {
+  clave: string
+  hora: string
+  area: string
+  registro: RegistroAsistencia | null
+}
+
+interface NotasBimestre {
+  bimestre: number
+  conteo: Record<NotaLogro, number>
+  total: number
+}
+
 interface TarjetaHijo {
   hijo: HijoVinculado
   resumen: ResumenAsistencia | null
   incidencias: RegistroAsistencia[]
   error: string
+  registrosHoy: RegistroAsistencia[]
+  clasesHoy: ClaseHoy[] | null
+  notas: NotasBimestre | null
+  errorNotas: string
 }
+
+interface AvisoAusencia {
+  clave: string
+  estudianteId: number
+  nombre: string
+  areas: string
+  seccion: string
+  hora: string
+}
+
+const NOTAS_LOGRO: NotaLogro[] = ['AD', 'A', 'B', 'C']
+const DIAS_SEMANA = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY']
+const DIAS_NOMBRE = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
+const CLAVE_AUSENCIAS_VISTAS = 'familia-ausencias-vistas'
 
 const MESES = [
   'enero',
@@ -56,7 +93,8 @@ const MESES = [
 ]
 
 const autenticacion = useAutenticacionStore()
-const { listarHijos, consultarAsistencia, consultarRiesgos } = usePortalFamilia()
+const { listarHijos, consultarAsistencia, consultarRiesgos, consultarHorario } = usePortalFamilia()
+const { consultar: consultarLibreta } = useLibretas()
 const { listarPagos } = usePagosFamilia()
 const DEUDAS_VISIBLES = 3
 const configuracion = useRuntimeConfig()
@@ -89,6 +127,26 @@ const proximaEmision = computed(
       .sort()[0] ?? null,
 )
 
+const ausenciasVistas = ref<string[]>(leerAusenciasVistas())
+const avisosAusencia = computed<AvisoAusencia[]>(() =>
+  tarjetas.value.flatMap((tarjeta) => {
+    const ausentes = tarjeta.registrosHoy.filter((registro) => registro.estado === 'AUSENTE')
+    const clave = ausentes.map((registro) => registro.asistenciaId).join('-')
+    const primera = ausentes[0]
+    if (!primera || ausenciasVistas.value.includes(clave)) return []
+    return [
+      {
+        clave,
+        estudianteId: tarjeta.hijo.estudianteId,
+        nombre: primerNombre(tarjeta.hijo.nombreCompleto),
+        areas: [...new Set(ausentes.map((registro) => registro.areaNombre))].join(', '),
+        seccion: describirSeccionHijo(periodoVigente(tarjeta.hijo, fechaHoy)),
+        hora: primera.horaInicio.slice(0, 5),
+      },
+    ]
+  }),
+)
+
 const nombre = computed(() => autenticacion.usuario?.nombreCompleto?.trim().split(/\s+/)[0] ?? '')
 const mes = MESES[Number(fechaHoy.slice(5, 7)) - 1]
 
@@ -96,11 +154,93 @@ function formatearDia(fecha: string): string {
   return `${fecha.slice(8, 10)}/${fecha.slice(5, 7)}`
 }
 
+const diaHoy = new Date(Number(fechaHoy.slice(0, 4)), Number(fechaHoy.slice(5, 7)) - 1, Number(fechaHoy.slice(8, 10)))
+const textoHoy = `${DIAS_NOMBRE[diaHoy.getDay()]} ${formatearDia(fechaHoy)}`
+
+function leerAusenciasVistas(): string[] {
+  try {
+    const guardado: unknown = JSON.parse(localStorage.getItem(CLAVE_AUSENCIAS_VISTAS) ?? '[]')
+    return Array.isArray(guardado) ? guardado.filter((clave): clave is string => typeof clave === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+function marcarAusenciaVista(clave: string): void {
+  ausenciasVistas.value = [...ausenciasVistas.value, clave].slice(-50)
+  try {
+    localStorage.setItem(CLAVE_AUSENCIAS_VISTAS, JSON.stringify(ausenciasVistas.value))
+  } catch {
+    return
+  }
+}
+
+/** Misma regla del back: el período se divide en cuatro tramos de duración similar. */
+function bimestreActual(periodo: PeriodoVinculado, fecha: string): number {
+  const dia = 86_400_000
+  const inicio = Date.parse(periodo.fechaInicio)
+  const diasTotales = Math.round((Date.parse(periodo.fechaFin) - inicio) / dia) + 1
+  const transcurridos = Math.max(0, Math.min(diasTotales - 1, Math.round((Date.parse(fecha) - inicio) / dia)))
+  return Math.min(4, Math.floor((transcurridos * 4) / diasTotales) + 1)
+}
+
+function armarClasesHoy(sesiones: HorarioEstudiante[], registrosHoy: RegistroAsistencia[]): ClaseHoy[] {
+  return sesiones
+    .filter((sesion) => sesion.dia === DIAS_SEMANA[diaHoy.getDay()])
+    .sort((primera, segunda) => primera.horaInicio.localeCompare(segunda.horaInicio))
+    .map((sesion) => ({
+      clave: `${sesion.id}`,
+      hora: sesion.horaInicio.slice(0, 5),
+      area: sesion.areaNombre,
+      registro:
+        registrosHoy.find(
+          (registro) =>
+            registro.areaCodigo === sesion.areaCodigo &&
+            registro.horaInicio.slice(0, 5) === sesion.horaInicio.slice(0, 5),
+        ) ?? null,
+    }))
+}
+
+function contarNotas(libreta: LibretaNotas): NotasBimestre {
+  const conteo: Record<NotaLogro, number> = { AD: 0, A: 0, B: 0, C: 0 }
+  const periodo = libreta.periodos.find((item) => item.periodoId === libreta.periodoSolicitadoId)
+  for (const area of periodo?.areas ?? []) {
+    for (const competencia of area.competencias) {
+      const nota = competencia.nota as NotaLogro | null
+      if (nota && NOTAS_LOGRO.includes(nota)) conteo[nota]++
+    }
+  }
+  return { bimestre: libreta.bimestre, conteo, total: NOTAS_LOGRO.reduce((suma, nota) => suma + conteo[nota], 0) }
+}
+
+async function cargarClasesHoy(hijo: HijoVinculado, registrosHoy: RegistroAsistencia[]): Promise<ClaseHoy[] | null> {
+  if (!periodoVigente(hijo, fechaHoy)) return []
+  try {
+    return armarClasesHoy(await consultarHorario(hijo.estudianteId, Number(fechaHoy.slice(0, 4))), registrosHoy)
+  } catch {
+    return null
+  }
+}
+
+async function cargarNotas(hijo: HijoVinculado): Promise<Pick<TarjetaHijo, 'notas' | 'errorNotas'>> {
+  const periodo = periodoVigente(hijo, fechaHoy)
+  if (!periodo) return { notas: null, errorNotas: '' }
+  try {
+    const libreta = await consultarLibreta(hijo.estudianteId, periodo.periodoId, bimestreActual(periodo, fechaHoy))
+    return { notas: contarNotas(libreta), errorNotas: '' }
+  } catch (fallo: unknown) {
+    return { notas: null, errorNotas: obtenerMensajeError(fallo, 'No se pudieron consultar las notas del bimestre.') }
+  }
+}
+
 async function armarTarjeta(hijo: HijoVinculado): Promise<TarjetaHijo> {
   const { desde, hasta } = calcularRango('MES', fechaHoy)
+  const notas = cargarNotas(hijo)
+  let registros: RegistroAsistencia[] = []
+  let base: Pick<TarjetaHijo, 'resumen' | 'incidencias' | 'error'>
 
   try {
-    const registros = await consultarAsistencia(hijo.estudianteId, desde, hasta)
+    registros = await consultarAsistencia(hijo.estudianteId, desde, hasta)
     const incidencias = registros
       .filter((registro) => registro.estado !== 'PRESENTE')
       .sort(
@@ -108,15 +248,18 @@ async function armarTarjeta(hijo: HijoVinculado): Promise<TarjetaHijo> {
           segundo.fecha.localeCompare(primero.fecha) || segundo.horaInicio.localeCompare(primero.horaInicio),
       )
       .slice(0, 3)
-    return { hijo, resumen: resumirAsistencia(registros), incidencias, error: '' }
+    base = { resumen: resumirAsistencia(registros), incidencias, error: '' }
   } catch (fallo: unknown) {
-    return {
-      hijo,
+    base = {
       resumen: null,
       incidencias: [],
       error: obtenerMensajeError(fallo, 'No se pudo cargar la asistencia del mes.'),
     }
   }
+
+  const registrosHoy = registros.filter((registro) => registro.fecha === fechaHoy)
+  const [clasesHoy, resultadoNotas] = await Promise.all([cargarClasesHoy(hijo, registrosHoy), notas])
+  return { hijo, ...base, registrosHoy, clasesHoy, ...resultadoNotas }
 }
 
 async function cargar(): Promise<void> {
@@ -202,6 +345,25 @@ onUnmounted(() => {
     />
 
     <template v-else>
+      <section v-if="avisosAusencia.length" class="avisos-ausencia" aria-label="Avisos de hoy">
+        <div v-for="aviso in avisosAusencia" :key="aviso.clave" class="aviso-ausencia" role="status">
+          <span class="icono-aviso" aria-hidden="true">!</span>
+          <div class="texto-aviso">
+            <strong>{{ aviso.nombre }} fue marcado ausente hoy</strong>
+            <small>
+              {{ aviso.areas }} · {{ aviso.seccion }} · {{ textoHoy }}, {{ aviso.hora }}. Si faltó por un motivo
+              justificado, puedes enviar la justificación.
+            </small>
+          </div>
+          <div class="botones-aviso">
+            <NuxtLink :to="`/familia/asistencia?estudianteId=${aviso.estudianteId}`" class="justificar">
+              Justificar
+            </NuxtLink>
+            <button type="button" class="entendido" @click="marcarAusenciaVista(aviso.clave)">Entendido</button>
+          </div>
+        </div>
+      </section>
+
       <section
         v-if="!errorPagos && recordatorios.length"
         class="recordatorio-pagos"
@@ -305,6 +467,27 @@ onUnmounted(() => {
             <NuxtLink to="/libretas">Ver progreso académico</NuxtLink>
           </section>
 
+          <section class="bloque-hoy" :aria-label="`Clases de hoy de ${primerNombre(tarjeta.hijo.nombreCompleto)}`">
+            <h3>Hoy en el colegio</h3>
+            <p v-if="tarjeta.clasesHoy === null" class="secundario">No se pudo consultar el horario de hoy.</p>
+            <p v-else-if="!tarjeta.clasesHoy.length" class="secundario">Hoy no tiene clases programadas.</p>
+            <ul v-else class="clases-hoy">
+              <li class="rango-hoy">
+                {{ tarjeta.clasesHoy.length }} {{ tarjeta.clasesHoy.length === 1 ? 'clase' : 'clases' }} · desde las
+                {{ tarjeta.clasesHoy[0]?.hora }}
+              </li>
+              <li v-for="clase in tarjeta.clasesHoy" :key="clase.clave">
+                <span>{{ clase.hora }} {{ clase.area }}</span>
+                <InsigniaEstado
+                  v-if="clase.registro"
+                  :texto="NOMBRES_ESTADO[clase.registro.estado]"
+                  :variante="VARIANTES_ESTADO[clase.registro.estado]"
+                />
+                <span v-else class="sin-registro">Aún no registrada</span>
+              </li>
+            </ul>
+          </section>
+
           <h3>Asistencia de {{ mes }}</h3>
 
           <AvisoMensaje v-if="tarjeta.error" :mensaje="tarjeta.error" tipo="error" />
@@ -341,6 +524,26 @@ onUnmounted(() => {
             <p v-else class="sin-incidencias">✔ Sin faltas ni tardanzas este mes.</p>
           </template>
 
+          <section
+            v-if="tarjeta.notas || tarjeta.errorNotas"
+            class="bloque-notas"
+            :aria-label="`Notas del bimestre de ${primerNombre(tarjeta.hijo.nombreCompleto)}`"
+          >
+            <h3>Notas del bimestre {{ tarjeta.notas?.bimestre ?? '' }}</h3>
+            <p v-if="tarjeta.errorNotas" class="secundario">{{ tarjeta.errorNotas }}</p>
+            <p v-else-if="!tarjeta.notas?.total" class="secundario">Aún no hay notas registradas en este bimestre.</p>
+            <dl v-else class="notas">
+              <div
+                v-for="nota in NOTAS_LOGRO"
+                :key="nota"
+                :class="{ 'nota-c': nota === 'C' && tarjeta.notas?.conteo.C }"
+              >
+                <dt>{{ nota }}</dt>
+                <dd>{{ tarjeta.notas?.conteo[nota] }}</dd>
+              </div>
+            </dl>
+          </section>
+
           <div class="acciones">
             <NuxtLink :to="`/familia/horario?estudianteId=${tarjeta.hijo.estudianteId}`">Ver horario</NuxtLink>
             <NuxtLink :to="`/familia/asistencia?estudianteId=${tarjeta.hijo.estudianteId}`">Ver asistencia</NuxtLink>
@@ -353,6 +556,148 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+.avisos-ausencia {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.aviso-ausencia {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid #fecdd3;
+  border-radius: 12px;
+  background: #fff1f2;
+  color: #9f1239;
+  font-size: 14px;
+}
+
+.icono-aviso {
+  display: grid;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 50%;
+  background: #ffe4e6;
+  font-weight: 800;
+}
+
+.texto-aviso {
+  min-width: 0;
+}
+
+.texto-aviso strong {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 15px;
+}
+
+.botones-aviso {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.justificar,
+.entendido {
+  padding: 6px 11px;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.justificar {
+  background: #9f1239;
+  color: white;
+}
+
+.entendido {
+  border: 1px solid #fecdd3;
+  background: white;
+  color: #9f1239;
+}
+
+.bloque-hoy,
+.bloque-notas {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.clases-hoy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid #eef2f7;
+  border-radius: 10px;
+  background: #f8fafc;
+  list-style: none;
+  font-size: 14px;
+}
+
+.clases-hoy li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.clases-hoy .rango-hoy {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.sin-registro {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.notas {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.notas div {
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  padding: 8px 4px;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+}
+
+.notas dt {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.notas dd {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.notas .nota-c dd {
+  color: #dc2626;
+}
+
 .alerta-riesgo {
   padding: 16px;
   border: 1px solid #f0b4aa;
@@ -677,6 +1022,14 @@ onUnmounted(() => {
 
   .botones-pagos > * {
     flex: 1;
+  }
+
+  .aviso-ausencia {
+    flex-wrap: wrap;
+  }
+
+  .botones-aviso {
+    margin-left: 44px;
   }
 }
 
