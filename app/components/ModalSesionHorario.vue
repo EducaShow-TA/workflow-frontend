@@ -28,6 +28,9 @@ const api = useHorarioSeccion()
 const areaCodigo = ref('')
 const docenteId = ref<number | ''>('')
 const aulaId = ref<number | ''>('')
+const tipoVigencia = ref<'PERMANENTE' | 'TEMPORAL'>('PERMANENTE')
+const vigenteDesde = ref('')
+const vigenteHasta = ref('')
 const validacion = ref<ValidacionSesion | null>(null)
 const validando = ref(false)
 const guardando = ref(false)
@@ -36,13 +39,20 @@ const error = ref('')
 let consulta = 0
 
 const solicitud = computed<SolicitudSesionHorario | null>(() =>
-  areaCodigo.value && docenteId.value && aulaId.value
+  areaCodigo.value &&
+  docenteId.value &&
+  aulaId.value &&
+  (tipoVigencia.value === 'PERMANENTE' ||
+    Boolean(vigenteDesde.value && vigenteHasta.value && vigenteDesde.value <= vigenteHasta.value))
     ? {
         bloqueId: propiedades.bloqueId,
         dia: propiedades.dia,
         areaCodigo: areaCodigo.value,
         docenteId: docenteId.value,
         aulaId: aulaId.value,
+        tipoVigencia: tipoVigencia.value,
+        vigenteDesde: tipoVigencia.value === 'TEMPORAL' ? vigenteDesde.value : null,
+        vigenteHasta: tipoVigencia.value === 'TEMPORAL' ? vigenteHasta.value : null,
       }
     : null,
 )
@@ -55,7 +65,13 @@ const sinCambios = computed(
     propiedades.sesion.aulaId === aulaId.value,
 )
 const puedeGuardar = computed(
-  () => Boolean(solicitud.value) && validacion.value?.valida === true && !validando.value && !sinCambios.value,
+  () =>
+    Boolean(solicitud.value) &&
+    validacion.value?.valida === true &&
+    !validando.value &&
+    !sinCambios.value &&
+    (tipoVigencia.value === 'PERMANENTE' ||
+      Boolean(vigenteDesde.value && vigenteHasta.value && vigenteDesde.value <= vigenteHasta.value)),
 )
 
 watch(
@@ -65,6 +81,9 @@ watch(
     areaCodigo.value = propiedades.sesion?.areaCodigo ?? ''
     docenteId.value = propiedades.sesion?.docenteId ?? ''
     aulaId.value = propiedades.sesion?.aulaId ?? ''
+    tipoVigencia.value = 'PERMANENTE'
+    vigenteDesde.value = ''
+    vigenteHasta.value = ''
     validacion.value = null
     confirmarEliminar.value = false
     error.value = ''
@@ -158,6 +177,23 @@ async function eliminar(): Promise<void> {
           <option v-for="aula in aulasActivas" :key="aula.id" :value="aula.id">{{ textoAula(aula) }}</option>
         </select>
         <small class="ayuda">La sección tiene {{ alumnos }} alumnos matriculados.</small>
+      </div>
+
+      <div v-if="sesion" class="campo">
+        <label for="sesion-vigencia">Vigencia del cambio</label>
+        <select id="sesion-vigencia" v-model="tipoVigencia" :disabled="guardando">
+          <option value="PERMANENTE">Permanente desde el próximo día</option>
+          <option value="TEMPORAL">Temporal por rango de fechas</option>
+        </select>
+      </div>
+      <div v-if="sesion && tipoVigencia === 'TEMPORAL'" class="fechas-vigencia">
+        <label class="campo" for="vigente-desde"
+          >Desde<input id="vigente-desde" v-model="vigenteDesde" type="date" :disabled="guardando"
+        /></label>
+        <label class="campo" for="vigente-hasta"
+          >Hasta<input id="vigente-hasta" v-model="vigenteHasta" type="date" :min="vigenteDesde" :disabled="guardando"
+        /></label>
+        <small class="ayuda">Al terminar el rango se restaura la asignación original.</small>
       </div>
 
       <div class="validacion" role="status" aria-live="polite">

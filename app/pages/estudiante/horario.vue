@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
 import { usePortalEstudiante } from '~/composables/usePortalEstudiante'
 import type { FichaEstudiante, HorarioEstudiante } from '~/types/portalEstudiante'
@@ -23,6 +23,7 @@ const cargandoFicha = ref(true)
 const cargando = ref(false)
 const errorFicha = ref('')
 const error = ref('')
+let temporizador: ReturnType<typeof setInterval> | undefined
 
 const anios = computed(() => {
   const valores = new Set<number>()
@@ -104,7 +105,15 @@ function imprimirHorario(): void {
 watch(anio, () => {
   if (ficha.value && !cargandoFicha.value) void cargarHorario()
 })
-onMounted(cargar)
+onMounted(() => {
+  void cargar()
+  temporizador = setInterval(() => void cargarHorario(), 60_000)
+  window.addEventListener('focus', cargarHorario)
+})
+onUnmounted(() => {
+  clearInterval(temporizador)
+  window.removeEventListener('focus', cargarHorario)
+})
 </script>
 
 <template>

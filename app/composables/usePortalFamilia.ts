@@ -10,6 +10,7 @@ import type {
   RegistroAsistencia,
   ResumenAsistencia,
 } from '~/types/familia'
+import type { HorarioEstudiante } from '~/types/portalEstudiante'
 
 export const ESTADOS_ASISTENCIA: EstadoAsistenciaHijo[] = ['PRESENTE', 'TARDANZA', 'AUSENTE', 'JUSTIFICADA']
 
@@ -133,6 +134,10 @@ export function usePortalFamilia() {
     return solicitar<HijoVinculado[]>('/api/v1/apoderados/mis-estudiantes')
   }
 
+  function consultarHorario(estudianteId: number, anio: number) {
+    return solicitar<HorarioEstudiante[]>(`/api/v1/apoderados/mi-horario?estudianteId=${estudianteId}&anio=${anio}`)
+  }
+
   /** Las clases que el docente aún no marca no son asistencia todavía, así que no se muestran. */
   async function consultarAsistencia(
     estudianteId: number,
@@ -174,5 +179,5 @@ export function usePortalFamilia() {
     return respuesta.blob()
   }
 
-  return { listarHijos, consultarAsistencia, justificarAsistencia, descargarDocumento }
+  return { listarHijos, consultarAsistencia, consultarHorario, justificarAsistencia, descargarDocumento }
 }

@@ -44,6 +44,11 @@ const errorCatalogos = ref('')
 const error = ref('')
 const aviso = ref('')
 const libreta = ref<LibretaNotas | null>(null)
+const comentarioPeriodo = ref('')
+const autorComentario = ref('')
+const guardandoComentario = ref(false)
+const comentarioError = ref('')
+const comentarioAviso = ref('')
 const comentariosPorPeriodo = computed(
   () =>
     new Map(
@@ -158,6 +163,10 @@ watch(
     consultaActual++
     consultando.value = false
     libreta.value = null
+    comentarioPeriodo.value = ''
+    autorComentario.value = ''
+    comentarioError.value = ''
+    comentarioAviso.value = ''
     error.value = ''
     aviso.value = ''
   },
@@ -176,7 +185,21 @@ async function consultar(): Promise<void> {
       Number(periodoId.value),
       Number(bimestre.value),
     )
-    if (turno === consultaActual) libreta.value = resultado
+    if (turno === consultaActual) {
+      libreta.value = resultado
+      try {
+        const comentario = await solicitar<{ comentario: string | null; autorNombre: string | null }>(
+          `/api/v1/estudiantes/${resultado.estudianteId}/libreta/comentario-periodo?periodoId=${resultado.periodoSolicitadoId}`,
+        )
+        if (turno === consultaActual) {
+          comentarioPeriodo.value = comentario.comentario ?? ''
+          autorComentario.value = comentario.autorNombre ?? ''
+        }
+      } catch (fallo: unknown) {
+        if (turno === consultaActual)
+          comentarioError.value = obtenerMensajeError(fallo, 'No se pudo cargar el comentario.')
+      }
+    }
   } catch (fallo: unknown) {
     if (turno === consultaActual) error.value = obtenerMensajeError(fallo, 'No se pudo consultar la libreta.')
   } finally {
@@ -206,6 +229,27 @@ async function descargarPdf(): Promise<void> {
     if (turno === consultaActual) error.value = obtenerMensajeError(fallo, 'No se pudo descargar el PDF.')
   } finally {
     descargando.value = false
+  }
+}
+
+async function guardarComentario(): Promise<void> {
+  const actual = libreta.value
+  if (!actual || !comentarioPeriodo.value.trim() || guardandoComentario.value) return
+  guardandoComentario.value = true
+  comentarioError.value = ''
+  comentarioAviso.value = ''
+  try {
+    const respuesta = await solicitar<{ comentario: string; autorNombre: string | null }>(
+      `/api/v1/estudiantes/${actual.estudianteId}/libreta/comentario-periodo?periodoId=${actual.periodoSolicitadoId}`,
+      { metodo: 'PUT', cuerpo: { comentario: comentarioPeriodo.value.trim() } },
+    )
+    comentarioPeriodo.value = respuesta.comentario
+    autorComentario.value = respuesta.autorNombre ?? ''
+    comentarioAviso.value = 'Comentario guardado.'
+  } catch (fallo: unknown) {
+    comentarioError.value = obtenerMensajeError(fallo, 'No se pudo guardar el comentario.')
+  } finally {
+    guardandoComentario.value = false
   }
 }
 onMounted(cargarCatalogos)
@@ -339,6 +383,40 @@ onMounted(cargarCatalogos)
           {{ periodo.fechaInicio }} a {{ periodo.fechaFin
           }}<strong v-if="periodo.periodoId === libreta.periodoSolicitadoId"> · Periodo seleccionado</strong>
         </p>
+        <section
+          v-if="periodo.periodoId === libreta.periodoSolicitadoId"
+          class="comentarios"
+          aria-labelledby="comentario-periodo"
+        >
+          <h3 id="comentario-periodo">Comentario cualitativo del período</h3>
+          <template v-if="esDocente || esAdministrador">
+            <label for="comentario-docente">Comentario del docente (máximo 2000 caracteres)</label>
+            <textarea
+              id="comentario-docente"
+              v-model="comentarioPeriodo"
+              maxlength="2000"
+              rows="5"
+              :disabled="guardandoComentario"
+            />
+            <p class="ayuda">
+              {{ comentarioPeriodo.length }}/2000 caracteres<span v-if="autorComentario">
+                · Última edición: {{ autorComentario }}</span
+              >
+            </p>
+            <button
+              class="primario"
+              type="button"
+              :disabled="guardandoComentario || !comentarioPeriodo.trim()"
+              @click="guardarComentario"
+            >
+              {{ guardandoComentario ? 'Guardando…' : 'Guardar comentario' }}
+            </button>
+          </template>
+          <p v-else-if="comentarioPeriodo" class="comentario-periodo">{{ comentarioPeriodo }}</p>
+          <p v-else class="ayuda">No hay un comentario registrado para este período.</p>
+          <AvisoMensaje v-if="comentarioError" :mensaje="comentarioError" tipo="error" />
+          <p v-if="comentarioAviso" role="status" class="exito">{{ comentarioAviso }}</p>
+        </section>
         <p v-if="!periodo.areas.length">No hay áreas o competencias disponibles para esta consulta.</p>
         <div v-for="area in periodo.areas" :key="area.codigo" class="area">
           <h3>{{ area.nombre }}</h3>
@@ -455,6 +533,18 @@ input {
   padding: 10px;
   background: white;
   color: inherit;
+}
+textarea {
+  min-height: 120px;
+  width: 100%;
+  border: 1px solid #c9d4e5;
+  border-radius: 7px;
+  padding: 10px;
+  font: inherit;
+  resize: vertical;
+}
+.comentario-periodo {
+  white-space: pre-wrap;
 }
 button {
   border: 1px solid #c9d4e5;

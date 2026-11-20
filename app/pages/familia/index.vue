@@ -287,6 +287,7 @@ onUnmounted(() => {
           </template>
 
           <div class="acciones">
+            <NuxtLink :to="`/familia/horario?estudianteId=${tarjeta.hijo.estudianteId}`">Ver horario</NuxtLink>
             <NuxtLink :to="`/familia/asistencia?estudianteId=${tarjeta.hijo.estudianteId}`">Ver asistencia</NuxtLink>
             <NuxtLink to="/libretas">Ver progreso académico</NuxtLink>
           </div>
