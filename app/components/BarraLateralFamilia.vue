@@ -4,6 +4,7 @@ const ruta = useRoute()
 const enlaces = [
   { nombre: 'Panel', destino: '/familia', icono: '/icons/menu-panel.svg' },
   { nombre: 'Progreso académico', destino: '/libretas', icono: '/icons/menu-calificaciones.svg' },
+  { nombre: 'Horario', destino: '/familia/horario', icono: '/icons/menu-horarios.svg' },
   { nombre: 'Asistencia', destino: '/familia/asistencia', icono: '/icons/menu-estudiantes.svg' },
   { nombre: 'Pagos', destino: '/familia/pagos', icono: '/icons/menu-finanzas.svg' },
 ]
