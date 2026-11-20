@@ -94,8 +94,7 @@ onMounted(cargar)
               {{ registro.usuarioNombre }}<small>Cuenta #{{ registro.usuarioCuentaId }}</small>
             </td>
             <td>
-              <strong>{{ registro.accion }}</strong
-              ><small>{{ registro.detalle }}</small>
+              <strong>{{ registro.accion }}</strong><small>{{ registro.detalle }}</small>
             </td>
             <td>
               {{ registro.vigenciaTipo

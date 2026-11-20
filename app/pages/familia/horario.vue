@@ -168,8 +168,7 @@ onUnmounted(() => {
           <p v-if="!sesionesPorDia[dia.codigo].length" class="vacio">Sin clases asignadas.</p>
           <article v-for="sesion in sesionesPorDia[dia.codigo]" :key="sesion.id" class="clase">
             <div class="horas">
-              <strong>{{ hora(sesion.horaInicio) }}</strong
-              ><span>{{ hora(sesion.horaFin) }}</span>
+              <strong>{{ hora(sesion.horaInicio) }}</strong><span>{{ hora(sesion.horaFin) }}</span>
             </div>
             <div>
               <h3>{{ sesion.areaNombre }}</h3>
