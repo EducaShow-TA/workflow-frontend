@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useApi } from '~/composables/useApi'
-import { useCalificaciones } from '~/composables/useCalificaciones'
+import {
+  ATAJOS_MOTIVO_RECTIFICACION,
+  LONGITUD_MAXIMA_MOTIVO_RECTIFICACION,
+  aplicarAtajoMotivo,
+  useCalificaciones,
+  validarMotivoRectificacion,
+} from '~/composables/useCalificaciones'
 import { useEstudiantesMatriculables } from '~/composables/useEstudiantesMatriculables'
 import { usePeriodosAcademicos } from '~/composables/usePeriodosAcademicos'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
@@ -31,6 +37,7 @@ interface ConfirmacionRegistro {
   estudiante: string
   competencia: string
   nota: NotaCualitativa
+  notaAnterior: NotaCualitativa | null
 }
 
 const { solicitar } = useApi()
@@ -43,10 +50,12 @@ const estudiantes = ref<EstudianteMatriculable[]>([])
 const areas = ref<AreaCatalogo[]>([])
 const calificaciones = ref<Calificacion[]>([])
 const periodoId = ref<number | null>(null)
+const bimestre = ref(1)
 const competenciaCodigo = ref('')
 const matriculaId = ref<number | null>(null)
 const nota = ref<NotaCualitativa>('A')
 const observacion = ref('')
+const motivo = ref('')
 const evidenciaUrl = ref('')
 const archivo = ref<File | null>(null)
 const inputArchivo = ref<HTMLInputElement | null>(null)
@@ -113,8 +122,9 @@ function cambiarArchivo(evento: Event): void {
   limpiarAvisos()
 }
 function limpiarFormulario(): void {
-  nota.value = 'A'
-  observacion.value = ''
+  nota.value = notaExistente.value?.nota ?? 'A'
+  observacion.value = notaExistente.value?.observacion ?? ''
+  motivo.value = ''
   evidenciaUrl.value = ''
   archivo.value = null
   if (inputArchivo.value) inputArchivo.value.value = ''
@@ -147,7 +157,7 @@ async function cargarCalificaciones(): Promise<void> {
   if (periodoId.value === null || !competenciaCodigo.value) return
   consultando.value = true
   try {
-    const resultado = await listar(periodoId.value, competenciaCodigo.value)
+    const resultado = await listar(periodoId.value, competenciaCodigo.value, bimestre.value)
     if (secuencia === secuenciaConsulta) calificaciones.value = resultado
   } catch (fallo: unknown) {
     if (secuencia === secuenciaConsulta) error.value = obtenerMensajeError(fallo, 'No se pudo cargar el seguimiento.')
@@ -163,7 +173,13 @@ watch(periodoId, () => {
 watch(matriculaId, () => {
   confirmacionRegistro.value = null
 })
-watch([periodoId, competenciaCodigo], () => {
+watch(notaExistente, (existente, anterior) => {
+  if (existente?.id === anterior?.id) return
+  nota.value = existente?.nota ?? 'A'
+  observacion.value = existente?.observacion ?? ''
+  motivo.value = ''
+})
+watch([periodoId, bimestre, competenciaCodigo], () => {
   limpiarAvisos()
   void cargarCalificaciones()
 })
@@ -176,19 +192,35 @@ async function guardar(): Promise<void> {
     error.value = 'Selecciona el período, la competencia y el estudiante.'
     return
   }
-  if (notaExistente.value) {
-    error.value =
-      'Este estudiante ya tiene una calificación en esta competencia. No se puede registrar otra desde este formulario.'
-    return
-  }
+  const existente = notaExistente.value
   if (observacion.value.trim().length > 1000) {
     error.value = 'La observación no puede superar los 1000 caracteres.'
     return
   }
   const url = evidenciaUrl.value.trim()
-  if ((!archivo.value && !url) || (archivo.value && url)) {
+  if (archivo.value && url) {
     error.value = 'Adjunta un archivo o indica una URL, pero no ambas opciones.'
     return
+  }
+  if (!existente && !archivo.value && !url) {
+    error.value = 'Adjunta un archivo o indica una URL de evidencia.'
+    return
+  }
+  if (existente) {
+    const sinCambios =
+      nota.value === existente.nota &&
+      observacion.value.trim() === (existente.observacion ?? '').trim() &&
+      !archivo.value &&
+      !url
+    if (sinCambios) {
+      error.value = 'No hay cambios que guardar: cambia la nota, la observación o la evidencia.'
+      return
+    }
+    const errorMotivo = validarMotivoRectificacion(motivo.value)
+    if (errorMotivo) {
+      error.value = errorMotivo
+      return
+    }
   }
   if (archivo.value && archivo.value.size > 10 * 1024 * 1024) {
     error.value = 'El archivo de evidencia no puede superar los 10 MB.'
@@ -207,9 +239,11 @@ async function guardar(): Promise<void> {
     periodoId: periodoId.value,
     matriculaId: matriculaId.value,
     competenciaCodigo: competenciaCodigo.value,
+    bimestre: bimestre.value,
     nota: nota.value,
     observacion: observacion.value.trim(),
     evidenciaUrl: url || null,
+    motivo: existente ? motivo.value.trim() : null,
   }
   guardando.value = true
   try {
@@ -218,11 +252,15 @@ async function guardar(): Promise<void> {
       estudiante: matriculaSeleccionada.value?.estudiante ?? 'Estudiante seleccionado',
       competencia: competenciaSeleccionada.value?.nombre ?? 'competencia seleccionada',
       nota: solicitud.nota,
+      notaAnterior: existente?.nota ?? null,
     }
     await cargarCalificaciones()
     limpiarFormulario()
   } catch (fallo: unknown) {
-    error.value = obtenerMensajeError(fallo, 'No se pudo registrar la calificación.')
+    error.value = obtenerMensajeError(
+      fallo,
+      existente ? 'No se pudo guardar la rectificación.' : 'No se pudo registrar la calificación.',
+    )
   } finally {
     guardando.value = false
   }
@@ -255,7 +293,7 @@ async function descargar(item: Calificacion): Promise<void> {
 
     <section class="tarjeta" aria-labelledby="titulo-filtros">
       <h2 id="titulo-filtros">1. Contexto académico</h2>
-      <p class="ayuda">Selecciona el período y la competencia para registrar o revisar el seguimiento.</p>
+      <p class="ayuda">Selecciona el período, bimestre y competencia para registrar o revisar el seguimiento.</p>
       <p v-if="cargando" role="status">Cargando datos académicos...</p>
       <div v-else class="campos">
         <div class="campo">
@@ -266,6 +304,13 @@ async function descargar(item: Calificacion): Promise<void> {
             </option>
           </select>
           <small v-if="!periodos.length">Primero abre el año escolar desde Grados/Secciones.</small>
+        </div>
+
+        <div class="campo">
+          <label for="bimestre-calificacion">Bimestre</label>
+          <select id="bimestre-calificacion" v-model.number="bimestre">
+            <option v-for="valor in [1, 2, 3, 4]" :key="valor" :value="valor">Bimestre {{ valor }}</option>
+          </select>
         </div>
         <div class="campo">
           <label for="competencia-calificacion">Competencia</label>
@@ -281,10 +326,13 @@ async function descargar(item: Calificacion): Promise<void> {
 
     <section class="tarjeta" aria-labelledby="titulo-registro">
       <div class="encabezado-seccion">
-        <h2 id="titulo-registro">2. Registrar calificación</h2>
+        <h2 id="titulo-registro">2. {{ notaExistente ? 'Rectificar calificación' : 'Registrar calificación' }}</h2>
         <span class="etiqueta">AD · A · B · C</span>
       </div>
-      <p class="ayuda">La evidencia es obligatoria: adjunta un archivo de hasta 10 MB o proporciona una URL.</p>
+      <p v-if="notaExistente" class="ayuda">
+        Si no adjuntas una evidencia nueva, se conserva la actual. El motivo queda en la auditoría de cambios.
+      </p>
+      <p v-else class="ayuda">La evidencia es obligatoria: adjunta un archivo de hasta 10 MB o proporciona una URL.</p>
       <form class="campos" @submit.prevent="guardar">
         <div class="campo ancho">
           <label for="matricula-calificacion">Estudiante con matrícula confirmada *</label>
@@ -306,7 +354,7 @@ async function descargar(item: Calificacion): Promise<void> {
         </div>
         <div class="campo">
           <label for="nota-calificacion">Nota cualitativa *</label>
-          <select id="nota-calificacion" v-model="nota" :disabled="Boolean(notaExistente)">
+          <select id="nota-calificacion" v-model="nota">
             <option value="AD">AD — Logro destacado</option>
             <option value="A">A — Logro esperado</option>
             <option value="B">B — En proceso</option>
@@ -321,7 +369,7 @@ async function descargar(item: Calificacion): Promise<void> {
             type="url"
             maxlength="2048"
             placeholder="https://..."
-            :disabled="Boolean(notaExistente) || Boolean(archivo)"
+            :disabled="Boolean(archivo)"
           />
         </div>
         <div class="campo ancho">
@@ -330,7 +378,7 @@ async function descargar(item: Calificacion): Promise<void> {
             id="archivo-calificacion"
             ref="inputArchivo"
             type="file"
-            :disabled="Boolean(notaExistente) || Boolean(evidenciaUrl.trim())"
+            :disabled="Boolean(evidenciaUrl.trim())"
             @change="cambiarArchivo"
           />
           <small v-if="archivo"
@@ -345,16 +393,46 @@ async function descargar(item: Calificacion): Promise<void> {
             rows="3"
             maxlength="1000"
             placeholder="Observaciones sobre el logro del estudiante..."
-            :disabled="Boolean(notaExistente)"
           />
         </div>
-        <p v-if="confirmacionRegistro" class="aviso aviso-exito ancho" role="status">
+        <div v-if="notaExistente" class="campo ancho motivo">
+          <label for="motivo-calificacion">Motivo de la rectificación *</label>
+          <div class="atajos" role="group" aria-label="Motivos frecuentes">
+            <button
+              v-for="atajo in ATAJOS_MOTIVO_RECTIFICACION"
+              :key="atajo"
+              type="button"
+              :class="['atajo', { 'atajo--activo': motivo.startsWith(`${atajo}:`) }]"
+              :aria-pressed="motivo.startsWith(`${atajo}:`)"
+              @click="motivo = aplicarAtajoMotivo(motivo, atajo).slice(0, LONGITUD_MAXIMA_MOTIVO_RECTIFICACION)"
+            >
+              {{ atajo }}
+            </button>
+          </div>
+          <textarea
+            id="motivo-calificacion"
+            v-model="motivo"
+            rows="2"
+            :maxlength="LONGITUD_MAXIMA_MOTIVO_RECTIFICACION"
+            placeholder="Explica por qué cambias la nota (mínimo 10 caracteres)"
+          />
+          <small
+            >{{ motivo.length }}/{{ LONGITUD_MAXIMA_MOTIVO_RECTIFICACION }} · No lo ven el alumno ni el
+            apoderado.</small
+          >
+        </div>
+        <p v-if="confirmacionRegistro?.notaAnterior" class="aviso aviso-exito ancho" role="status">
+          Nota de <strong>{{ confirmacionRegistro.estudiante }}</strong> rectificada de
+          <strong>{{ confirmacionRegistro.notaAnterior }}</strong> a <strong>{{ confirmacionRegistro.nota }}</strong> en
+          <strong>{{ confirmacionRegistro.competencia }}</strong>.
+        </p>
+        <p v-else-if="confirmacionRegistro" class="aviso aviso-exito ancho" role="status">
           Calificación registrada correctamente para <strong>{{ confirmacionRegistro.estudiante }}</strong>: obtuvo
           <strong>{{ confirmacionRegistro.nota }}</strong> en <strong>{{ confirmacionRegistro.competencia }}</strong>.
         </p>
-        <p v-else-if="notaExistente" class="aviso ancho" role="status">
-          Este estudiante ya tiene nota <strong>{{ notaExistente.nota }}</strong> en la competencia seleccionada. La
-          rectificación debe realizarse mediante el procedimiento definido por el colegio.
+        <p v-else-if="notaExistente" class="aviso aviso-info ancho" role="status">
+          Este estudiante ya tiene <strong>{{ notaExistente.nota }}</strong> en esta competencia (bimestre
+          {{ bimestre }}). Guardar la reemplazará: indica el motivo.
         </p>
         <div class="acciones ancho">
           <button
@@ -367,11 +445,16 @@ async function descargar(item: Calificacion): Promise<void> {
               !periodoSeleccionado ||
               !competenciaSeleccionada ||
               !matriculas.length ||
-              matriculaId === null ||
-              Boolean(notaExistente)
+              matriculaId === null
             "
           >
-            {{ guardando ? 'Guardando...' : 'Registrar calificación y evidencia' }}
+            {{
+              guardando
+                ? 'Guardando...'
+                : notaExistente
+                  ? 'Guardar rectificación'
+                  : 'Registrar calificación y evidencia'
+            }}
           </button>
         </div>
       </form>
@@ -432,7 +515,12 @@ async function descargar(item: Calificacion): Promise<void> {
                 >
                 <span v-else>—</span>
               </td>
-              <td>{{ formatearFecha(item.fechaRegistro) }}</td>
+              <td>
+                {{ formatearFecha(item.fechaRegistro) }}
+                <small v-if="item.rectificaciones" class="rectificada">
+                  {{ item.rectificaciones === 1 ? 'Rectificada' : `Rectificada ${item.rectificaciones} veces` }}
+                </small>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -590,6 +678,45 @@ h2 {
   border: 1px solid #fde68a;
   border-radius: 8px;
   font-size: 13px;
+}
+.aviso-info {
+  color: #1e3a8a;
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+.motivo {
+  padding: 14px;
+  border: 2px solid #c4b5fd;
+  border-radius: 12px;
+  background: #faf7ff;
+}
+.atajos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.atajo {
+  padding: 6px 12px;
+  border: 1px solid #c4b5fd;
+  border-radius: 999px;
+  background: #fff;
+  color: #5b21b6;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.atajo--activo {
+  border-color: #7c3aed;
+  background: #7c3aed;
+  color: #fff;
+}
+.rectificada {
+  display: block;
+  margin-top: 3px;
+  color: #64748b;
+  font-size: 12px;
 }
 .aviso-exito {
   color: #166534;

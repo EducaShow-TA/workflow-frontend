@@ -67,9 +67,11 @@ onMounted(cargar)
   <main class="docente-vista marcaje">
     <header class="docente-titulo">
       <div>
-        <span class="docente-sobrelinea">US-2.3 · Control de asistencia</span>
+        <span class="docente-sobrelinea">Asistencia del personal</span>
         <h1>Mi marcaje</h1>
-        <p>Registra tu entrada y salida. El servidor valida el horario y conserva la hora oficial.</p>
+        <p>
+          Registra tu entrada y salida dentro del horario habilitado. La fecha y hora quedan registradas oficialmente.
+        </p>
       </div>
       <button type="button" class="docente-boton docente-boton--secundario" :disabled="cargando" @click="cargar">
         Actualizar
@@ -79,8 +81,8 @@ onMounted(cargar)
     <section class="marcaje-condiciones" aria-labelledby="marcaje-titulo-condiciones">
       <h2 id="marcaje-titulo-condiciones">Marcaje de hoy</h2>
       <p>
-        Solo puedes registrar tu propia jornada dentro de la ventana habilitada. La fecha y hora se obtienen del
-        servidor.
+        Solo puedes registrar tu propia jornada dentro de la ventana habilitada. La fecha y hora quedan registradas
+        oficialmente.
       </p>
       <div class="marcaje-datos">
         <div>

@@ -1,5 +1,10 @@
 import { useApi } from '~/composables/useApi'
-import type { EvaluacionParcial, SolicitudEvaluacionParcial } from '~/types/evaluacionParcial'
+import type {
+  EvaluacionParcial,
+  NotaEvaluacionParcial,
+  SolicitudEvaluacionParcial,
+  SolicitudNotaParcial,
+} from '~/types/evaluacionParcial'
 
 const RUTA_EVALUACIONES = '/api/v1/evaluaciones-parciales'
 
@@ -28,5 +33,23 @@ export function useEvaluacionesParciales() {
     })
   }
 
-  return { listar, crear, actualizar }
+  function listarNotas(evaluacionId: number): Promise<NotaEvaluacionParcial[]> {
+    return solicitar<NotaEvaluacionParcial[]>(`${RUTA_EVALUACIONES}/${evaluacionId}/calificaciones`)
+  }
+
+  function registrarNota(
+    evaluacionId: number,
+    matriculaId: number,
+    solicitud: SolicitudNotaParcial,
+    archivo: File | null,
+  ): Promise<NotaEvaluacionParcial> {
+    const ruta = `${RUTA_EVALUACIONES}/${evaluacionId}/matriculas/${matriculaId}`
+    if (!archivo) return solicitar<NotaEvaluacionParcial>(ruta, { metodo: 'PUT', cuerpo: solicitud })
+    const cuerpo = new FormData()
+    cuerpo.append('datos', new Blob([JSON.stringify(solicitud)], { type: 'application/json' }))
+    cuerpo.append('archivo', archivo)
+    return solicitar<NotaEvaluacionParcial>(ruta, { metodo: 'PUT', cuerpo })
+  }
+
+  return { listar, crear, actualizar, listarNotas, registrarNota }
 }

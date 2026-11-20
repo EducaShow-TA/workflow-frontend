@@ -97,6 +97,7 @@ onMounted(async () => {
 
 <template>
   <main class="pagina-finanzas">
+    <NavegacionFinanzas />
     <header class="encabezado-finanzas">
       <div>
         <p class="ruta">Finanzas / Pensiones</p>
@@ -177,7 +178,7 @@ onMounted(async () => {
 
     <section class="tarjeta listado" aria-labelledby="titulo-listado" :aria-busy="cargando">
       <h2 id="titulo-listado">Boletas generadas</h2>
-      <p v-if="cargando" role="status">Consultando las boletas en el servidor…</p>
+      <p v-if="cargando" role="status">Cargando boletas…</p>
       <p v-else-if="error" class="error" role="alert">
         {{ error }} <button type="button" class="boton" @click="consultar()">Reintentar</button>
       </p>

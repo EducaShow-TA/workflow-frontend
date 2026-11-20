@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import type { BoletaPension, ComprobanteBoleta } from '~/types/boletaPension'
-import { useBoletasPension } from '~/composables/useBoletasPension'
-import { formatearFecha } from '~/composables/useFechas'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
+import { fechaPago, formatearSolesFamilia, nombrarMesBoleta, usePagosFamilia } from '~/composables/usePagosFamilia'
+import type { ComprobantePagoFamilia, DeudaFamilia } from '~/types/familia'
 
 const TARJETA_APROBADA = '4111 1111 1111 1111'
 const TARJETA_RECHAZADA = '4000 0000 0000 0002'
@@ -11,48 +10,61 @@ const DEMORA_PASARELA_MS = 1800
 
 const propiedades = defineProps<{
   abierta: boolean
-  boleta: BoletaPension | null
+  deudas: DeudaFamilia[]
+  titular?: string
 }>()
 
 const emitir = defineEmits<{
   cerrar: []
-  pagada: [comprobante: ComprobanteBoleta]
+  pagadas: [comprobantes: ComprobantePagoFamilia[]]
 }>()
 
-const { registrarPago } = useBoletasPension()
-const moneda = new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' })
+const { pagar: registrarPagos, descargarComprobante } = usePagosFamilia()
 
 type Paso = 'datos' | 'procesando' | 'aprobado'
 
 const paso = ref<Paso>('datos')
-const titular = ref('')
+const titularTarjeta = ref('')
 const numero = ref('')
 const vencimiento = ref('')
 const cvv = ref('')
 const error = ref('')
-const comprobante = ref<ComprobanteBoleta | null>(null)
+const comprobantes = ref<ComprobantePagoFamilia[]>([])
+const descargando = ref(false)
+// El padre recarga la lista al aprobarse el pago; el modal conserva lo que se pagó.
+const aPagar = ref<DeudaFamilia[]>([])
 
 const procesando = computed(() => paso.value === 'procesando')
 const digitos = computed(() => numero.value.replace(/\D/g, ''))
 const marca = computed(() =>
   digitos.value.startsWith('4') ? 'VISA' : digitos.value.startsWith('5') ? 'Mastercard' : '',
 )
+const total = computed(
+  () => Math.round(aPagar.value.reduce((suma, deuda) => suma + deuda.boleta.montoTotal, 0) * 100) / 100,
+)
+const descripcion = computed(() => {
+  const hijos = [...new Set(aPagar.value.map((deuda) => deuda.nombreHijo))]
+  const meses = aPagar.value.map((deuda) => nombrarMesBoleta(deuda.boleta.mesCobro, true))
+  const cantidad = aPagar.value.length
+  return `${hijos.join(' y ')} · ${cantidad === 1 ? meses[0] : `${cantidad} boletas (${meses.join(', ')})`}`
+})
 
 watch(
   () => propiedades.abierta,
   (abierta) => {
     if (!abierta) return
+    aPagar.value = [...propiedades.deudas]
     paso.value = 'datos'
-    titular.value = propiedades.boleta?.apoderado ?? ''
+    titularTarjeta.value = propiedades.titular ?? ''
     numero.value = TARJETA_APROBADA
     vencimiento.value = '12/30'
     cvv.value = '123'
     error.value = ''
-    comprobante.value = null
+    comprobantes.value = []
   },
 )
 
-watch([titular, numero, vencimiento, cvv], () => {
+watch([titularTarjeta, numero, vencimiento, cvv], () => {
   if (paso.value === 'datos') error.value = ''
 })
 
@@ -77,21 +89,16 @@ function vencimientoValido(): boolean {
 }
 
 function validar(): string {
-  if (!titular.value.trim()) return 'Ingresa el nombre del titular de la tarjeta.'
+  if (!titularTarjeta.value.trim()) return 'Ingresa el nombre del titular de la tarjeta.'
   if (digitos.value.length !== 16) return 'El número de tarjeta debe tener 16 dígitos.'
   if (!vencimientoValido()) return 'La fecha de vencimiento no es válida o ya pasó (formato MM/AA).'
   if (!/^\d{3,4}$/.test(cvv.value)) return 'El código de seguridad debe tener 3 o 4 dígitos.'
   return ''
 }
 
-function referenciaSimulada(): string {
-  return `SIM-${Date.now().toString(36).toUpperCase()}`
-}
-
 async function pagar(): Promise<void> {
-  const boleta = propiedades.boleta
   error.value = validar()
-  if (error.value || !boleta) return
+  if (error.value || !aPagar.value.length) return
 
   paso.value = 'procesando'
   await new Promise((resolver) => setTimeout(resolver, DEMORA_PASARELA_MS))
@@ -103,16 +110,26 @@ async function pagar(): Promise<void> {
   }
 
   try {
-    comprobante.value = await registrarPago(boleta, {
-      monto: boleta.montoTotal,
-      medioPago: 'VIRTUAL',
-      referencia: referenciaSimulada(),
-    })
+    comprobantes.value = await registrarPagos(aPagar.value.map((deuda) => deuda.boleta.boletaId))
     paso.value = 'aprobado'
-    emitir('pagada', comprobante.value)
+    emitir('pagadas', comprobantes.value)
   } catch (fallo: unknown) {
     paso.value = 'datos'
-    error.value = obtenerMensajeError(fallo, 'El pago fue aprobado por la pasarela, pero no se pudo registrar.')
+    error.value = obtenerMensajeError(fallo, 'No se pudo registrar el pago. No se cobró ninguna boleta.')
+  }
+}
+
+async function descargarTodos(): Promise<void> {
+  descargando.value = true
+  error.value = ''
+  try {
+    for (const comprobante of comprobantes.value) {
+      await descargarComprobante(comprobante.id, comprobante.numeroComprobante)
+    }
+  } catch (fallo: unknown) {
+    error.value = obtenerMensajeError(fallo, 'No se pudo descargar el comprobante.')
+  } finally {
+    descargando.value = false
   }
 }
 </script>
@@ -120,102 +137,126 @@ async function pagar(): Promise<void> {
 <template>
   <VentanaModal
     :abierta="abierta"
-    titulo="Pago en línea"
-    :descripcion="boleta ? `Boleta #${boleta.id} · ${boleta.estudiante} · ${boleta.mesCobro}` : ''"
+    :titulo="aPagar.length === 1 ? 'Pagar pensión' : 'Pagar pensiones'"
+    :descripcion="descripcion"
     :bloqueada="procesando"
     @cerrar="emitir('cerrar')"
   >
-    <div v-if="boleta" class="contenido">
+    <div class="contenido">
       <p class="simulacion" role="note">
-        <strong>Pasarela simulada.</strong> No se realiza ningún cobro real y los datos de la tarjeta no se envían ni se
-        guardan.
+        <strong>Pasarela simulada.</strong> No se realiza ningún cobro real y los datos de la tarjeta no salen de tu
+        navegador.
       </p>
 
-      <div class="importe">
-        <span>Total a pagar</span>
-        <strong>{{ moneda.format(boleta.montoTotal) }}</strong>
-        <small>Vence el {{ formatearFecha(boleta.fechaVencimiento) }}</small>
-      </div>
-
-      <div v-if="paso === 'aprobado' && comprobante" class="aprobado" role="status">
+      <div v-if="paso === 'aprobado'" class="aprobado" role="status">
         <span class="check" aria-hidden="true">✓</span>
         <h3>Pago aprobado</h3>
         <dl>
           <div>
-            <dt>Comprobante</dt>
-            <dd>{{ comprobante.numeroComprobante }}</dd>
+            <dt>{{ comprobantes.length === 1 ? 'Comprobante' : 'Comprobantes' }}</dt>
+            <dd>
+              {{
+                comprobantes.length === 1
+                  ? comprobantes[0]?.numeroComprobante
+                  : `${comprobantes.length} (uno por boleta)`
+              }}
+            </dd>
           </div>
           <div>
             <dt>Monto</dt>
-            <dd>{{ moneda.format(comprobante.montoPagado) }}</dd>
+            <dd>{{ formatearSolesFamilia(total) }}</dd>
           </div>
           <div>
             <dt>Medio</dt>
-            <dd>Virtual (tarjeta {{ marca || 'de prueba' }} ···· {{ digitos.slice(-4) }})</dd>
+            <dd>Virtual · {{ marca || 'tarjeta' }} ···· {{ digitos.slice(-4) }}</dd>
           </div>
           <div>
             <dt>Fecha</dt>
-            <dd>{{ formatearFecha(comprobante.fechaEmision.slice(0, 10)) }}</dd>
+            <dd>{{ comprobantes[0] ? fechaPago(comprobantes[0].fechaEmision) : '' }}</dd>
           </div>
         </dl>
-        <p>La boleta quedó como pagada.</p>
+        <p>{{ comprobantes.length === 1 ? 'La boleta quedó como pagada.' : 'Las boletas quedaron como pagadas.' }}</p>
+        <AvisoMensaje v-if="error" :mensaje="error" tipo="error" />
       </div>
 
-      <p v-else-if="procesando" class="procesando" role="status">
-        <span class="giro" aria-hidden="true" />Procesando el pago con la pasarela…
-      </p>
+      <template v-else>
+        <div class="importe">
+          <span>Total a pagar</span>
+          <strong>{{ formatearSolesFamilia(total) }}</strong>
+          <small>
+            {{
+              aPagar.length === 1
+                ? `Vence el ${aPagar[0] ? fechaPago(aPagar[0].boleta.fechaVencimiento) : ''}`
+                : `${aPagar.length} boletas`
+            }}
+          </small>
+        </div>
 
-      <form v-else id="formulario-pago-linea" class="tarjeta" novalidate @submit.prevent="pagar">
-        <div class="campo">
-          <label for="pago-titular">Titular de la tarjeta</label>
-          <input id="pago-titular" v-model="titular" autocomplete="off" maxlength="60" />
-        </div>
-        <div class="campo">
-          <label for="pago-numero"
-            >Número de tarjeta <span v-if="marca" class="marca">{{ marca }}</span></label
-          >
-          <input
-            id="pago-numero"
-            :value="numero"
-            inputmode="numeric"
-            autocomplete="off"
-            placeholder="0000 0000 0000 0000"
-            @input="formatearNumero"
-          />
-        </div>
-        <div class="doble">
+        <p v-if="procesando" class="procesando" role="status">
+          <span class="giro" aria-hidden="true" />Procesando el pago con la pasarela…
+        </p>
+
+        <form v-else id="formulario-pago-linea" class="tarjeta" novalidate @submit.prevent="pagar">
           <div class="campo">
-            <label for="pago-vencimiento">Vencimiento</label>
+            <label for="pago-titular">Titular de la tarjeta</label>
+            <input id="pago-titular" v-model="titularTarjeta" autocomplete="off" maxlength="60" />
+          </div>
+          <div class="campo">
+            <label for="pago-numero"
+              >Número de tarjeta <span v-if="marca" class="marca">{{ marca }}</span></label
+            >
             <input
-              id="pago-vencimiento"
-              :value="vencimiento"
+              id="pago-numero"
+              :value="numero"
               inputmode="numeric"
               autocomplete="off"
-              placeholder="MM/AA"
-              @input="formatearVencimiento"
+              placeholder="0000 0000 0000 0000"
+              @input="formatearNumero"
             />
           </div>
-          <div class="campo">
-            <label for="pago-cvv">CVV</label>
-            <input id="pago-cvv" v-model="cvv" inputmode="numeric" autocomplete="off" maxlength="4" type="password" />
+          <div class="doble">
+            <div class="campo">
+              <label for="pago-vencimiento">Vencimiento</label>
+              <input
+                id="pago-vencimiento"
+                :value="vencimiento"
+                inputmode="numeric"
+                autocomplete="off"
+                placeholder="MM/AA"
+                @input="formatearVencimiento"
+              />
+            </div>
+            <div class="campo">
+              <label for="pago-cvv">CVV</label>
+              <input id="pago-cvv" v-model="cvv" inputmode="numeric" autocomplete="off" maxlength="4" type="password" />
+            </div>
           </div>
-        </div>
-        <p class="ayuda">
-          Tarjetas de prueba: <code>{{ TARJETA_APROBADA }}</code> se aprueba; <code>{{ TARJETA_RECHAZADA }}</code> se
-          rechaza.
-        </p>
-        <AvisoMensaje v-if="error" :mensaje="error" tipo="error" />
-      </form>
+          <p class="ayuda">
+            Tarjetas de prueba: <code>{{ TARJETA_APROBADA }}</code> se aprueba; <code>{{ TARJETA_RECHAZADA }}</code> se
+            rechaza.
+          </p>
+          <AvisoMensaje v-if="error" :mensaje="error" tipo="error" />
+        </form>
+      </template>
     </div>
 
     <template #pie>
       <template v-if="paso === 'aprobado'">
+        <BotonAccion variante="secundario" :deshabilitado="descargando" @click="descargarTodos">
+          {{
+            descargando
+              ? 'Descargando…'
+              : comprobantes.length === 1
+                ? 'Descargar comprobante'
+                : 'Descargar comprobantes'
+          }}
+        </BotonAccion>
         <BotonAccion @click="emitir('cerrar')">Listo</BotonAccion>
       </template>
       <template v-else>
         <BotonAccion variante="secundario" :deshabilitado="procesando" @click="emitir('cerrar')">Cancelar</BotonAccion>
-        <BotonAccion tipo="submit" form="formulario-pago-linea" :deshabilitado="procesando || !boleta">
-          {{ procesando ? 'Procesando...' : `Pagar ${boleta ? moneda.format(boleta.montoTotal) : ''}` }}
+        <BotonAccion tipo="submit" form="formulario-pago-linea" :deshabilitado="procesando || !aPagar.length">
+          {{ procesando ? 'Procesando…' : `Pagar ${formatearSolesFamilia(total)}` }}
         </BotonAccion>
       </template>
     </template>

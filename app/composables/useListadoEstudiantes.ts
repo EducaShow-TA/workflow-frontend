@@ -42,6 +42,7 @@ export function useListadoEstudiantes() {
           const ordinales: Record<number, string> = { 1: '1ro', 2: '2do', 3: '3ro', 4: '4to', 5: '5to' }
 
           return {
+            estudianteId: estudiante.estudianteId,
             codigo: `EST-${estudiante.estudianteId}`,
             nombres: estudiante.nombre,
             apellidos: `${estudiante.apellidoPaterno} ${estudiante.apellidoMaterno}`.trim(),

@@ -2,6 +2,7 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       apiBase: '',
+      recordatorioPagoDias: 10,
     },
   },
   css: ['~/assets/css/main.css'],

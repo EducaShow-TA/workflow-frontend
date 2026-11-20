@@ -1,5 +1,7 @@
 export type TipoCalificacionAuditoria = 'FINAL' | 'PARCIAL'
 
+export type GrupoAccionAuditoria = 'RECTIFICACIONES' | 'REGISTROS' | 'AUTOMATICAS'
+
 export interface RegistroAuditoriaCalificacion {
   id: number
   fechaHora: string
@@ -10,8 +12,12 @@ export interface RegistroAuditoriaCalificacion {
   periodoId: number | null
   matriculaId: number | null
   estudianteId: number | null
+  estudianteNombre?: string | null
   competenciaCodigo: string | null
+  competenciaNombre?: string | null
+  areaNombre?: string | null
   evaluacionId: number | null
+  bimestre: number | null
   notaAnterior: string | null
   notaNueva: string | null
   puntajeAnterior: number | null
@@ -22,4 +28,5 @@ export interface RegistroAuditoriaCalificacion {
   justificadaNueva: boolean | null
   observacionAnterior: string | null
   observacionNueva: string | null
+  motivo?: string | null
 }

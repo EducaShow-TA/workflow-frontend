@@ -174,7 +174,7 @@ const datosDetalle = computed(() => {
       valor: registro.rolUsuario ? `${obtenerNombreRol(registro.rolUsuario)} (cuenta #${registro.idUsuario})` : '—',
     },
     {
-      etiqueta: 'Endpoint',
+      etiqueta: 'Ruta solicitada',
       valor: registro.endpoint ? `${registro.metodoHttp ?? ''} ${registro.endpoint}`.trim() : '—',
     },
   ]
@@ -184,8 +184,8 @@ const datosDetalle = computed(() => {
 <template>
   <main class="pagina-logs">
     <EncabezadoPagina
-      titulo="Logs del Sistema"
-      descripcion="Monitoreo de errores y eventos registrados por el servidor."
+      titulo="Registros del sistema"
+      descripcion="Consulta la actividad y los incidentes registrados en la plataforma."
     >
       <template #acciones>
         <BotonAccion variante="secundario" :deshabilitado="cargando" @click="cargarRegistros()">
@@ -200,18 +200,6 @@ const datosDetalle = computed(() => {
           </svg>
           {{ cargando ? 'Actualizando...' : 'Actualizar' }}
         </BotonAccion>
-        <BotonAccion variante="secundario" deshabilitado title="Exportación disponible próximamente">
-          <svg class="icono-boton" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path
-              d="M8 2v8m0 0L5 7m3 3 3-3M3 12.5V13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-.5"
-              stroke="currentColor"
-              stroke-width="1.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
-          Exportar CSV
-        </BotonAccion>
       </template>
     </EncabezadoPagina>
 
@@ -222,7 +210,7 @@ const datosDetalle = computed(() => {
           id="buscar-log"
           v-model="filtros.texto"
           type="search"
-          placeholder="Buscar por mensaje, código, endpoint, módulo o correo..."
+          placeholder="Buscar por mensaje, código, ruta, módulo o correo..."
           autocomplete="off"
         />
       </div>
@@ -248,7 +236,7 @@ const datosDetalle = computed(() => {
     <section class="panel-tabla" aria-labelledby="titulo-registros">
       <header class="encabezado-tabla">
         <h2 id="titulo-registros">Registros recientes</h2>
-        <span class="ayuda">Selecciona un registro para ver su traza técnica.</span>
+        <span class="ayuda">Selecciona un registro para consultar los detalles del error.</span>
       </header>
 
       <PanelEstadoCarga
@@ -272,7 +260,7 @@ const datosDetalle = computed(() => {
                 <th scope="col">Marca de tiempo</th>
                 <th scope="col">Nivel</th>
                 <th scope="col">Usuario / Rol y módulo</th>
-                <th scope="col">Acción / Endpoint</th>
+                <th scope="col">Acción / Ruta</th>
                 <th scope="col">Mensaje</th>
               </tr>
             </thead>
@@ -401,10 +389,11 @@ const datosDetalle = computed(() => {
           </dl>
 
           <div class="traza">
-            <h3>Traza técnica</h3>
+            <h3>Detalles del error</h3>
             <pre v-if="detalle.stackTrace">{{ detalle.stackTrace }}</pre>
             <p v-else class="sin-traza">
-              Sin traza técnica: el error fue controlado por el sistema (validación, permisos o regla de negocio).
+              No hay detalles adicionales. El sistema controló el caso mediante una validación, un permiso o una regla
+              de negocio.
             </p>
           </div>
         </div>

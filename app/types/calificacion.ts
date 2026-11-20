@@ -6,9 +6,11 @@ export interface SolicitudCalificacion {
   periodoId: number
   matriculaId: number
   competenciaCodigo: string
+  bimestre: number
   nota: NotaCualitativa
   observacion: string
   evidenciaUrl: string | null
+  motivo?: string | null
 }
 
 /** Respuesta de /api/v1/seguimiento/competencias/{codigo}. */
@@ -18,13 +20,29 @@ export interface Calificacion {
   estudianteId: number
   estudiante: string
   competenciaCodigo: string
+  bimestre: number | null
   nota: NotaCualitativa
   observacion: string | null
   evidenciaTipo: 'URL' | 'ARCHIVO'
   evidenciaNombre: string | null
   evidenciaUrl: string | null
   evidenciaTamanio: number | null
+  puntajeConsolidado?: number | null
+  consolidada?: boolean
   fechaRegistro: string
+  rectificaciones: number
+}
+
+/** Movimiento del historial de una calificación (US-3.6). */
+export interface MovimientoCalificacion {
+  id: number
+  fechaHora: string
+  usuario: string
+  rolUsuario: string
+  accion: 'REGISTRAR_O_ACTUALIZAR' | 'RECTIFICAR'
+  notaAnterior: NotaCualitativa | null
+  notaNueva: NotaCualitativa | null
+  motivo: string | null
 }
 
 /** Competencia activa del área de una clase del docente. */
@@ -57,6 +75,7 @@ export interface AlumnoClase {
 /** Resultado del análisis de riesgo académico para un área y periodo. */
 export interface RiesgoAcademico {
   periodoId: number
+  bimestre: number
   areaCodigo: string
   umbral: number
   totalAlumnos: number

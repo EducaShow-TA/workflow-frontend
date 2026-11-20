@@ -9,7 +9,7 @@ import { usePeriodosAcademicos } from '~/composables/usePeriodosAcademicos'
 import type { Area } from '~/types/competencia'
 import type { EstudianteMatriculable } from '~/types/matricula'
 import type { PeriodoAcademico } from '~/types/periodoAcademico'
-import type { RegistroAuditoriaCalificacion } from '~/types/auditoriaCalificacion'
+import type { GrupoAccionAuditoria, RegistroAuditoriaCalificacion } from '~/types/auditoriaCalificacion'
 
 definePageMeta({ middleware: 'autenticacion' })
 
@@ -28,6 +28,7 @@ interface FiltrosAuditoria {
   estudianteId: string
   competenciaCodigo: string
   tipo: '' | 'FINAL' | 'PARCIAL'
+  accion: '' | GrupoAccionAuditoria
 }
 
 const TAMANO_PAGINA = 20
@@ -46,6 +47,7 @@ const filtros = reactive<FiltrosAuditoria>({
   estudianteId: '',
   competenciaCodigo: '',
   tipo: '',
+  accion: '',
 })
 const pagina = ref(0)
 const paginas = ref(0)
@@ -77,7 +79,8 @@ const hayFiltros = computed(() =>
     filtros.matriculaId ||
     filtros.estudianteId ||
     filtros.competenciaCodigo.trim() ||
-    filtros.tipo,
+    filtros.tipo ||
+    filtros.accion,
   ),
 )
 
@@ -99,7 +102,7 @@ function rutaConsulta(): string {
   parametros.append('sort', 'fechaHora,desc')
   parametros.append('sort', 'id,desc')
 
-  for (const campo of ['periodoId', 'matriculaId', 'estudianteId', 'competenciaCodigo', 'tipo'] as const) {
+  for (const campo of ['periodoId', 'matriculaId', 'estudianteId', 'competenciaCodigo', 'tipo', 'accion'] as const) {
     const valor = filtros[campo].trim()
     if (valor) {
       parametros.set(campo, valor)
@@ -177,6 +180,7 @@ function limpiarFiltros(): void {
     estudianteId: '',
     competenciaCodigo: '',
     tipo: '',
+    accion: '',
   })
   void consultar(0)
 }
@@ -201,28 +205,34 @@ function periodoVisible(id: number | null): string {
   return periodo ? `${periodoEtiqueta(periodo)} (ID ${id})` : `Período no encontrado (ID ${id})`
 }
 
-function estudianteVisible(id: number | null): string {
+function estudianteVisible(id: number | null, nombre?: string | null): string {
   if (id === null) {
     return 'Estudiante no especificado'
   }
+
+  if (nombre) return `${nombre} (ID ${id})`
 
   const estudiante = estudiantesPorId.value.get(id)
   if (!estudiante) {
     return `Estudiante no encontrado (ID ${id})`
   }
 
-  const nombre = [estudiante.nombre, estudiante.apellidoPaterno, estudiante.apellidoMaterno].filter(Boolean).join(' ')
-  return `${nombre || 'Estudiante'} (ID ${id})`
+  const nombreCompleto = [estudiante.nombre, estudiante.apellidoPaterno, estudiante.apellidoMaterno]
+    .filter(Boolean)
+    .join(' ')
+  return `${nombreCompleto || 'Estudiante'} (ID ${id})`
 }
 
 function matriculaVisible(id: number | null): string {
   return id === null ? 'Matrícula no especificada' : `Matrícula #${id}`
 }
 
-function competenciaVisible(codigo: string | null): string {
+function competenciaVisible(codigo: string | null, nombre?: string | null, area?: string | null): string {
   if (!codigo) {
     return 'Competencia no especificada'
   }
+
+  if (nombre) return `${nombre}${area ? ` · Área: ${area}` : ''}`
 
   const competencia = competenciasPorCodigo.value.get(codigo)
   return competencia
@@ -335,6 +345,16 @@ onMounted(() => {
         </select>
       </div>
 
+      <div class="campo-filtro">
+        <label for="filtro-accion-auditoria">Acción</label>
+        <select id="filtro-accion-auditoria" v-model="filtros.accion" :disabled="cargando">
+          <option value="">Todas</option>
+          <option value="RECTIFICACIONES">Rectificaciones</option>
+          <option value="REGISTROS">Registros y actualizaciones</option>
+          <option value="AUTOMATICAS">Recálculos y cierres</option>
+        </select>
+      </div>
+
       <div class="acciones-filtros">
         <BotonAccion tipo="submit" :deshabilitado="cargando">Aplicar filtros</BotonAccion>
         <BotonAccion variante="secundario" :deshabilitado="!hayFiltros || cargando" @click="limpiarFiltros">
@@ -377,7 +397,7 @@ onMounted(() => {
               </div>
               <div>
                 <dt>Estudiante</dt>
-                <dd>{{ estudianteVisible(item.estudianteId) }}</dd>
+                <dd>{{ estudianteVisible(item.estudianteId, item.estudianteNombre) }}</dd>
               </div>
               <div>
                 <dt>Matrícula</dt>
@@ -389,11 +409,15 @@ onMounted(() => {
               </div>
               <div>
                 <dt>Competencia</dt>
-                <dd>{{ competenciaVisible(item.competenciaCodigo) }}</dd>
+                <dd>{{ competenciaVisible(item.competenciaCodigo, item.competenciaNombre, item.areaNombre) }}</dd>
               </div>
               <div>
                 <dt>Evaluación relacionada</dt>
                 <dd>{{ evaluacionVisible(item) }}</dd>
+              </div>
+              <div>
+                <dt>Bimestre</dt>
+                <dd>{{ item.bimestre ?? 'Sin asignar' }}</dd>
               </div>
               <div>
                 <dt>Nota de la competencia</dt>
@@ -410,6 +434,10 @@ onMounted(() => {
               <div>
                 <dt>¿Calificación justificada?</dt>
                 <dd>{{ describirCambioAuditoria(item.justificadaAnterior, item.justificadaNueva, 'booleano') }}</dd>
+              </div>
+              <div v-if="item.motivo" class="motivo-registro">
+                <dt>Motivo de la rectificación</dt>
+                <dd>{{ item.motivo }}</dd>
               </div>
               <div class="observacion">
                 <dt>Observación</dt>
@@ -599,6 +627,18 @@ onMounted(() => {
   overflow-wrap: anywhere;
 }
 
+.motivo-registro {
+  grid-column: 1 / -1;
+  padding: 10px 12px;
+  border: 1px solid #ddd6fe;
+  border-radius: 10px;
+  background: #faf7ff;
+}
+
+.motivo-registro dd {
+  overflow-wrap: anywhere;
+}
+
 .observacion {
   grid-column: 1 / -1;
 }
@@ -646,7 +686,8 @@ onMounted(() => {
     flex-direction: column;
   }
 
-  .observacion {
+  .observacion,
+  .motivo-registro {
     grid-column: auto;
   }
 

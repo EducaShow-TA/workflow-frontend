@@ -14,6 +14,7 @@ const registro: RegistroAuditoriaCalificacion = {
   estudianteId: 1,
   competenciaCodigo: 'COMP-1',
   evaluacionId: null,
+  bimestre: null,
   notaAnterior: null,
   notaNueva: 'A',
   puntajeAnterior: null,
@@ -31,6 +32,9 @@ describe('presentación amigable de auditoría de calificaciones', () => {
     expect(describirAccionAuditoria(registro)).toBe('Calificación de la competencia registrada')
     expect(describirAccionAuditoria({ ...registro, notaAnterior: 'B' })).toBe(
       'Calificación de la competencia actualizada',
+    )
+    expect(describirAccionAuditoria({ ...registro, accion: 'RECTIFICAR', notaAnterior: 'B' })).toBe(
+      'Rectificación de la calificación de la competencia',
     )
     expect(describirAccionAuditoria({ ...registro, accion: 'RECALCULAR_REGLA' })).toBe(
       'Logro de la competencia recalculado por un cambio en la regla',

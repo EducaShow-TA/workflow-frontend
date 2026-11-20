@@ -4,7 +4,10 @@ import type { AsistenciaDocente, ErroresMarcaje, FormularioMarcaje } from '~/typ
 import type { DocenteOpcion } from '~/types/sesionClase'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
 import { formatearFecha, obtenerFechaHoyIso } from '~/composables/useFechas'
+import { guardarArchivo } from '~/composables/useReporteAsistencia'
 import { useSesionesClase } from '~/composables/useSesionesClase'
+import { useAutenticacionStore } from '~/stores/autenticacion'
+import { useCargaMasivaAsistenciaDocente } from '~/composables/useCargaMasivaAsistenciaDocente'
 import {
   ESTADOS_AJUSTABLES,
   LONGITUD_MAXIMA_MOTIVO,
@@ -28,6 +31,8 @@ interface FilaDocente {
 
 const { listar, registrar, ajustar } = useAsistenciaDocente()
 const { listarDocentes } = useSesionesClase()
+const autenticacion = useAutenticacionStore()
+const { descargarPlantilla, cargar: cargarCsv } = useCargaMasivaAsistenciaDocente()
 
 const fecha = ref(obtenerFechaHoyIso())
 const busqueda = ref('')
@@ -36,6 +41,15 @@ const asistencias = ref<AsistenciaDocente[]>([])
 const cargando = ref(true)
 const error = ref('')
 const aviso = ref('')
+const archivoCsv = ref<File | null>(null)
+const entradaArchivoCsv = ref<HTMLInputElement | null>(null)
+const resultadoCargaCsv = ref<Awaited<ReturnType<typeof cargarCsv>> | null>(null)
+const errorCargaCsv = ref('')
+const validandoCsv = ref(false)
+const guardandoCsv = ref(false)
+const descargandoPlantillaCsv = ref(false)
+
+const esAdministrador = computed(() => autenticacion.usuario?.rol === 'ADMINISTRADOR')
 
 const modalAbierto = ref(false)
 const asistenciaEnAjuste = ref<AsistenciaDocente | null>(null)
@@ -168,6 +182,59 @@ async function guardar(): Promise<void> {
   }
 }
 
+function seleccionarArchivoCsv(evento: Event): void {
+  const entrada = evento.target as HTMLInputElement
+  archivoCsv.value = entrada.files?.[0] ?? null
+  resultadoCargaCsv.value = null
+  errorCargaCsv.value = ''
+}
+
+async function obtenerPlantillaCsv(): Promise<void> {
+  descargandoPlantillaCsv.value = true
+  errorCargaCsv.value = ''
+  try {
+    const contenido = await descargarPlantilla()
+    guardarArchivo(new Blob([contenido], { type: 'text/csv;charset=utf-8' }), 'plantilla-asistencia-docentes.csv')
+  } catch (fallo: unknown) {
+    errorCargaCsv.value = obtenerMensajeError(fallo, 'No se pudo descargar la plantilla CSV.')
+  } finally {
+    descargandoPlantillaCsv.value = false
+  }
+}
+
+async function validarArchivoCsv(): Promise<void> {
+  if (!archivoCsv.value) return
+  validandoCsv.value = true
+  errorCargaCsv.value = ''
+  resultadoCargaCsv.value = null
+  try {
+    resultadoCargaCsv.value = await cargarCsv(archivoCsv.value, true)
+  } catch (fallo: unknown) {
+    errorCargaCsv.value = obtenerMensajeError(fallo, 'No se pudo validar el archivo CSV.')
+  } finally {
+    validandoCsv.value = false
+  }
+}
+
+async function guardarArchivoCsv(): Promise<void> {
+  if (!archivoCsv.value || !resultadoCargaCsv.value || resultadoCargaCsv.value.errores.length) return
+  guardandoCsv.value = true
+  errorCargaCsv.value = ''
+  try {
+    const resultado = await cargarCsv(archivoCsv.value, false)
+    resultadoCargaCsv.value = resultado
+    if (!resultado.guardado) return
+    aviso.value = `Carga completada: ${resultado.registrosNuevos} nuevos y ${resultado.registrosActualizados} actualizados.`
+    archivoCsv.value = null
+    if (entradaArchivoCsv.value) entradaArchivoCsv.value.value = ''
+    await cargar()
+  } catch (fallo: unknown) {
+    errorCargaCsv.value = obtenerMensajeError(fallo, 'No se pudo guardar la carga CSV.')
+  } finally {
+    guardandoCsv.value = false
+  }
+}
+
 watch(fecha, (nueva) => {
   if (nueva) {
     aviso.value = ''
@@ -183,9 +250,105 @@ onMounted(cargar)
     <EncabezadoPagina
       titulo="Asistencia docente"
       descripcion="Consulta los marcajes de los docentes y registra o ajusta los que tengan incidencias, indicando el motivo."
-    />
+    >
+      <template #acciones>
+        <NuxtLink class="enlace-configuracion" to="/asistencia-docentes/configuracion"> Configurar marcaje </NuxtLink>
+      </template>
+    </EncabezadoPagina>
 
     <AvisoMensaje v-if="aviso" :mensaje="aviso" tipo="exito" cerrable @cerrar="aviso = ''" />
+
+    <section v-if="esAdministrador" class="tarjeta carga-csv" aria-labelledby="titulo-carga-csv">
+      <header class="encabezado-carga-csv">
+        <div>
+          <h2 id="titulo-carga-csv">Carga masiva por CSV</h2>
+          <p>Registra o actualiza marcajes de varios docentes y fechas en un solo lote.</p>
+        </div>
+        <button
+          type="button"
+          class="boton-csv secundario"
+          :disabled="descargandoPlantillaCsv || validandoCsv || guardandoCsv"
+          @click="obtenerPlantillaCsv"
+        >
+          {{ descargandoPlantillaCsv ? 'Descargando…' : 'Descargar plantilla' }}
+        </button>
+      </header>
+
+      <div class="contenido-carga-csv">
+        <div class="campo campo-archivo-csv">
+          <label for="archivo-asistencia-docentes">Archivo CSV</label>
+          <input
+            id="archivo-asistencia-docentes"
+            ref="entradaArchivoCsv"
+            type="file"
+            accept=".csv,text/csv"
+            :disabled="validandoCsv || guardandoCsv"
+            @change="seleccionarArchivoCsv"
+          />
+          <small class="ayuda">
+            Columnas: DNI del docente, fecha, hora de entrada, hora de salida, estado y motivo. Estados: PRESENTE,
+            TARDANZA o INASISTENCIA. Máximo 500 filas.
+          </small>
+        </div>
+
+        <p v-if="archivoCsv" class="archivo-seleccionado">Seleccionado: {{ archivoCsv.name }}</p>
+
+        <div class="acciones-csv">
+          <button
+            type="button"
+            class="boton-csv"
+            :disabled="!archivoCsv || validandoCsv || guardandoCsv || descargandoPlantillaCsv"
+            @click="validarArchivoCsv"
+          >
+            {{ validandoCsv ? 'Validando…' : 'Validar archivo' }}
+          </button>
+          <button
+            v-if="resultadoCargaCsv && !resultadoCargaCsv.errores.length && !resultadoCargaCsv.guardado"
+            type="button"
+            class="boton-csv confirmar"
+            :disabled="guardandoCsv || validandoCsv"
+            @click="guardarArchivoCsv"
+          >
+            {{ guardandoCsv ? 'Guardando…' : 'Guardar lote validado' }}
+          </button>
+        </div>
+
+        <AvisoMensaje v-if="errorCargaCsv" :mensaje="errorCargaCsv" tipo="error" />
+
+        <div v-if="resultadoCargaCsv" class="resultado-csv" role="status" aria-live="polite">
+          <p>
+            <strong>{{ resultadoCargaCsv.guardado ? 'Carga guardada.' : 'Resultado de validación.' }}</strong>
+            {{ resultadoCargaCsv.filasValidas }} de {{ resultadoCargaCsv.totalFilas }} filas válidas;
+            {{ resultadoCargaCsv.filasRechazadas }} rechazadas.
+            <template v-if="resultadoCargaCsv.guardado">
+              {{ resultadoCargaCsv.registrosNuevos }} registros nuevos y
+              {{ resultadoCargaCsv.registrosActualizados }} actualizados.
+            </template>
+          </p>
+          <div v-if="resultadoCargaCsv.errores.length" class="tabla-desplazable errores-csv">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">Fila</th>
+                  <th scope="col">Campo</th>
+                  <th scope="col">Detalle</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(errorFila, indice) in resultadoCargaCsv.errores" :key="`${errorFila.fila}-${indice}`">
+                  <td>{{ errorFila.fila }}</td>
+                  <td>{{ errorFila.campo }}</td>
+                  <td>{{ errorFila.mensaje }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p v-else-if="!resultadoCargaCsv.guardado" class="ayuda">
+            La validación pasó. Revisa el resumen y guarda el lote para aplicar los cambios.
+          </p>
+        </div>
+      </div>
+    </section>
 
     <dl class="totales">
       <div class="total presente">
@@ -362,6 +525,126 @@ onMounted(cargar)
   gap: 20px;
   margin: 0 auto;
   padding: 32px;
+}
+
+.enlace-configuracion {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 14px;
+  border: 1px solid #3159a8;
+  border-radius: 8px;
+  color: #234486;
+  background: white;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.enlace-configuracion:hover {
+  background: #f2f5fc;
+}
+
+.encabezado-carga-csv {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px 14px;
+}
+
+.encabezado-carga-csv h2 {
+  margin: 0 0 4px;
+  color: #191c1e;
+  font-size: 18px;
+}
+
+.encabezado-carga-csv p,
+.resultado-csv p {
+  margin: 0;
+  color: #434655;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.contenido-carga-csv {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 0 20px 20px;
+}
+
+.campo-archivo-csv input[type='file'] {
+  padding: 8px;
+  background: #fff;
+}
+
+.boton-csv {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 14px;
+  border: 1px solid #234486;
+  border-radius: 8px;
+  color: #fff;
+  background: #234486;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.boton-csv.secundario {
+  color: #234486;
+  background: #fff;
+}
+
+.boton-csv.confirmar {
+  border-color: #167545;
+  background: #167545;
+}
+
+.boton-csv:hover:not(:disabled) {
+  filter: brightness(0.94);
+}
+
+.boton-csv:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.acciones-csv {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.archivo-seleccionado {
+  margin: -4px 0 0;
+  color: #434655;
+  font-size: 13px;
+}
+
+.resultado-csv {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #d9dee8;
+  border-radius: 8px;
+  background: #f9fafb;
+}
+
+.errores-csv {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.errores-csv table {
+  min-width: 520px;
 }
 
 .totales {
@@ -666,6 +949,10 @@ th {
   .filtros .campo {
     min-width: 0;
     flex: 1 1 100%;
+  }
+
+  .encabezado-carga-csv {
+    flex-direction: column;
   }
 }
 </style>

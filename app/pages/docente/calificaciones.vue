@@ -1,23 +1,25 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { AlumnoClase, Calificacion, MiClase, NotaCualitativa, RiesgoAcademico } from '~/types/calificacion'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
 import { formatearFecha } from '~/composables/useFechas'
 import { useCalificaciones } from '~/composables/useCalificaciones'
+import { useEvaluacionesParciales } from '~/composables/useEvaluacionesParciales'
+import type { EvaluacionParcial, NotaEvaluacionParcial } from '~/types/evaluacionParcial'
 import { NOTAS, claveClase, nombreClase, useMisClases } from '~/composables/useMisClases'
 import { useAutenticacionStore } from '~/stores/autenticacion'
 
 definePageMeta({ layout: 'docente', middleware: 'autenticacion' })
 
 const CLAVE_RECORDADA = 'educashow.docente.calificaciones'
-const CLAVE_UMBRAL = 'educashow.docente.umbral-riesgo'
-const UMBRALES = [1, 2, 3, 4, 5]
 
 type FiltroNota = NotaCualitativa | 'SIN_NOTA' | 'RIESGO' | ''
 
 const autenticacion = useAutenticacionStore()
 const { listar: listarClases, listarAlumnos, obtenerRiesgo } = useMisClases()
 const { listar: listarNotas, descargarEvidencia } = useCalificaciones()
+const { listar: listarEvaluaciones, listarNotas: listarNotasParciales } = useEvaluacionesParciales()
+const ruta = useRoute()
 const esDocente = computed(() => autenticacion.usuario?.rol === 'DOCENTE')
 
 const clases = ref<MiClase[]>([])
@@ -29,7 +31,6 @@ const notasPorCompetencia = ref<Record<string, Calificacion[]>>({})
 const riesgoAcademico = ref<RiesgoAcademico | null>(null)
 const busqueda = ref('')
 const filtroNota = ref<FiltroNota>('')
-const umbralRiesgo = ref(2)
 const cargando = ref(true)
 const cargandoClase = ref(false)
 const error = ref('')
@@ -37,6 +38,15 @@ const aviso = ref('')
 
 const modalAbierto = ref(false)
 const alumnoEnEdicion = ref<AlumnoClase | null>(null)
+const rectificacionAbierta = ref(false)
+const historialAbierto = ref(false)
+const matriculaResaltada = ref<number | null>(null)
+const evaluacionesCompetencia = ref<EvaluacionParcial[]>([])
+const notasParciales = ref<Record<number, NotaEvaluacionParcial[]>>({})
+const cargandoParciales = ref(false)
+const ventanaParcial = ref<{ evaluacion: EvaluacionParcial; alumno: AlumnoClase } | null>(null)
+let solicitudParciales = 0
+let temporizadorResaltado: ReturnType<typeof setTimeout> | undefined
 
 const areas = computed(() => {
   const mapa = new Map<string, { codigo: string; nombre: string; secciones: number }>()
@@ -53,6 +63,13 @@ const competencia = computed(
   () => clase.value?.competencias.find((item) => item.codigo === competenciaElegida.value) ?? null,
 )
 const notas = computed(() => notasPorCompetencia.value[competenciaElegida.value] ?? [])
+const evaluacionesBimestre = computed(() =>
+  evaluacionesCompetencia.value.filter((item) => item.bimestre === riesgoAcademico.value?.bimestre),
+)
+const modoParcial = computed(() => evaluacionesBimestre.value.length > 0)
+const ponderacionBimestre = computed(() =>
+  evaluacionesBimestre.value.map((item) => `${Number(item.ponderacion)} %`).join(' + '),
+)
 const notaPorMatricula = computed(() => new Map(notas.value.map((nota) => [nota.matriculaId, nota])))
 
 const conteo = computed(() => {
@@ -96,6 +113,69 @@ const contexto = computed(() =>
 const haySiguiente = computed(() =>
   pendientes.value.some((alumno) => alumno.matriculaId !== alumnoEnEdicion.value?.matriculaId),
 )
+
+function notaParcial(evaluacionId: number, matriculaId: number): NotaEvaluacionParcial | null {
+  return (
+    (notasParciales.value[evaluacionId] ?? []).find(
+      (nota) => nota.matriculaId === matriculaId && (nota.nota || nota.justificada),
+    ) ?? null
+  )
+}
+
+function porcentajeFaltante(matriculaId: number): number {
+  return evaluacionesBimestre.value
+    .filter((evaluacion) => !notaParcial(evaluacion.id, matriculaId))
+    .reduce((suma, evaluacion) => suma + Number(evaluacion.ponderacion), 0)
+}
+
+async function cargarParciales(): Promise<void> {
+  const actual = clase.value
+  const codigo = competenciaElegida.value
+  const turno = ++solicitudParciales
+  evaluacionesCompetencia.value = []
+  notasParciales.value = {}
+  if (!actual || !codigo) return
+  cargandoParciales.value = true
+  try {
+    const lista = await listarEvaluaciones(actual.periodoId, codigo)
+    const bimestre = riesgoAcademico.value?.bimestre
+    const delBimestre = lista.filter((item) => item.bimestre === bimestre)
+    const notas = await Promise.all(delBimestre.map((item) => listarNotasParciales(item.id)))
+    if (turno !== solicitudParciales) return
+    evaluacionesCompetencia.value = lista
+    notasParciales.value = Object.fromEntries(delBimestre.map((item, indice) => [item.id, notas[indice] ?? []]))
+  } catch (fallo: unknown) {
+    if (turno === solicitudParciales) {
+      error.value = obtenerMensajeError(fallo, 'No se pudieron cargar las evaluaciones parciales.')
+    }
+  } finally {
+    if (turno === solicitudParciales) cargandoParciales.value = false
+  }
+}
+
+function abrirParcial(evaluacion: EvaluacionParcial, alumno: AlumnoClase): void {
+  aviso.value = ''
+  ventanaParcial.value = { evaluacion, alumno }
+}
+
+async function alGuardarParcial(): Promise<void> {
+  const ventana = ventanaParcial.value
+  ventanaParcial.value = null
+  const actual = clase.value
+  if (!ventana || !actual) return
+  aviso.value = `Nota de ${ventana.alumno.nombreCompleto} guardada en “${ventana.evaluacion.titulo}”.`
+  try {
+    const [notasEvaluacion, logros] = await Promise.all([
+      listarNotasParciales(ventana.evaluacion.id),
+      listarNotas(actual.periodoId, competenciaElegida.value, riesgoAcademico.value?.bimestre ?? 1),
+    ])
+    notasParciales.value = { ...notasParciales.value, [ventana.evaluacion.id]: notasEvaluacion }
+    notasPorCompetencia.value = { ...notasPorCompetencia.value, [competenciaElegida.value]: logros }
+    riesgoAcademico.value = await obtenerRiesgo(actual.periodoId, actual.areaCodigo)
+  } catch (fallo: unknown) {
+    error.value = obtenerMensajeError(fallo, 'No se pudo actualizar el logro del bimestre.')
+  }
+}
 
 function normalizar(texto: string): string {
   return texto.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
@@ -148,10 +228,25 @@ async function elegirClase(clave: string, competenciaPreferida = ''): Promise<vo
   await cargarClase()
 }
 
+function aplicarConsulta(): void {
+  if (typeof ruta.query.alumno === 'string') busqueda.value = ruta.query.alumno
+  if (ruta.query.filtro === 'riesgo') filtroNota.value = 'RIESGO'
+}
+
+watch(
+  () => ruta.query,
+  async (consulta) => {
+    if (!clases.value.length || typeof consulta.clase !== 'string') return
+    if (consulta.clase !== claseElegida.value) await elegirClase(consulta.clase)
+    aplicarConsulta()
+  },
+)
+
 function elegirCompetencia(codigo: string): void {
   competenciaElegida.value = codigo
   filtroNota.value = ''
   recordar()
+  void cargarParciales()
 }
 
 async function cargarClase(): Promise<void> {
@@ -165,10 +260,10 @@ async function cargarClase(): Promise<void> {
   try {
     const [lista, riesgo] = await Promise.all([
       listarAlumnos(actual.periodoId),
-      obtenerRiesgo(actual.periodoId, actual.areaCodigo, umbralRiesgo.value),
+      obtenerRiesgo(actual.periodoId, actual.areaCodigo),
     ])
     const porCompetencia = await Promise.all(
-      actual.competencias.map((item) => listarNotas(actual.periodoId, item.codigo)),
+      actual.competencias.map((item) => listarNotas(actual.periodoId, item.codigo, riesgo.bimestre)),
     )
     if (claveClase(actual) !== claseElegida.value) return
     alumnos.value = lista
@@ -176,26 +271,11 @@ async function cargarClase(): Promise<void> {
     notasPorCompetencia.value = Object.fromEntries(
       actual.competencias.map((item, indice) => [item.codigo, porCompetencia[indice] ?? []]),
     )
+    void cargarParciales()
   } catch (fallo: unknown) {
     error.value = obtenerMensajeError(fallo, 'No se pudo cargar la lista de alumnos.')
   } finally {
     cargandoClase.value = false
-  }
-}
-
-async function cambiarUmbral(valor: number): Promise<void> {
-  umbralRiesgo.value = valor
-  if (!enRiesgo.value.size && filtroNota.value === 'RIESGO') filtroNota.value = ''
-  try {
-    localStorage.setItem(CLAVE_UMBRAL, String(valor))
-  } catch {
-    /* el navegador puede bloquear el almacenamiento */
-  }
-  if (!clase.value) return
-  try {
-    riesgoAcademico.value = await obtenerRiesgo(clase.value.periodoId, clase.value.areaCodigo, valor)
-  } catch (fallo: unknown) {
-    error.value = obtenerMensajeError(fallo, 'No se pudo actualizar el análisis de riesgo académico.')
   }
 }
 
@@ -212,7 +292,56 @@ function alternarFiltro(valor: FiltroNota): void {
 function abrir(alumno: AlumnoClase): void {
   alumnoEnEdicion.value = alumno
   aviso.value = ''
-  modalAbierto.value = true
+  if (notaPorMatricula.value.has(alumno.matriculaId)) rectificacionAbierta.value = true
+  else modalAbierto.value = true
+}
+
+function verHistorial(alumno: AlumnoClase): void {
+  alumnoEnEdicion.value = alumno
+  aviso.value = ''
+  historialAbierto.value = true
+}
+
+async function rectificarDesdeHistorial(): Promise<void> {
+  historialAbierto.value = false
+  await nextTick()
+  rectificacionAbierta.value = true
+}
+
+function textoRectificada(cantidad: number): string {
+  return cantidad === 1 ? 'Rectificada · ver historial' : `Rectificada ${cantidad} veces · ver historial`
+}
+
+function actualizarNota(calificacion: Calificacion): void {
+  const codigo = competenciaElegida.value
+  const lista = (notasPorCompetencia.value[codigo] ?? []).filter(
+    (nota) => nota.matriculaId !== calificacion.matriculaId,
+  )
+  notasPorCompetencia.value = { ...notasPorCompetencia.value, [codigo]: [...lista, calificacion] }
+  if (clase.value) {
+    void obtenerRiesgo(clase.value.periodoId, clase.value.areaCodigo)
+      .then((resultado) => {
+        riesgoAcademico.value = resultado
+      })
+      .catch((fallo: unknown) => {
+        error.value = obtenerMensajeError(fallo, 'No se pudo actualizar el análisis de riesgo académico.')
+      })
+  }
+}
+
+function alRectificar(calificacion: Calificacion, notaAnterior: NotaCualitativa): void {
+  actualizarNota(calificacion)
+  const nombre = alumnoEnEdicion.value?.nombreCompleto ?? 'el alumno'
+  aviso.value =
+    notaAnterior === calificacion.nota
+      ? `Calificación de ${nombre} rectificada; se mantiene la nota ${calificacion.nota}.`
+      : `Nota de ${nombre} rectificada de ${notaAnterior} a ${calificacion.nota}.`
+  rectificacionAbierta.value = false
+  matriculaResaltada.value = calificacion.matriculaId
+  clearTimeout(temporizadorResaltado)
+  temporizadorResaltado = setTimeout(() => {
+    matriculaResaltada.value = null
+  }, 3000)
 }
 
 function calificarPendientes(): void {
@@ -221,20 +350,7 @@ function calificarPendientes(): void {
 }
 
 function alGuardar(calificacion: Calificacion, siguiente: boolean): void {
-  const codigo = competenciaElegida.value
-  const lista = (notasPorCompetencia.value[codigo] ?? []).filter(
-    (nota) => nota.matriculaId !== calificacion.matriculaId,
-  )
-  notasPorCompetencia.value = { ...notasPorCompetencia.value, [codigo]: [...lista, calificacion] }
-  if (clase.value) {
-    void obtenerRiesgo(clase.value.periodoId, clase.value.areaCodigo, umbralRiesgo.value)
-      .then((resultado) => {
-        riesgoAcademico.value = resultado
-      })
-      .catch((fallo: unknown) => {
-        error.value = obtenerMensajeError(fallo, 'No se pudo actualizar el análisis de riesgo académico.')
-      })
-  }
+  actualizarNota(calificacion)
   aviso.value = `Nota ${calificacion.nota} guardada para ${alumnoEnEdicion.value?.nombreCompleto ?? 'el alumno'}.`
 
   const proximo = siguiente ? pendientes.value[0] : undefined
@@ -257,6 +373,8 @@ async function descargar(calificacion: Calificacion): Promise<void> {
   }
 }
 
+onBeforeUnmount(() => clearTimeout(temporizadorResaltado))
+
 onMounted(async () => {
   if (!esDocente.value) {
     cargando.value = false
@@ -265,14 +383,15 @@ onMounted(async () => {
   try {
     clases.value = await listarClases()
     const recordada = leerRecordada()
-    try {
-      const guardado = Number(localStorage.getItem(CLAVE_UMBRAL))
-      if (UMBRALES.includes(guardado)) umbralRiesgo.value = guardado
-    } catch {
-      /* el navegador puede bloquear el almacenamiento */
+    const pedida = typeof ruta.query.clase === 'string' ? ruta.query.clase : ''
+    const inicial =
+      clases.value.find((item) => claveClase(item) === pedida) ??
+      clases.value.find((item) => claveClase(item) === recordada.clase) ??
+      clases.value[0]
+    if (inicial) {
+      await elegirClase(claveClase(inicial), pedida ? '' : recordada.competencia)
+      aplicarConsulta()
     }
-    const inicial = clases.value.find((item) => claveClase(item) === recordada.clase) ?? clases.value[0]
-    if (inicial) await elegirClase(claveClase(inicial), recordada.competencia)
   } catch (fallo: unknown) {
     error.value = obtenerMensajeError(fallo, 'No se pudieron cargar tus clases.')
   } finally {
@@ -285,7 +404,7 @@ onMounted(async () => {
   <main class="docente-vista">
     <header class="docente-titulo">
       <div>
-        <span class="docente-sobrelinea">US-3.2 · US-3.8</span>
+        <span class="docente-sobrelinea">Evaluación por competencias</span>
         <h1>Calificaciones</h1>
         <p>Elige tu clase y la competencia; registra la nota de cada alumno con su evidencia.</p>
       </div>
@@ -347,6 +466,7 @@ onMounted(async () => {
         <div class="docente-tarjeta__titulo docente-tarjeta__titulo--wrap">
           <h2 id="titulo-clase">{{ clase.areaNombre }} · {{ nombreClase(clase) }} · {{ clase.anhio }}</h2>
           <button
+            v-if="!modoParcial"
             type="button"
             class="docente-boton"
             :disabled="cargandoClase || !competencia || !pendientes.length"
@@ -393,19 +513,12 @@ onMounted(async () => {
                   }}
                 </strong>
                 <span>
-                  Acumulan {{ umbralRiesgo }} o más notas C en las competencias de {{ clase.areaNombre }}. Solo
-                  considera notas; no cuenta tardanzas ni inasistencias.
+                  Acumulan más de {{ riesgoAcademico?.umbral ?? 1 }} notas C del bimestre
+                  {{ riesgoAcademico?.bimestre ?? 'actual' }} en las competencias de {{ clase.areaNombre }}. Incluye
+                  calificaciones manuales y parciales; no cuenta tardanzas ni inasistencias.
                 </span>
               </div>
               <div class="riesgo__acciones">
-                <label for="umbral-riesgo">Umbral de notas C</label>
-                <select
-                  id="umbral-riesgo"
-                  :value="umbralRiesgo"
-                  @change="cambiarUmbral(Number(($event.target as HTMLSelectElement).value))"
-                >
-                  <option v-for="valor in UMBRALES" :key="valor" :value="valor">{{ valor }} o más</option>
-                </select>
                 <button
                   type="button"
                   class="docente-boton docente-boton--secundario"
@@ -458,7 +571,92 @@ onMounted(async () => {
 
             <AvisoMensaje v-if="aviso" :mensaje="aviso" tipo="exito" />
 
-            <div class="docente-tabla-contenedor tabla-desplazable">
+            <p v-if="cargandoParciales" class="docente-texto-secundario" role="status">
+              Consultando evaluaciones parciales…
+            </p>
+
+            <template v-else-if="modoParcial">
+              <AvisoMensaje
+                tipo="advertencia"
+                :mensaje="`Esta competencia se calcula con las evaluaciones parciales del bimestre ${riesgoAcademico?.bimestre} que definió el administrador (${ponderacionBimestre}). Califica cada evaluación; el logro del bimestre se obtiene automáticamente.`"
+              />
+              <div class="docente-tabla-contenedor tabla-desplazable">
+                <table class="docente-tabla tabla-parciales">
+                  <thead>
+                    <tr>
+                      <th scope="col">N.°</th>
+                      <th scope="col">Alumno</th>
+                      <th v-for="evaluacion in evaluacionesBimestre" :key="evaluacion.id" scope="col">
+                        {{ evaluacion.titulo }}
+                        <small class="columna-detalle">
+                          {{ Number(evaluacion.ponderacion) }} %
+                          <span v-if="evaluacion.tareaId" class="marca-tarea">Tarea</span>
+                        </small>
+                      </th>
+                      <th scope="col">Logro del bimestre</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-if="!alumnosFiltrados.length">
+                      <td :colspan="evaluacionesBimestre.length + 3" class="docente-tabla__vacia">
+                        {{ alumnos.length ? 'Ningún alumno coincide con el filtro.' : 'La sección no tiene alumnos.' }}
+                      </td>
+                    </tr>
+                    <tr v-for="alumno in alumnosFiltrados" :key="alumno.matriculaId">
+                      <td class="numero">{{ alumnos.indexOf(alumno) + 1 }}</td>
+                      <td>
+                        <strong class="nombre">{{ alumno.nombreCompleto }}</strong>
+                        <small class="dni">DNI {{ alumno.dni }}</small>
+                      </td>
+                      <td v-for="evaluacion in evaluacionesBimestre" :key="evaluacion.id">
+                        <button
+                          v-if="notaParcial(evaluacion.id, alumno.matriculaId) || evaluacion.tareaId"
+                          type="button"
+                          class="celda-nota"
+                          :aria-label="`${evaluacion.titulo} de ${alumno.nombreCompleto}`"
+                          @click="abrirParcial(evaluacion, alumno)"
+                        >
+                          {{
+                            notaParcial(evaluacion.id, alumno.matriculaId)?.justificada
+                              ? 'Just.'
+                              : (notaParcial(evaluacion.id, alumno.matriculaId)?.nota ?? '—')
+                          }}
+                          <span
+                            v-if="notaParcial(evaluacion.id, alumno.matriculaId)?.comentario"
+                            title="Tiene comentario"
+                            aria-hidden="true"
+                            >💬</span
+                          >
+                        </button>
+                        <button
+                          v-else
+                          type="button"
+                          class="docente-boton boton-calificar"
+                          @click="abrirParcial(evaluacion, alumno)"
+                        >
+                          Calificar
+                        </button>
+                      </td>
+                      <td>
+                        <strong class="logro">{{ notaPorMatricula.get(alumno.matriculaId)?.nota ?? '—' }}</strong>
+                        <small
+                          v-if="notaPorMatricula.get(alumno.matriculaId) && porcentajeFaltante(alumno.matriculaId) > 0"
+                          class="provisional"
+                        >
+                          provisional · faltan {{ porcentajeFaltante(alumno.matriculaId) }} %
+                        </small>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p class="docente-texto-secundario nota-pie">
+                Las columnas de tareas también se pueden calificar desde Tareas: es la misma nota. Mientras falten
+                notas, el logro es provisional; al cerrar actas, las que faltan pasan a C.
+              </p>
+            </template>
+
+            <div v-else class="docente-tabla-contenedor tabla-desplazable">
               <table class="docente-tabla">
                 <thead>
                   <tr>
@@ -479,12 +677,23 @@ onMounted(async () => {
                   <tr
                     v-for="alumno in alumnosFiltrados"
                     :key="alumno.matriculaId"
-                    :class="{ 'fila-riesgo': enRiesgo.has(alumno.matriculaId) }"
+                    :class="{
+                      'fila-riesgo': enRiesgo.has(alumno.matriculaId),
+                      'fila-rectificada': matriculaResaltada === alumno.matriculaId,
+                    }"
                   >
                     <td class="numero">{{ alumnos.indexOf(alumno) + 1 }}</td>
                     <td>
                       <strong class="nombre">{{ alumno.nombreCompleto }}</strong>
                       <small class="dni">DNI {{ alumno.dni }}</small>
+                      <button
+                        v-if="(notaPorMatricula.get(alumno.matriculaId)?.rectificaciones ?? 0) > 0"
+                        type="button"
+                        class="ver-historial solo-movil"
+                        @click="verHistorial(alumno)"
+                      >
+                        {{ textoRectificada(notaPorMatricula.get(alumno.matriculaId)!.rectificaciones) }}
+                      </button>
                       <span v-if="enRiesgo.has(alumno.matriculaId)" class="marca-riesgo">
                         En riesgo · {{ riesgoPorMatricula.get(alumno.matriculaId)?.notasC ?? 0 }} C
                       </span>
@@ -515,6 +724,14 @@ onMounted(async () => {
                       </td>
                       <td class="fecha">
                         {{ formatearFecha(notaPorMatricula.get(alumno.matriculaId)!.fechaRegistro.slice(0, 10)) }}
+                        <button
+                          v-if="notaPorMatricula.get(alumno.matriculaId)!.rectificaciones > 0"
+                          type="button"
+                          class="ver-historial"
+                          @click="verHistorial(alumno)"
+                        >
+                          {{ textoRectificada(notaPorMatricula.get(alumno.matriculaId)!.rectificaciones) }}
+                        </button>
                       </td>
                     </template>
                     <template v-else>
@@ -523,7 +740,14 @@ onMounted(async () => {
                       <td class="tenue">—</td>
                     </template>
                     <td class="accion">
+                      <span
+                        v-if="notaPorMatricula.get(alumno.matriculaId)?.consolidada"
+                        class="tenue"
+                        title="La nota se calcula a partir de las evaluaciones parciales"
+                        >Calculada</span
+                      >
                       <button
+                        v-else
                         type="button"
                         :class="[
                           'docente-boton',
@@ -531,7 +755,7 @@ onMounted(async () => {
                         ]"
                         @click="abrir(alumno)"
                       >
-                        {{ notaPorMatricula.has(alumno.matriculaId) ? 'Editar' : 'Registrar' }}
+                        {{ notaPorMatricula.has(alumno.matriculaId) ? 'Rectificar' : 'Registrar' }}
                       </button>
                     </td>
                   </tr>
@@ -549,16 +773,123 @@ onMounted(async () => {
       :alumno="alumnoEnEdicion"
       :contexto="contexto"
       :periodo-id="clase.periodoId"
+      :bimestre="riesgoAcademico?.bimestre ?? 1"
       :competencia-codigo="competencia.codigo"
-      :actual="alumnoEnEdicion ? (notaPorMatricula.get(alumnoEnEdicion.matriculaId) ?? null) : null"
+      :actual="null"
       :hay-siguiente="haySiguiente"
       @cerrar="modalAbierto = false"
       @guardada="alGuardar"
+    />
+
+    <ModalRectificarCalificacion
+      v-if="clase && competencia"
+      :abierta="rectificacionAbierta"
+      :alumno="alumnoEnEdicion"
+      :contexto="contexto"
+      :periodo-id="clase.periodoId"
+      :bimestre="riesgoAcademico?.bimestre ?? 1"
+      :competencia-codigo="competencia.codigo"
+      :actual="alumnoEnEdicion ? (notaPorMatricula.get(alumnoEnEdicion.matriculaId) ?? null) : null"
+      @cerrar="rectificacionAbierta = false"
+      @guardada="alRectificar"
+    />
+
+    <ModalNotaParcial
+      v-if="ventanaParcial"
+      :abierta="Boolean(ventanaParcial)"
+      :titulo="`Calificar · ${ventanaParcial.evaluacion.titulo}`"
+      :descripcion="`${ventanaParcial.alumno.nombreCompleto} · ${competencia?.nombre ?? ''} · bimestre ${ventanaParcial.evaluacion.bimestre} · ${Number(ventanaParcial.evaluacion.ponderacion)} %`"
+      :evaluacion-id="ventanaParcial.evaluacion.id"
+      :matricula-id="ventanaParcial.alumno.matriculaId"
+      :tarea-id="ventanaParcial.evaluacion.tareaId ?? null"
+      :actual="notaParcial(ventanaParcial.evaluacion.id, ventanaParcial.alumno.matriculaId)"
+      @cerrar="ventanaParcial = null"
+      @guardada="alGuardarParcial"
+    />
+
+    <ModalHistorialCalificacion
+      v-if="clase && competencia"
+      :abierta="historialAbierto"
+      :alumno="alumnoEnEdicion"
+      :contexto="contexto"
+      :bimestre="riesgoAcademico?.bimestre ?? 1"
+      :actual="alumnoEnEdicion ? (notaPorMatricula.get(alumnoEnEdicion.matriculaId) ?? null) : null"
+      @cerrar="historialAbierto = false"
+      @rectificar="rectificarDesdeHistorial"
     />
   </main>
 </template>
 
 <style scoped>
+.tabla-parciales th {
+  vertical-align: bottom;
+}
+
+.columna-detalle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+.marca-tarea {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #ede9fe;
+  color: #5b21b6;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.celda-nota {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 44px;
+  justify-content: center;
+  padding: 4px 10px;
+  border: 1px solid #c3c6d7;
+  border-radius: 8px;
+  background: white;
+  color: #0f172a;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.celda-nota:hover {
+  border-color: #004ac6;
+  background: #eff6ff;
+}
+
+.celda-nota:focus-visible {
+  outline: 3px solid #93c5fd;
+  outline-offset: 2px;
+}
+
+.boton-calificar {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.logro {
+  font-size: 15px;
+}
+
+.provisional {
+  display: block;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.nota-pie {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+}
+
 .selector {
   display: flex;
   flex-direction: column;
@@ -824,6 +1155,41 @@ onMounted(async () => {
   box-shadow: inset 3px 0 0 #b91c1c;
 }
 
+.docente-tabla tr td {
+  transition: background-color 0.6s ease;
+}
+
+.fila-rectificada td {
+  background: #f0fdf4;
+}
+
+.fila-rectificada td:first-child {
+  box-shadow: inset 4px 0 0 #16a34a;
+}
+
+.ver-historial {
+  display: block;
+  margin-top: 3px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #1e40af;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.ver-historial:focus-visible {
+  outline: 2px solid #004ac6;
+  outline-offset: 2px;
+}
+
+.solo-movil {
+  display: none;
+}
+
 .marca-riesgo {
   display: inline-block;
   margin-top: 4px;
@@ -980,6 +1346,10 @@ onMounted(async () => {
 
   .docente-tabla :is(th, td):is(:nth-child(1), :nth-child(4), :nth-child(5)):not(.docente-tabla__vacia) {
     display: none;
+  }
+
+  .solo-movil {
+    display: block;
   }
 }
 </style>

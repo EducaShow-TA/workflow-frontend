@@ -32,6 +32,13 @@ export interface SolicitudAjusteAsistenciaDocente {
   motivoAjuste: string
 }
 
+/** Configuración global para la ventana de marcaje y la tolerancia docente. */
+export interface ConfiguracionMarcajeDocente {
+  toleranciaMinutos: number
+  ventanaAntesMinutos: number
+  ventanaDespuesMinutos: number
+}
+
 export interface FormularioMarcaje {
   docenteId: number | null
   fecha: string

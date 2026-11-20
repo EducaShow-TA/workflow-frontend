@@ -3,6 +3,7 @@ import { reactive, ref } from 'vue'
 import PasoApoderados from '~/components/PasoApoderados.vue'
 import PasoConfirmacion from '~/components/PasoConfirmacion.vue'
 import type { RegistroEstudiante } from '~/types/registroEstudiante'
+import type { CredencialApoderado } from '~/types/apoderado'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
 import { useApi } from '~/composables/useApi'
 import { validarPoliticaContrasena } from '~/composables/usePoliticaContrasena'
@@ -26,6 +27,13 @@ const pasos = ['Datos Personales', 'Contacto', 'Apoderados', 'Confirmación']
 const formatoUsuario = /^[A-Za-z0-9]+$/
 const { solicitar } = useApi()
 const enviando = ref(false)
+const credencialesCreadas = ref<CredencialApoderado[]>([])
+
+interface CuentaApoderadoCreada {
+  dni: string
+  username: string
+  contrasenhaTemporal: string
+}
 
 const formulario = reactive<RegistroEstudiante>({
   username: '',
@@ -231,7 +239,7 @@ async function registrarEstudiante(): Promise<void> {
   enviando.value = true
   mensajeEstado.value = ''
   try {
-    await solicitar('/api/v1/estudiantes', {
+    const respuesta = await solicitar<{ cuentasApoderados?: CuentaApoderadoCreada[] }>('/api/v1/estudiantes', {
       metodo: 'POST',
       cuerpo: {
         username: formulario.username.trim(),
@@ -261,6 +269,20 @@ async function registrarEstudiante(): Promise<void> {
       },
     })
     mensajeEstado.value = 'Estudiante registrado correctamente.'
+    const cuentas = respuesta?.cuentasApoderados ?? []
+    if (cuentas.length) {
+      credencialesCreadas.value = cuentas.map((cuenta) => {
+        const apoderado = formulario.apoderados.find((item) => item.numeroDocumento === cuenta.dni)
+        return {
+          nombre: apoderado
+            ? `${apoderado.nombres} ${apoderado.apellidoPaterno} ${apoderado.apellidoMaterno}`.trim()
+            : `el documento ${cuenta.dni}`,
+          username: cuenta.username,
+          contrasenhaTemporal: cuenta.contrasenhaTemporal,
+        }
+      })
+      return
+    }
     await navigateTo('/estudiantes')
   } catch (error: unknown) {
     mensajeEstado.value = obtenerMensajeError(error, 'No se pudo registrar al estudiante.')
@@ -550,6 +572,20 @@ async function registrarEstudiante(): Promise<void> {
     <p v-if="mensajeEstado" class="mensaje-estado" role="status">
       {{ mensajeEstado }}
     </p>
+
+    <VentanaModal
+      :abierta="credencialesCreadas.length > 0"
+      titulo="Estudiante registrado"
+      :descripcion="`${formulario.nombres} ${formulario.apellidoPaterno} ya está en el sistema. Se crearon cuentas para sus apoderados.`"
+      ancho="amplia"
+      bloqueada
+      @cerrar="navigateTo('/estudiantes')"
+    >
+      <CredencialesApoderado :credenciales="credencialesCreadas" />
+      <template #pie>
+        <BotonAccion @click="navigateTo('/estudiantes')">Ir a la lista de estudiantes</BotonAccion>
+      </template>
+    </VentanaModal>
   </main>
 </template>
 

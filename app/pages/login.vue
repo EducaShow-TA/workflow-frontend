@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { obtenerRutaInicio } from '~/composables/usePermisosRol'
 import { useAutenticacionStore } from '~/stores/autenticacion'
 import { INTENTOS_ANTES_DE_BLOQUEO, MINUTOS_BLOQUEO } from '~/composables/useRecuperacionContrasena'
+
 definePageMeta({
   layout: 'autenticacion',
 })
@@ -59,13 +61,7 @@ async function procesarInicioSesion(): Promise<void> {
     return
   }
 
-  await navigateTo(
-    autenticacion.usuario?.rol === 'DOCENTE'
-      ? '/docente'
-      : autenticacion.usuario?.rol === 'APODERADO'
-        ? '/libretas'
-        : '/panel',
-  )
+  await navigateTo(obtenerRutaInicio(autenticacion.usuario?.rol ?? 'ADMINISTRADOR'))
 }
 
 function irARecuperacion(): void {
@@ -124,11 +120,6 @@ function irARecuperacion(): void {
       </CampoFormulario>
 
       <div class="opciones">
-        <label class="recordar-sesion" title="Disponible al conectar el servicio REST">
-          <input type="checkbox" disabled />
-          <span>Recordar sesión</span>
-        </label>
-
         <button type="button" class="enlace-recuperacion" @click="irARecuperacion">¿Olvidaste tu contraseña?</button>
       </div>
 

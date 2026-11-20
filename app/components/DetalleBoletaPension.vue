@@ -156,7 +156,7 @@ onMounted(cargar)
             >Número de comprobante (opcional)<input
               v-model="referencia"
               maxlength="40"
-              placeholder="Vacío: lo genera el servidor"
+              placeholder="Se asignará al registrar el pago"
           /></label>
         </fieldset>
         <p v-if="errorPago" class="error" role="alert">{{ errorPago }}</p>
@@ -171,7 +171,7 @@ onMounted(cargar)
           </p>
           <p>
             Medio: {{ medio === 'PRESENCIAL' ? 'Presencial' : 'Virtual' }}. Comprobante:
-            {{ referencia.trim() || 'Generado por el servidor' }}.
+            {{ referencia.trim() || 'Se asignará al registrar el pago' }}.
           </p>
           <button class="boton primario" :disabled="guardando" type="button" @click="confirmarPago">
             {{ guardando ? 'Registrando…' : 'Confirmar pago aprobado' }}

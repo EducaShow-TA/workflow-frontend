@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useListadoEstudiantes } from '~/composables/useListadoEstudiantes'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
 
@@ -13,6 +13,15 @@ const cargando = ref(true)
 const errorCarga = ref('')
 
 const busqueda = ref('')
+const ruta = useRoute()
+
+watch(
+  () => ruta.query.buscar,
+  (valor) => {
+    if (typeof valor === 'string') busqueda.value = valor
+  },
+  { immediate: true },
+)
 const gradoSeleccionado = ref('')
 const seccionSeleccionada = ref('')
 const mensajeInformativo = ref('')
@@ -176,7 +185,20 @@ async function informarNuevoEstudiante(): Promise<void> {
               </td>
 
               <td>
-                <span>—</span>
+                <NuxtLink
+                  class="enlace-apoderados"
+                  :to="{
+                    path: `/estudiantes/${estudiante.estudianteId}/apoderados`,
+                    query: {
+                      nombre: `${estudiante.nombres} ${estudiante.apellidos}`,
+                      documento: estudiante.numeroDocumento,
+                      grado:
+                        estudiante.grado === 'Sin asignar' ? '' : `${estudiante.grado} ${estudiante.seccion}`.trim(),
+                    },
+                  }"
+                >
+                  Apoderados
+                </NuxtLink>
               </td>
             </tr>
 
@@ -190,7 +212,7 @@ async function informarNuevoEstudiante(): Promise<void> {
       <footer class="pie-tabla">
         {{
           cargando
-            ? 'Consultando el servidor…'
+            ? 'Cargando estudiantes…'
             : `Mostrando ${estudiantesFiltrados.length} de ${estudiantes.length} estudiantes`
         }}
       </footer>
@@ -463,5 +485,23 @@ td {
   table {
     min-width: 850px;
   }
+}
+.enlace-apoderados {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  padding: 6px 12px;
+  border: 1px solid #c3c6d7;
+  border-radius: 8px;
+  color: #004ac6;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.enlace-apoderados:hover {
+  border-color: #004ac6;
+  background: #eff6ff;
 }
 </style>

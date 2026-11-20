@@ -37,6 +37,17 @@ const descripcionFecha = computed(() => {
   return `${DIAS[new Date(anhio, mes - 1, dia).getDay()]} ${String(dia).padStart(2, '0')}/${String(mes).padStart(2, '0')}/${anhio}`
 })
 const esHoy = computed(() => fecha.value === obtenerFechaHoyIso())
+const esPasado = computed(() => Boolean(fecha.value) && fecha.value < obtenerFechaHoyIso())
+const titulo = computed(() => {
+  if (esHoy.value || !fecha.value) return 'Mis clases de hoy'
+  const [anhio, mes, dia] = fecha.value.split('-').map(Number) as [number, number, number]
+  const nombreDia = DIAS[new Date(anhio, mes - 1, dia).getDay()]!.toLowerCase()
+  return `Mis clases del ${nombreDia} ${String(dia).padStart(2, '0')}/${String(mes).padStart(2, '0')}`
+})
+
+function volverAHoy(): void {
+  fecha.value = obtenerFechaHoyIso()
+}
 const areas = computed(() => [...new Set(sesiones.value.map((sesion) => sesion.areaNombre))].sort())
 const secciones = computed(() =>
   [...new Set(sesiones.value.map((sesion) => nombreSeccion(sesion)))].sort((a, b) => a.localeCompare(b, 'es')),
@@ -136,16 +147,34 @@ onBeforeUnmount(() => clearInterval(reloj))
   <main class="docente-vista pagina-asistencia">
     <header class="docente-titulo">
       <div>
-        <span class="docente-sobrelinea">US-2.1 · Control de asistencia</span>
-        <h1>{{ esHoy ? 'Mis clases de hoy' : 'Mis clases' }}</h1>
-        <p>{{ descripcionFecha }} · {{ autenticacion.usuario?.nombreCompleto ?? '' }}</p>
+        <span class="docente-sobrelinea">Control de asistencia</span>
+        <h1>{{ titulo }}</h1>
+        <p class="subtitulo">
+          {{ descripcionFecha }} · {{ autenticacion.usuario?.nombreCompleto ?? '' }}
+          <button v-if="!esHoy" type="button" class="volver-hoy" @click="volverAHoy">← Volver a hoy</button>
+        </p>
       </div>
       <BotonAccion variante="secundario" :deshabilitado="cargando || !esDocente" @click="cargar"
         >Actualizar</BotonAccion
       >
     </header>
 
-    <div class="docente-aviso" role="note">
+    <div v-if="!esHoy && esPasado" class="docente-aviso aviso-pasado" role="note">
+      <strong>Estás viendo un día pasado</strong>
+      <span>
+        Puedes revisar las listas y corregir asistencias ya registradas. Las clases que no se registraron a tiempo
+        quedan sin asistencia.
+      </span>
+    </div>
+
+    <div v-else-if="!esHoy" class="docente-aviso aviso-futuro" role="note">
+      <strong>Este día aún no llega</strong>
+      <span
+        >Puedes ver qué clases tendrás. La asistencia se habilita ese día, desde 15 minutos antes de cada clase.</span
+      >
+    </div>
+
+    <div v-else class="docente-aviso" role="note">
       <strong>Cuándo se toma la asistencia</strong>
       <span>
         Desde 15 minutos antes del inicio hasta 30 minutos después. Una vez registrada, puedes corregirla cuando lo
@@ -221,6 +250,44 @@ onBeforeUnmount(() => clearInterval(reloj))
 </template>
 
 <style scoped>
+.subtitulo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.volver-hoy {
+  padding: 3px 10px;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.volver-hoy:focus-visible {
+  outline: 2px solid #1d4ed8;
+  outline-offset: 2px;
+}
+
+.aviso-pasado {
+  border-color: #fde68a;
+  border-left-color: #f59e0b;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.aviso-futuro {
+  border-color: #e2e8f0;
+  border-left-color: #94a3b8;
+  background: #f8fafc;
+  color: #334155;
+}
+
 .pagina-asistencia {
   max-width: 1000px;
   gap: 20px;

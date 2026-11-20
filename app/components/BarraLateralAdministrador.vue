@@ -2,7 +2,7 @@
 interface EnlaceMenu {
   nombre: string
   icono: string
-  destino?: string
+  destino: string
   prefijoActivo?: string
 }
 
@@ -20,15 +20,24 @@ const enlaces: EnlaceMenu[] = [
   { nombre: 'Grados/Secciones', icono: '/icons/menu-secciones.svg', destino: '/secciones' },
   { nombre: 'Áreas y competencias', icono: '/icons/menu-competencias.svg', destino: '/competencias' },
   { nombre: 'Tareas', icono: '/icons/menu-tareas.svg', destino: '/tareas' },
-  { nombre: 'Portal Docente', icono: '/icons/menu-docentes.svg', destino: '/docente' },
   { nombre: 'Calificaciones', icono: '/icons/menu-calificaciones.svg', destino: '/calificaciones' },
   { nombre: 'Horarios', icono: '/icons/menu-horarios.svg', destino: '/horarios' },
   { nombre: 'Sesiones de clase', icono: '/icons/menu-matricula.svg', destino: '/sesiones-clase' },
   { nombre: 'Asistencia docente', icono: '/icons/menu-docentes.svg', destino: '/asistencia-docentes' },
-  { nombre: 'Docentes', icono: '/icons/menu-docentes.svg' },
   { nombre: 'Horario por sección', icono: '/icons/menu-clases.svg', destino: '/horario-secciones' },
   { nombre: 'Finanzas', icono: '/icons/menu-finanzas.svg', destino: '/finanzas' },
-  { nombre: 'Reportes', icono: '/icons/menu-reportes.svg', destino: '/reportes/boletas' },
+  {
+    nombre: 'Reportes',
+    icono: '/icons/menu-reportes.svg',
+    destino: '/reportes/boletas',
+    prefijoActivo: '/reportes/boletas',
+  },
+  {
+    nombre: 'Cuadro de mérito',
+    icono: '/icons/menu-reportes.svg',
+    destino: '/reportes/cuadro-merito',
+    prefijoActivo: '/reportes/cuadro-merito',
+  },
   { nombre: 'Usuarios', icono: '/icons/menu-usuarios.svg', destino: '/usuarios' },
   { nombre: 'Roles/Permisos', icono: '/icons/menu-roles.svg', destino: '/roles-permisos' },
   { nombre: 'Logs del sistema', icono: '/icons/menu-logs.svg', destino: '/logs-sistema' },
@@ -67,24 +76,8 @@ function estaActivo(enlace: EnlaceMenu): boolean {
           </span>
           <span>{{ enlace.nombre }}</span>
         </NuxtLink>
-
-        <span v-else class="enlace-menu deshabilitado" aria-disabled="true" title="Módulo pendiente de implementación">
-          <span class="contenedor-icono">
-            <img :src="enlace.icono" alt="" />
-          </span>
-          <span>{{ enlace.nombre }}</span>
-        </span>
       </template>
     </nav>
-
-    <div class="parte-inferior">
-      <span class="enlace-menu deshabilitado" aria-disabled="true" title="Configuración pendiente">
-        <span class="contenedor-icono">
-          <img src="/icons/menu-config.svg" alt="" />
-        </span>
-        <span>Configuración</span>
-      </span>
-    </div>
   </aside>
 </template>
 
