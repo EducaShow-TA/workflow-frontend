@@ -44,6 +44,9 @@ export interface SolicitudSesionHorario {
   areaCodigo: string
   docenteId: number
   aulaId: number
+  tipoVigencia?: 'PERMANENTE' | 'TEMPORAL'
+  vigenteDesde?: string | null
+  vigenteHasta?: string | null
 }
 
 export interface ConflictoSesion {

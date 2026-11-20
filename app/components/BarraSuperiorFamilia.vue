@@ -9,6 +9,7 @@ const titulos: Record<string, string> = {
   '/familia': 'Panel',
   '/familia/asistencia': 'Asistencia',
   '/familia/pagos': 'Pagos',
+  '/familia/horario': 'Horario de mi hijo',
   '/libretas': 'Progreso académico',
 }
 const titulo = computed(() => titulos[ruta.path] ?? 'Portal del apoderado')

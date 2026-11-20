@@ -188,6 +188,7 @@ onMounted(cargarCatalogos)
         <h1>Horario por sección</h1>
         <p>Asigna curso, docente y aula a cada bloque. El sistema impide cruces de docente o aula y aulas sin aforo.</p>
       </div>
+      <NuxtLink class="boton" to="/horarios/auditoria">Historial de cambios</NuxtLink>
       <NuxtLink class="boton" to="/horarios">Plantillas de bloques</NuxtLink>
     </header>
 
