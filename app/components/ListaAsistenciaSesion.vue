@@ -13,6 +13,7 @@ import {
   useSesionesClase,
 } from '~/composables/useSesionesClase'
 import { useAutenticacionStore } from '~/stores/autenticacion'
+import CargaMasivaAsistenciaSesion from '~/components/CargaMasivaAsistenciaSesion.vue'
 
 type Modo = 'tomar' | 'lectura' | 'edicion' | 'por-abrir' | 'cerrada'
 
@@ -41,6 +42,7 @@ const cargando = ref(true)
 const guardando = ref(false)
 const error = ref('')
 const errorGuardar = ref('')
+const aviso = ref('')
 const resumenGuardado = ref<{ presentes: number; tardanzas: number; ausentes: number } | null>(null)
 
 const sesion = computed(() => lista.value?.sesion ?? null)
@@ -183,6 +185,18 @@ async function guardar(): Promise<void> {
   }
 }
 
+async function cargaCsvActualizada(resumen: { nuevos: number; actualizados: number }): Promise<void> {
+  resumenGuardado.value = null
+  await cargar()
+  resumenGuardado.value = {
+    presentes: lista.value?.sesion.presentes ?? 0,
+    tardanzas: lista.value?.sesion.tardanzas ?? 0,
+    ausentes: lista.value?.sesion.ausentes ?? 0,
+  }
+  errorGuardar.value = ''
+  aviso.value = `Carga CSV completada: ${resumen.nuevos} nuevos y ${resumen.actualizados} actualizados.`
+}
+
 onMounted(cargar)
 </script>
 
@@ -235,6 +249,13 @@ onMounted(cargar)
       </template>
 
       <template v-else>
+        <AvisoMensaje v-if="aviso" :mensaje="aviso" tipo="exito" cerrable @cerrar="aviso = ''" />
+        <CargaMasivaAsistenciaSesion
+          v-if="editable"
+          :sesion-id="propiedades.sesionId"
+          @actualizada="cargaCsvActualizada"
+        />
+
         <dl class="totales">
           <div class="total presente">
             <dt>Presentes</dt>
