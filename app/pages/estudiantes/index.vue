@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useListadoEstudiantes } from '~/composables/useListadoEstudiantes'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
 
@@ -13,6 +13,15 @@ const cargando = ref(true)
 const errorCarga = ref('')
 
 const busqueda = ref('')
+const ruta = useRoute()
+
+watch(
+  () => ruta.query.buscar,
+  (valor) => {
+    if (typeof valor === 'string') busqueda.value = valor
+  },
+  { immediate: true },
+)
 const gradoSeleccionado = ref('')
 const seccionSeleccionada = ref('')
 const mensajeInformativo = ref('')

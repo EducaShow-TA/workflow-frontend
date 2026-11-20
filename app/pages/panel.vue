@@ -6,6 +6,7 @@ import {
   fechaLocalPanel,
   fechaTituloPanel,
   formatearSolesPanel,
+  listarPendientesPanel,
   mesesCobranzaPanel,
   nombreMesPanel,
   porcentajePanel,
@@ -56,45 +57,7 @@ const ventana = computed(() => {
   return { texto: `Matrícula abierta · ${cierre}`, abierta: true }
 })
 
-const pendientes = computed(() => {
-  const datos = panel.value
-  if (!datos) return []
-  const { pendientes: p, indicadores: i } = datos
-  return [
-    {
-      cantidad: p.matriculasPorConfirmar,
-      tono: 'ambar',
-      titulo: p.matriculasPorConfirmar === 1 ? 'Matrícula por confirmar' : 'Matrículas por confirmar',
-      detalle: 'Registradas y aún no confirmadas',
-      enlace: 'Revisar',
-      destino: '/matriculas',
-    },
-    {
-      cantidad: p.familiasEnMora,
-      tono: 'rojo',
-      titulo: p.familiasEnMora === 1 ? 'Familia con boletas en mora' : 'Familias con boletas en mora',
-      detalle: `${formatearSolesPanel(p.montoEnMora)} pendientes de cobro`,
-      enlace: 'Ver reporte',
-      destino: '/reportes/boletas',
-    },
-    {
-      cantidad: p.docentesSinMarcar,
-      tono: 'azul',
-      titulo: p.docentesSinMarcar === 1 ? 'Docente sin marcar entrada hoy' : 'Docentes sin marcar entrada hoy',
-      detalle: `De ${i.docentesConClaseHoy} con clases programadas hoy`,
-      enlace: 'Ver marcajes',
-      destino: '/asistencia-docentes',
-    },
-    {
-      cantidad: p.erroresUltimas24h,
-      tono: 'gris',
-      titulo: p.erroresUltimas24h === 1 ? 'Error del sistema en 24 h' : 'Errores del sistema en 24 h',
-      detalle: p.erroresCriticos24h ? `${p.erroresCriticos24h} de nivel crítico` : 'Ninguno de nivel crítico',
-      enlace: 'Ver logs',
-      destino: '/logs-sistema',
-    },
-  ].filter((pendiente) => pendiente.cantidad > 0)
-})
+const pendientes = computed(() => (panel.value ? listarPendientesPanel(panel.value) : []))
 
 const indicadores = computed(() => {
   const datos = panel.value
