@@ -36,13 +36,13 @@ const indicadores = computed(() => [
   {
     nombre: 'Tareas activas',
     valor: '—',
-    descripcion: 'Pendiente de consulta por docente',
+    descripcion: 'Consulta las actividades y entregas de tus clases.',
     icono: '/icons/menu-tareas.svg',
   },
   {
     nombre: 'Notas por registrar',
     valor: '—',
-    descripcion: 'Pendiente de consulta por docente',
+    descripcion: 'Revisa el progreso de tus estudiantes por competencia.',
     icono: '/icons/menu-competencias.svg',
   },
 ])
@@ -85,14 +85,6 @@ const accesos = [
       <span class="docente-insignia">Portal Docente</span>
     </div>
 
-    <div class="docente-aviso" role="status">
-      <strong>Primera versión de interfaz</strong>
-      <span
-        >Las pantallas están disponibles para revisión visual. Los datos del docente y sus secciones se conectarán
-        cuando el backend exponga los servicios correspondientes.</span
-      >
-    </div>
-
     <section aria-labelledby="resumen-docente">
       <h2 id="resumen-docente" class="docente-seccion-titulo">Resumen académico</h2>
       <div class="docente-grid docente-grid--tres">
@@ -122,11 +114,11 @@ const accesos = [
     <section class="docente-tarjeta" aria-labelledby="mis-secciones">
       <div class="docente-tarjeta__titulo">
         <h2 id="mis-secciones">Mis secciones asignadas</h2>
-        <span class="docente-insignia docente-insignia--neutral">Sin sincronizar</span>
+        <span class="docente-insignia docente-insignia--neutral">Mis clases</span>
       </div>
       <DocenteEstadoVacio
-        titulo="Todavía no se pueden consultar tus secciones"
-        descripcion="Es necesario un endpoint que devuelva únicamente los cursos y las secciones asignados al docente autenticado. No se muestran datos de otros docentes."
+        titulo="Aún no tienes secciones asignadas"
+        descripcion="Cuando se te asigne una sección, la información de tus clases aparecerá aquí."
         icono="/icons/menu-clases.svg"
       />
     </section>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import type { BloqueHorarioDocente } from '~/types/horarioDocente'
 import { useApi } from '~/composables/useApi'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
@@ -20,6 +20,25 @@ const vista = ref<'SEMANA' | 'HOY'>('SEMANA')
 const sesiones = ref<BloqueHorarioDocente[]>([])
 const cargando = ref(false)
 const error = ref('')
+const guardando = ref(false)
+const editorAbierto = ref(false)
+const sesionEditadaId = ref<number | null>(null)
+const formulario = ref({ horarioId: 0, bloqueId: 0, dia: 'MONDAY', areaCodigo: '', aulaId: 0 })
+const bloquesDisponibles = computed(() => {
+  const porId = new Map(
+    sesiones.value.filter((item) => item.horarioId === formulario.value.horarioId).map((item) => [item.bloqueId, item]),
+  )
+  return [...porId.values()].sort((a, b) => a.horaInicio.localeCompare(b.horaInicio))
+})
+const areasDisponibles = computed(() => [
+  ...new Map(sesiones.value.map((item) => [item.areaCodigo, item.areaNombre])).entries(),
+])
+const aulasDisponibles = computed(() => [
+  ...new Map(sesiones.value.map((item) => [item.aulaId, item.aulaCodigo])).entries(),
+])
+const horariosDisponibles = computed(() => [
+  ...new Map(sesiones.value.map((item) => [item.horarioId, descripcion(item)])).entries(),
+])
 const hoy = new Date().getDay()
 const hoyCodigo = hoy >= 1 && hoy <= 5 ? DIAS[hoy - 1]?.codigo : null
 const nombreHoy = hoyCodigo ? DIAS.find((dia) => dia.codigo === hoyCodigo)?.nombre : ''
@@ -52,17 +71,113 @@ async function cargar(): Promise<void> {
     cargando.value = false
   }
 }
+
+function exportarAgenda(): void {
+  vista.value = 'SEMANA'
+  nextTick(() => window.print())
+}
+
+function abrirEditor(sesion?: BloqueHorarioDocente): void {
+  sesionEditadaId.value = sesion?.id ?? null
+  formulario.value = sesion
+    ? {
+        horarioId: sesion.horarioId,
+        bloqueId: sesion.bloqueId,
+        dia: sesion.dia,
+        areaCodigo: sesion.areaCodigo,
+        aulaId: sesion.aulaId,
+      }
+    : {
+        horarioId: horariosDisponibles.value[0]?.[0] ?? 0,
+        bloqueId: bloquesDisponibles.value[0]?.bloqueId ?? 0,
+        dia: 'MONDAY',
+        areaCodigo: areasDisponibles.value[0]?.[0] ?? '',
+        aulaId: aulasDisponibles.value[0]?.[0] ?? 0,
+      }
+  editorAbierto.value = true
+}
+
+function ajustarBloque(): void {
+  if (!bloquesDisponibles.value.some((bloque) => bloque.bloqueId === formulario.value.bloqueId)) {
+    formulario.value.bloqueId = bloquesDisponibles.value[0]?.bloqueId ?? 0
+  }
+}
+
+async function guardarSesion(): Promise<void> {
+  guardando.value = true
+  error.value = ''
+  try {
+    const cuerpo = {
+      bloqueId: formulario.value.bloqueId,
+      dia: formulario.value.dia,
+      areaCodigo: formulario.value.areaCodigo,
+      aulaId: formulario.value.aulaId,
+    }
+    if (sesionEditadaId.value) {
+      await api.solicitar(`/api/v1/docentes/mi-horario/sesiones/${sesionEditadaId.value}`, { metodo: 'PUT', cuerpo })
+    } else {
+      await api.solicitar(`/api/v1/docentes/mi-horario/${formulario.value.horarioId}/sesiones`, {
+        metodo: 'POST',
+        cuerpo,
+      })
+    }
+    editorAbierto.value = false
+    await cargar()
+  } catch (fallo: unknown) {
+    error.value = obtenerMensajeError(fallo, 'No se pudo guardar la sesión del horario.')
+  } finally {
+    guardando.value = false
+  }
+}
+
+async function eliminarSesion(sesion: BloqueHorarioDocente): Promise<void> {
+  if (!window.confirm(`¿Eliminar ${sesion.areaNombre} del horario de ${descripcion(sesion)}?`)) return
+  error.value = ''
+  try {
+    await api.solicitar(`/api/v1/docentes/mi-horario/sesiones/${sesion.id}`, { metodo: 'DELETE' })
+    await cargar()
+  } catch (fallo: unknown) {
+    error.value = obtenerMensajeError(fallo, 'No se pudo eliminar la sesión del horario.')
+  }
+}
+
 watch(anio, () => void cargar())
 onMounted(cargar)
 </script>
 
 <template>
   <main class="docente-vista horario">
+    <header class="agenda-exportacion">
+      <div class="agenda-exportacion__marca">
+        <img src="/icons/logo.svg" alt="" />
+        <span>EducaShow <small>Gestión académica</small></span>
+      </div>
+      <div class="agenda-exportacion__titulo">
+        <p>Agenda académica docente</p>
+        <h1>Horario semanal de clases</h1>
+      </div>
+      <div class="agenda-exportacion__periodo">
+        <span>Año escolar</span>
+        <strong>{{ anio }}</strong>
+        <small>Generado el {{ new Intl.DateTimeFormat('es-PE', { dateStyle: 'long' }).format(new Date()) }}</small>
+      </div>
+      <div class="agenda-exportacion__resumen">
+        <span
+          ><strong>{{ sesiones.length }}</strong> bloques semanales</span
+        >
+        <span
+          ><strong>{{ cantidadSecciones }}</strong> secciones</span
+        >
+        <span
+          ><strong>{{ cantidadAsignaturas }}</strong> asignaturas</span
+        >
+      </div>
+    </header>
     <header class="docente-titulo">
       <div>
-        <span class="docente-sobrelinea">US-4.6 · Organización académica</span>
+        <span class="docente-sobrelinea">Organización académica</span>
         <h1>Mi horario de clases</h1>
-        <p>Consulta tus asignaturas, secciones, aulas y bloques asignados por administración.</p>
+        <p>Consulta y gestiona tus bloques, asignaturas, secciones y aulas asignadas.</p>
       </div>
       <label class="selector-anio"
         >Año escolar
@@ -76,14 +191,14 @@ onMounted(cargar)
     <section class="horario-informacion" aria-labelledby="horario-aviso-titulo">
       <div class="horario-informacion__encabezado">
         <h2 id="horario-aviso-titulo">Horario personal</h2>
-        <span class="horario-etiqueta horario-etiqueta--demo">Sincronizado con el servidor</span>
+        <span class="horario-etiqueta horario-etiqueta--demo">Horario actualizado</span>
       </div>
       <p>
-        Solo se muestran bloques asignados a tu cuenta. Si administración modifica la grilla, vuelve a actualizar esta
-        vista.
+        Puedes agregar, modificar o retirar tus sesiones. Las validaciones de disponibilidad y cruces se aplican al
+        guardar.
       </p>
       <div class="horario-informacion__puntos">
-        <span>Horario consolidado de todas tus secciones</span><span>Área, grado, sección y aula en cada bloque</span
+        <span>Horario consolidado de todas tus secciones</span><span>Gestión de tus bloques asignados</span
         ><span>Consulta semanal o del día actual</span>
       </div>
     </section>
@@ -138,6 +253,19 @@ onMounted(cargar)
             Hoy
           </button>
         </div>
+        <div class="docente-controles">
+          <button
+            type="button"
+            class="docente-boton docente-boton--secundario"
+            @click="abrirEditor()"
+            :disabled="!sesiones.length"
+          >
+            Agregar bloque
+          </button>
+          <button type="button" class="docente-boton docente-boton--secundario" @click="exportarAgenda">
+            Exportar
+          </button>
+        </div>
       </div>
       <p v-if="cargando" role="status">Consultando horario…</p>
       <p v-else-if="!sesiones.length" class="horario-dia-vacio">
@@ -156,6 +284,10 @@ onMounted(cargar)
               <h4>{{ bloque.areaNombre }}</h4>
               <p>{{ descripcion(bloque) }}</p>
               <small>Aula {{ bloque.aulaCodigo }}</small>
+              <div class="horario-acciones">
+                <button type="button" @click="abrirEditor(bloque)">Modificar</button>
+                <button type="button" @click="eliminarSesion(bloque)">Eliminar</button>
+              </div>
             </div>
           </article>
         </section>
@@ -176,6 +308,10 @@ onMounted(cargar)
             <h3>{{ bloque.areaNombre }}</h3>
             <p>{{ descripcion(bloque) }}</p>
             <small>Aula {{ bloque.aulaCodigo }}</small>
+            <div class="horario-acciones">
+              <button type="button" @click="abrirEditor(bloque)">Modificar</button>
+              <button type="button" @click="eliminarSesion(bloque)">Eliminar</button>
+            </div>
           </div>
         </article>
       </div>
@@ -186,6 +322,54 @@ onMounted(cargar)
         </button>
       </div>
     </section>
+    <div v-if="editorAbierto" class="horario-editor-fondo" role="presentation" @click.self="editorAbierto = false">
+      <form class="horario-editor" aria-labelledby="horario-editor-titulo" @submit.prevent="guardarSesion">
+        <h2 id="horario-editor-titulo">{{ sesionEditadaId ? 'Modificar bloque' : 'Agregar bloque' }}</h2>
+        <label v-if="!sesionEditadaId"
+          >Sección
+          <select v-model.number="formulario.horarioId" required @change="ajustarBloque">
+            <option v-for="[id, nombre] in horariosDisponibles" :key="id" :value="id">{{ nombre }}</option>
+          </select>
+        </label>
+        <label
+          >Bloque horario
+          <select v-model.number="formulario.bloqueId" required>
+            <option v-for="bloque in bloquesDisponibles" :key="bloque.bloqueId" :value="bloque.bloqueId">
+              {{ hora(bloque.horaInicio) }}–{{ hora(bloque.horaFin) }}
+            </option>
+          </select>
+        </label>
+        <label
+          >Día
+          <select v-model="formulario.dia" required>
+            <option v-for="dia in DIAS" :key="dia.codigo" :value="dia.codigo">{{ dia.nombre }}</option>
+          </select>
+        </label>
+        <label
+          >Área
+          <select v-model="formulario.areaCodigo" required>
+            <option v-for="[codigo, nombre] in areasDisponibles" :key="codigo" :value="codigo">{{ nombre }}</option>
+          </select>
+        </label>
+        <label
+          >Aula
+          <select v-model.number="formulario.aulaId" required>
+            <option v-for="[id, codigo] in aulasDisponibles" :key="id" :value="id">{{ codigo }}</option>
+          </select>
+        </label>
+        <p v-if="!sesiones.length">
+          Primero administración debe publicar un horario de sección para poder agregar bloques.
+        </p>
+        <div class="horario-editor__acciones">
+          <button type="button" class="docente-boton docente-boton--secundario" @click="editorAbierto = false">
+            Cancelar
+          </button>
+          <button type="submit" class="docente-boton" :disabled="guardando || !formulario.horarioId">
+            {{ guardando ? 'Guardando…' : 'Guardar' }}
+          </button>
+        </div>
+      </form>
+    </div>
   </main>
 </template>
 
@@ -194,6 +378,61 @@ onMounted(cargar)
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+.horario-acciones {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.horario-acciones button {
+  padding: 5px 9px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  color: #1e40af;
+  background: #fff;
+  cursor: pointer;
+}
+.horario-editor-fondo {
+  position: fixed;
+  z-index: 50;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: #0f172a88;
+}
+.horario-editor {
+  display: grid;
+  width: min(100%, 440px);
+  gap: 14px;
+  padding: 24px;
+  border-radius: 14px;
+  background: white;
+  box-shadow: 0 20px 60px #0f172a40;
+}
+.horario-editor h2 {
+  margin: 0;
+}
+.horario-editor label {
+  display: grid;
+  gap: 6px;
+  color: #334155;
+  font-size: 13px;
+}
+.horario-editor select {
+  width: 100%;
+  padding: 9px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+}
+.horario-editor__acciones {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 6px;
+}
+.agenda-exportacion {
+  display: none;
 }
 .horario-informacion {
   padding: 20px 24px;
@@ -545,6 +784,198 @@ onMounted(cargar)
   }
   .horario-indicador {
     min-height: 92px;
+  }
+}
+
+@media print {
+  @page {
+    size: landscape;
+    margin: 12mm;
+  }
+
+  :global(body) {
+    background: #fff !important;
+  }
+
+  :global(.docente-lateral),
+  :global(.docente-superior) {
+    display: none !important;
+  }
+
+  :global(.portal-docente),
+  :global(.portal-docente__contenido) {
+    display: block !important;
+    min-height: 0 !important;
+  }
+
+  :global(.portal-docente__pagina) {
+    padding: 0 !important;
+  }
+
+  .horario {
+    display: block;
+    padding: 0;
+  }
+
+  .agenda-exportacion {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 14px 24px;
+    align-items: center;
+    margin-bottom: 18px;
+    padding: 0 0 14px;
+    border-bottom: 2px solid #1e3a8a;
+    color: #172554;
+  }
+
+  .agenda-exportacion__marca {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 14px;
+    font-weight: 800;
+  }
+
+  .agenda-exportacion__marca img {
+    width: 32px;
+    height: 32px;
+  }
+
+  .agenda-exportacion__marca small,
+  .agenda-exportacion__periodo span,
+  .agenda-exportacion__periodo small {
+    display: block;
+    color: #64748b;
+    font-size: 9px;
+    font-weight: 400;
+  }
+
+  .agenda-exportacion__titulo {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .agenda-exportacion__titulo p {
+    margin: 0 0 3px;
+    color: #475569;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .agenda-exportacion__titulo h1 {
+    margin: 0;
+    font-size: 21px;
+  }
+
+  .agenda-exportacion__periodo {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    text-align: right;
+  }
+
+  .agenda-exportacion__periodo strong {
+    display: block;
+    margin: 2px 0 5px;
+    font-size: 22px;
+  }
+
+  .agenda-exportacion__resumen {
+    display: flex;
+    grid-column: 1 / -1;
+    gap: 18px;
+    padding: 8px 11px;
+    border-radius: 6px;
+    background: #eff6ff;
+    color: #1e3a8a;
+    font-size: 10px;
+  }
+
+  .agenda-exportacion__resumen strong {
+    font-size: 12px;
+  }
+
+  .horario > :not(.horario-principal):not(.agenda-exportacion) {
+    display: none !important;
+  }
+
+  .horario-principal {
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .horario-principal__cabecera .docente-controles,
+  .horario-principal__cabecera > button,
+  .horario-principal__pie {
+    display: none !important;
+  }
+
+  .horario-semana {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 7px;
+  }
+
+  .horario-dia {
+    padding: 8px;
+    border: 1px solid #cbd5e1;
+    border-radius: 7px;
+    background: #fff;
+  }
+
+  .horario-dia h3 {
+    margin: 0 0 8px;
+    padding: 0 0 6px;
+    border-bottom: 2px solid #2563eb;
+    color: #1e3a8a;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .horario-dia-lista__fila,
+  .horario-dia-lista__contenido {
+    break-inside: avoid;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .horario-dia-lista__fila {
+    grid-template-columns: 43px minmax(0, 1fr);
+    gap: 5px;
+    margin-bottom: 7px;
+  }
+
+  .horario-dia-lista__horas {
+    font-size: 8px;
+  }
+
+  .horario-dia-lista__contenido {
+    padding: 6px;
+    border-left-width: 3px;
+    border-radius: 4px;
+  }
+
+  .horario-dia-lista__contenido h4,
+  .horario-dia-lista__contenido h3 {
+    margin: 0;
+    font-size: 9px;
+  }
+
+  .horario-dia-lista__contenido p {
+    margin: 4px 0 2px;
+    font-size: 8px;
+  }
+
+  .horario-dia-lista__contenido small {
+    font-size: 7px;
+  }
+
+  .horario-dia-vacio {
+    padding: 8px 3px;
+    color: #64748b;
+    font-size: 8px;
   }
 }
 </style>

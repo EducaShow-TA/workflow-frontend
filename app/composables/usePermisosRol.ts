@@ -14,9 +14,9 @@ const NOMBRES_ROL: Record<RolUsuario, string> = {
 
 const DESCRIPCIONES_ROL: Record<RolUsuario, string> = {
   ADMINISTRADOR: 'Gestiona la matrícula, la estructura académica y las cuentas de usuario del colegio.',
-  DOCENTE: 'Registrará asistencia y calificaciones de sus secciones (sprints 2 y 3).',
-  ALUMNO: 'Consulta su panel y su asistencia; horario y calificaciones llegarán en próximos sprints.',
-  APODERADO: 'Consultará las boletas, pagos y el avance de sus hijos (sprints 2 y 3).',
+  DOCENTE: 'Gestiona sus clases, registra asistencia y acompaña el progreso de sus estudiantes.',
+  ALUMNO: 'Consulta su panel y su historial de asistencia.',
+  APODERADO: 'Consulta las boletas, los pagos y el progreso académico de sus hijos.',
 }
 
 export const PERMISOS: Permiso[] = [

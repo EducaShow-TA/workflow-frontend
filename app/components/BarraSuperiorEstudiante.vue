@@ -7,9 +7,13 @@ const autenticacion = useAutenticacionStore()
 const perfilAbierto = ref(false)
 const titulos: Record<string, string> = {
   '/estudiante': 'Panel',
+  '/estudiante/horario': 'Mi horario',
   '/estudiante/asistencia': 'Asistencia',
+  '/estudiante/tareas': 'Tareas',
 }
-const titulo = computed(() => titulos[ruta.path] ?? 'Portal del estudiante')
+const titulo = computed(
+  () => titulos[ruta.path] ?? (ruta.path.startsWith('/estudiante/tareas/') ? 'Tarea' : 'Portal del estudiante'),
+)
 const iniciales = computed(() => {
   const palabras = (autenticacion.usuario?.nombreCompleto ?? 'Estudiante').trim().split(/\s+/)
   return palabras

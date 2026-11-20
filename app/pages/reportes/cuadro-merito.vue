@@ -153,20 +153,10 @@ onUnmounted(() => {
           <p>Año escolar {{ cuadro.anhioEscolar }} · Actas cerradas</p>
         </div>
         <div class="acciones">
-          <button
-            class="boton secundario"
-            type="button"
-            :disabled="!!descargando"
-            @click="descargarArchivo('pdf')"
-          >
+          <button class="boton secundario" type="button" :disabled="!!descargando" @click="descargarArchivo('pdf')">
             {{ descargando === 'pdf' ? 'Descargando PDF…' : 'Descargar PDF' }}
           </button>
-          <button
-            class="boton secundario"
-            type="button"
-            :disabled="!!descargando"
-            @click="descargarArchivo('excel')"
-          >
+          <button class="boton secundario" type="button" :disabled="!!descargando" @click="descargarArchivo('excel')">
             {{ descargando === 'excel' ? 'Descargando Excel…' : 'Descargar Excel' }}
           </button>
         </div>

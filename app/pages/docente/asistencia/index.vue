@@ -136,7 +136,7 @@ onBeforeUnmount(() => clearInterval(reloj))
   <main class="docente-vista pagina-asistencia">
     <header class="docente-titulo">
       <div>
-        <span class="docente-sobrelinea">US-2.1 · Control de asistencia</span>
+        <span class="docente-sobrelinea">Control de asistencia</span>
         <h1>{{ esHoy ? 'Mis clases de hoy' : 'Mis clases' }}</h1>
         <p>{{ descripcionFecha }} · {{ autenticacion.usuario?.nombreCompleto ?? '' }}</p>
       </div>
