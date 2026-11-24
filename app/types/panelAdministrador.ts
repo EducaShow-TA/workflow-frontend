@@ -2,6 +2,7 @@ export interface VentanaMatriculaPanel {
   fechaInicio: string
   fechaLimite: string
   estado: 'PENDIENTE' | 'VIGENTE'
+  anhioEscolar: number
 }
 
 export interface PendientesPanelAdministrador {

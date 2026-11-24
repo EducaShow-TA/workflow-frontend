@@ -2,7 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import type { ErroresPeriodoMatricula, PeriodoMatricula, SolicitudPeriodoMatricula } from '~/types/periodoMatricula'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
-import { calcularDiasEntre, formatearFecha, obtenerFechaHoyIso } from '~/composables/useFechas'
+import { calcularDiasEntre, esFechaIsoValida, formatearFecha, obtenerFechaHoyIso } from '~/composables/useFechas'
 import {
   calcularEstadoPeriodo,
   describirPeriodo,
@@ -13,7 +13,9 @@ import {
   usePeriodoMatricula,
   validarPeriodoMatricula,
 } from '~/composables/usePeriodoMatricula'
-import { obtenerAnhio } from '~/composables/useAnhioEscolar'
+import { anticiparAnhioDeVentana } from '~/composables/useAnhioEscolar'
+import { usePeriodosAcademicos } from '~/composables/usePeriodosAcademicos'
+import type { PeriodoAcademico } from '~/types/periodoAcademico'
 import { tieneErrores } from '~/composables/useValidacion'
 
 definePageMeta({
@@ -38,18 +40,16 @@ const proximoPeriodo = computed(() =>
     .at(0),
 )
 
-// La matrícula de Dic 2026 – Feb 2027 llena las vacantes del año escolar 2027.
-const anhioVacantes = computed(() => {
-  const periodo = periodoVigente.value ?? proximoPeriodo.value
-  return periodo ? obtenerAnhio(periodo.fechaLimite) : null
-})
+const anhioVacantes = computed(() => (periodoVigente.value ?? proximoPeriodo.value)?.anhioEscolar ?? null)
 
 async function cargarPeriodos(): Promise<void> {
   cargando.value = true
   errorCarga.value = ''
 
   try {
-    periodos.value = await listarPeriodos()
+    const [ventanas, academicos] = await Promise.all([listarPeriodos(), listarPeriodosAcademicos().catch(() => [])])
+    periodos.value = ventanas
+    periodosAcademicos.value = academicos
   } catch (error: unknown) {
     errorCarga.value = obtenerMensajeError(error, 'No se pudieron cargar los periodos de matrícula.')
   } finally {
@@ -92,6 +92,14 @@ const periodoEnEdicion = computed(() => periodos.value.find((periodo) => periodo
 const inicioBloqueado = computed(() => periodoEnEdicion.value?.estado === 'VIGENTE')
 
 // Vista previa del estado con las fechas ingresadas, antes de guardar.
+const { listar: listarPeriodosAcademicos } = usePeriodosAcademicos()
+const periodosAcademicos = ref<PeriodoAcademico[]>([])
+const anhioPrevisto = computed(() =>
+  esFechaIsoValida(formulario.fechaInicio)
+    ? anticiparAnhioDeVentana(formulario.fechaInicio, periodosAcademicos.value)
+    : null,
+)
+
 const estadoPrevisto = computed(() => {
   if (!formulario.fechaInicio || !formulario.fechaLimite || formulario.fechaLimite <= formulario.fechaInicio) {
     return null
@@ -227,10 +235,11 @@ async function confirmarDesactivacion(): Promise<void> {
 
         <div class="contenido-tarjeta">
           <div v-if="periodoVigente" class="situacion">
-            <InsigniaEstado texto="Matrícula abierta" variante="exito" />
+            <InsigniaEstado :texto="`Matrícula ${periodoVigente.anhioEscolar} abierta`" variante="exito" />
 
             <p>
-              Periodo <strong>{{ describirPeriodo(periodoVigente) }}</strong>: del
+              Matrícula para el <strong>año escolar {{ periodoVigente.anhioEscolar }}</strong> · periodo
+              <strong>{{ describirPeriodo(periodoVigente) }}</strong>: del
               <strong>{{ formatearFecha(periodoVigente.fechaInicio) }}</strong> al
               <strong>{{ formatearFecha(periodoVigente.fechaLimite) }}</strong>. Cierra
               {{ describirDiasHasta(periodoVigente.fechaLimite) }}.
@@ -258,6 +267,7 @@ async function confirmarDesactivacion(): Promise<void> {
             <thead>
               <tr>
                 <th scope="col">Periodo</th>
+                <th scope="col">Año escolar</th>
                 <th scope="col">Fecha de inicio</th>
                 <th scope="col">Fecha límite</th>
                 <th scope="col">Duración</th>
@@ -269,6 +279,7 @@ async function confirmarDesactivacion(): Promise<void> {
             <tbody>
               <tr v-for="periodo in periodos" :key="periodo.id">
                 <td class="dato-destacado">{{ describirPeriodo(periodo) }}</td>
+                <td class="dato-destacado">{{ periodo.anhioEscolar }}</td>
                 <td>{{ formatearFecha(periodo.fechaInicio) }}</td>
                 <td>{{ formatearFecha(periodo.fechaLimite) }}</td>
                 <td>{{ describirDuracion(periodo) }}</td>
@@ -305,7 +316,7 @@ async function confirmarDesactivacion(): Promise<void> {
               </tr>
 
               <tr v-if="periodos.length === 0">
-                <td colspan="6" class="sin-resultados">
+                <td colspan="7" class="sin-resultados">
                   Aún no hay periodos de matrícula. Registra el primero con «Nuevo periodo».
                 </td>
               </tr>
@@ -371,6 +382,16 @@ async function confirmarDesactivacion(): Promise<void> {
           </div>
         </div>
 
+        <p v-if="anhioPrevisto" class="vista-previa" role="status">
+          <span
+            >Esta ventana será para el <strong>año escolar {{ anhioPrevisto.anhio }}</strong
+            >{{
+              anhioPrevisto.inicioClases
+                ? `, porque las clases de ${anhioPrevisto.anhio - 1} ya empezaron el ${formatearFecha(anhioPrevisto.inicioClases)}.`
+                : '.'
+            }}</span
+          >
+        </p>
         <p v-if="estadoPrevisto" class="vista-previa" role="status">
           Con estas fechas, el periodo quedará
           <InsigniaEstado
