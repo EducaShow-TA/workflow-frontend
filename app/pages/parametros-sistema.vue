@@ -2,8 +2,10 @@
 import { computed, onMounted, ref } from 'vue'
 import { formatearFecha, obtenerFechaHoyIso } from '~/composables/useFechas'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
+import { obtenerEtiquetaEstadoBimestre, useBimestres } from '~/composables/useBimestres'
 import { usePeriodosAcademicos } from '~/composables/usePeriodosAcademicos'
 import { describirFechaSistema, leerFechaHoraSistema, useParametrosSistema } from '~/composables/useParametrosSistema'
+import type { BimestreAcademico } from '~/types/bimestre'
 import type { PeriodoAcademico } from '~/types/periodoAcademico'
 import type { ParametrosSistema } from '~/types/parametrosSistema'
 
@@ -11,9 +13,11 @@ const MOTIVO_MINIMO = 10
 
 const { obtener, simularFecha, volverAFechaReal, configurarPagoEnLinea } = useParametrosSistema()
 const { listarPorAnhio } = usePeriodosAcademicos()
+const { listar: listarBimestres } = useBimestres()
 
 const parametros = ref<ParametrosSistema | null>(null)
 const periodos = ref<PeriodoAcademico[]>([])
+const bimestres = ref<BimestreAcademico[]>([])
 const cargando = ref(true)
 const error = ref('')
 const mensajeExito = ref('')
@@ -48,6 +52,19 @@ const anhioEscolar = computed(() => {
   const estado = estados.has('EN_CURSO') ? 'En curso' : estados.has('PLANIFICADO') ? 'Planificado' : 'Finalizado'
   return { inicio, fin, estado }
 })
+const bimestreVigente = computed(
+  () =>
+    bimestres.value.find((bimestre) => bimestre.estado === 'EN_CURSO') ??
+    bimestres.value.find((bimestre) => bimestre.estado === 'POR_CERRAR'),
+)
+const descripcionAnhio = computed(() => {
+  if (!anhioEscolar.value) return ''
+  const clases = `clases del ${formatearFecha(anhioEscolar.value.inicio)} al ${formatearFecha(anhioEscolar.value.fin)}`
+  const bimestre = bimestreVigente.value
+  return bimestre
+    ? `${clases} · bimestre ${bimestre.numero} ${obtenerEtiquetaEstadoBimestre(bimestre.estado).toLowerCase()} (hasta el ${formatearFecha(bimestre.fechaFin).slice(0, 5)}).`
+    : `${clases}.`
+})
 const varianteAnhio = computed(() =>
   anhioEscolar.value?.estado === 'En curso'
     ? 'exito'
@@ -64,12 +81,17 @@ const errorFecha = computed(() =>
   intentoGuardar.value && (!fechaNueva.value || !horaNueva.value) ? 'Elige la fecha y la hora.' : '',
 )
 
+async function cargarAnhio() {
+  periodos.value = anhioSistema.value ? await listarPorAnhio(anhioSistema.value) : []
+  bimestres.value = periodos.value.length && anhioSistema.value ? await listarBimestres(anhioSistema.value) : []
+}
+
 async function cargar() {
   cargando.value = true
   error.value = ''
   try {
     parametros.value = await obtener()
-    periodos.value = anhioSistema.value ? await listarPorAnhio(anhioSistema.value) : []
+    await cargarAnhio()
   } catch (causa: unknown) {
     error.value = obtenerMensajeError(causa, 'No se pudieron cargar los parámetros del sistema.')
   } finally {
@@ -99,7 +121,7 @@ async function guardarFecha() {
     })
     modalFecha.value = false
     mensajeExito.value = 'El sistema ahora trabaja con la fecha simulada.'
-    periodos.value = anhioSistema.value ? await listarPorAnhio(anhioSistema.value) : []
+    await cargarAnhio()
   } catch (causa: unknown) {
     errorModal.value = obtenerMensajeError(causa, 'No se pudo cambiar la fecha del sistema.')
   } finally {
@@ -113,7 +135,7 @@ async function usarFechaReal() {
   try {
     parametros.value = await volverAFechaReal()
     mensajeExito.value = 'El sistema volvió a la fecha real.'
-    periodos.value = anhioSistema.value ? await listarPorAnhio(anhioSistema.value) : []
+    await cargarAnhio()
   } catch (causa: unknown) {
     error.value = obtenerMensajeError(causa, 'No se pudo volver a la fecha real.')
   } finally {
@@ -202,9 +224,8 @@ onMounted(cargar)
           <div v-if="anhioEscolar" class="situacion">
             <InsigniaEstado :texto="anhioEscolar.estado" :variante="varianteAnhio" />
             <p>
-              <strong>{{ anhioSistema }}</strong>: clases del {{ formatearFecha(anhioEscolar.inicio) }} al
-              {{ formatearFecha(anhioEscolar.fin) }}. Las fechas del año se gestionan en Grados/Secciones, junto a los
-              días no lectivos.
+              <strong>{{ anhioSistema }}</strong>: {{ descripcionAnhio }} Las fechas, los bimestres y su cierre se
+              gestionan en Grados/Secciones, junto a los días no lectivos.
             </p>
           </div>
           <p v-else class="nota">

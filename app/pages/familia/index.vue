@@ -22,6 +22,7 @@ import {
   NOMBRES_ESTADO_BOLETA,
   usePagosFamilia,
 } from '~/composables/usePagosFamilia'
+import { bimestreEnFecha, useBimestres } from '~/composables/useBimestres'
 import { useLibretas } from '~/composables/useLibretas'
 import { useAutenticacionStore } from '~/stores/autenticacion'
 import type { LibretaNotas } from '~/types/libreta'
@@ -95,6 +96,7 @@ const MESES = [
 const autenticacion = useAutenticacionStore()
 const { listarHijos, consultarAsistencia, consultarRiesgos, consultarHorario } = usePortalFamilia()
 const { consultar: consultarLibreta } = useLibretas()
+const { listar: listarBimestres } = useBimestres()
 const { listarPagos } = usePagosFamilia()
 const DEUDAS_VISIBLES = 3
 const configuracion = useRuntimeConfig()
@@ -175,13 +177,23 @@ function marcarAusenciaVista(clave: string): void {
   }
 }
 
-/** Misma regla del back: el período se divide en cuatro tramos de duración similar. */
-function bimestreActual(periodo: PeriodoVinculado, fecha: string): number {
+/** Respaldo si no se pudo leer el calendario: cuatro tramos de duración similar, como el back. */
+function bimestrePorTramos(periodo: PeriodoVinculado, fecha: string): number {
   const dia = 86_400_000
   const inicio = Date.parse(periodo.fechaInicio)
   const diasTotales = Math.round((Date.parse(periodo.fechaFin) - inicio) / dia) + 1
   const transcurridos = Math.max(0, Math.min(diasTotales - 1, Math.round((Date.parse(fecha) - inicio) / dia)))
   return Math.min(4, Math.floor((transcurridos * 4) / diasTotales) + 1)
+}
+
+async function bimestreActual(periodo: PeriodoVinculado): Promise<number> {
+  try {
+    const calendario = await listarBimestres(Number(periodo.fechaInicio.slice(0, 4)))
+    if (calendario.length) return bimestreEnFecha(calendario, fechaHoy)
+  } catch {
+    return bimestrePorTramos(periodo, fechaHoy)
+  }
+  return bimestrePorTramos(periodo, fechaHoy)
 }
 
 function armarClasesHoy(sesiones: HorarioEstudiante[], registrosHoy: RegistroAsistencia[]): ClaseHoy[] {
@@ -226,7 +238,7 @@ async function cargarNotas(hijo: HijoVinculado): Promise<Pick<TarjetaHijo, 'nota
   const periodo = periodoVigente(hijo, fechaHoy)
   if (!periodo) return { notas: null, errorNotas: '' }
   try {
-    const libreta = await consultarLibreta(hijo.estudianteId, periodo.periodoId, bimestreActual(periodo, fechaHoy))
+    const libreta = await consultarLibreta(hijo.estudianteId, periodo.periodoId, await bimestreActual(periodo))
     return { notas: contarNotas(libreta), errorNotas: '' }
   } catch (fallo: unknown) {
     return { notas: null, errorNotas: obtenerMensajeError(fallo, 'No se pudieron consultar las notas del bimestre.') }
