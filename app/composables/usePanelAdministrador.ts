@@ -74,9 +74,9 @@ export function listarPendientesPanel(panel: PanelAdministrador): PendientePanel
       cantidad: p.matriculasPorConfirmar,
       tono: 'ambar',
       titulo: p.matriculasPorConfirmar === 1 ? 'Matrícula por confirmar' : 'Matrículas por confirmar',
-      detalle: 'Registradas y aún no confirmadas',
-      enlace: 'Revisar',
-      destino: '/matriculas',
+      detalle: `${p.anhiosPorConfirmar.length ? `Año escolar ${p.anhiosPorConfirmar.join(', ')} · ` : ''}reservan vacante, pero no aparecen en tareas, asistencia ni notas`,
+      enlace: 'Confirmar ahora',
+      destino: '/matriculas/nueva',
     },
     {
       cantidad: p.familiasEnMora,

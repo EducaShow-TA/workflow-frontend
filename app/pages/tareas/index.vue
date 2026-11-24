@@ -63,7 +63,10 @@ const periodoSeleccionado = computed(() => periodos.value.find((periodo) => peri
 const tareasOrdenadas = computed(() => [...tareas.value].sort((a, b) => b.id - a.id))
 
 function descripcionPeriodo(periodo: PeriodoAcademico): string {
-  return `${periodo.numeroGrado}.° ${periodo.nivelEducativo} - Sección ${periodo.seccion} (${periodo.fechaInicio.slice(0, 4)})`
+  return conAnhio(
+    formatearSeccionCompleta(periodo.numeroGrado, periodo.seccion, periodo.nivelEducativo),
+    periodo.fechaInicio.slice(0, 4),
+  )
 }
 
 function formatearFecha(fecha: string): string {

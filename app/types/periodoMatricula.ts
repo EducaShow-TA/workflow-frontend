@@ -11,6 +11,8 @@ export interface PeriodoMatricula {
   estado: EstadoPeriodo
   /** Hay matrículas registradas entre sus fechas; un periodo vencido con matrículas no se puede editar. */
   tieneMatriculas: boolean
+  /** Año escolar que se matricula: si las clases del año ya empezaron, el siguiente (calculado por el backend). */
+  anhioEscolar: number
 }
 
 /** Cuerpo de POST y PUT /api/v1/periodos-matricula. */

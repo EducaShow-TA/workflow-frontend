@@ -19,7 +19,7 @@ const ruta = useRoute()
 const { listarHijos, consultarHorario } = usePortalFamilia()
 const hijos = ref<HijoVinculado[]>([])
 const estudianteId = ref<number | ''>('')
-const anio = ref(new Date().getFullYear())
+const anio = ref(ahoraSistema().getFullYear())
 const sesiones = ref<HorarioEstudiante[]>([])
 const cargandoHijos = ref(true)
 const cargando = ref(false)
@@ -48,7 +48,7 @@ const periodoAnio = computed(
       .sort((a, b) => b.fechaInicio.localeCompare(a.fechaInicio))[0] ?? null,
 )
 const nombreSeccion = computed(() =>
-  periodoAnio.value ? `${periodoAnio.value.gradoNumero}.° ${periodoAnio.value.seccion}` : '',
+  periodoAnio.value ? formatearSeccionCompleta(periodoAnio.value.gradoNumero, periodoAnio.value.seccion) : '',
 )
 const sesionesPorDia = computed(
   () =>
@@ -101,8 +101,8 @@ async function cargarHijos(): Promise<void> {
       ? indicado
       : (hijos.value[0]?.estudianteId ?? '')
     if (anios.value.length && !anios.value.includes(anio.value)) {
-      anio.value = anios.value.includes(new Date().getFullYear())
-        ? new Date().getFullYear()
+      anio.value = anios.value.includes(ahoraSistema().getFullYear())
+        ? ahoraSistema().getFullYear()
         : (anios.value.at(-1) ?? anio.value)
     }
   } catch (fallo: unknown) {
@@ -173,7 +173,9 @@ onUnmounted(() => {
             <div>
               <h3>{{ sesion.areaNombre }}</h3>
               <p>{{ sesion.docenteNombre }}</p>
-              <small>Aula {{ sesion.aulaCodigo }} · {{ sesion.gradoNumero }}.° {{ sesion.seccionCodigo }}</small>
+              <small
+                >Aula {{ sesion.aulaCodigo }} · {{ formatearSeccion(sesion.gradoNumero, sesion.seccionCodigo) }}</small
+              >
             </div>
           </article>
         </section>

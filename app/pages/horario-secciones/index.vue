@@ -15,7 +15,7 @@ definePageMeta({ middleware: 'autenticacion' })
 const ruta = useRoute()
 const api = useHorarioSeccion()
 const { listarAreas, listarDocentes } = useSesionesClase()
-const anhioActual = new Date().getFullYear()
+const anhioActual = ahoraSistema().getFullYear()
 const ANHIOS = [anhioActual, anhioActual + 1]
 
 const secciones = ref<Seccion[]>([])
@@ -57,7 +57,7 @@ const coloresArea = computed(() => {
 })
 
 function nombreSeccion(item: Seccion): string {
-  return `${item.gradoNumero}.° ${item.nombre}`
+  return formatearSeccionCompleta(item.gradoNumero, item.nombre)
 }
 
 function franja(bloque: BloqueGrilla): string {

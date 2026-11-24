@@ -93,7 +93,10 @@ async function cargarCatalogos(): Promise<void> {
       }))
       periodos.value = listaPeriodos.map((item) => ({
         id: item.periodoId,
-        nombre: `${item.numeroGrado}.° ${item.nivelEducativo} · Sección ${item.seccion} · ${item.fechaInicio.slice(0, 4)}`,
+        nombre: conAnhio(
+          formatearSeccionCompleta(item.numeroGrado, item.seccion, item.nivelEducativo),
+          item.fechaInicio.slice(0, 4),
+        ),
       }))
     } else if (esDocente.value) {
       const clases = await listarClases()
@@ -103,7 +106,7 @@ async function cargarCatalogos(): Promise<void> {
             item.periodoId,
             {
               id: item.periodoId,
-              nombre: `${item.gradoNumero}.° ${item.seccionCodigo} · ${item.anhio}`,
+              nombre: conAnhio(formatearSeccionCompleta(item.gradoNumero, item.seccionCodigo), item.anhio),
             },
           ]),
         ).values(),
@@ -120,7 +123,10 @@ async function cargarCatalogos(): Promise<void> {
         estudiante.periodos.forEach((periodo) => {
           disponibles.set(periodo.periodoId, {
             id: periodo.periodoId,
-            nombre: `${periodo.gradoNumero}.° ${periodo.seccion} · ${periodo.fechaInicio.slice(0, 4)}`,
+            nombre: conAnhio(
+              formatearSeccionCompleta(periodo.gradoNumero, periodo.seccion),
+              periodo.fechaInicio.slice(0, 4),
+            ),
           })
         }),
       )
@@ -374,7 +380,11 @@ onMounted(cargarCatalogos)
       <p v-if="!libreta.periodos.length" class="tarjeta">No hay información académica para mostrar.</p>
       <article v-for="periodo in libreta.periodos" :key="periodo.periodoId" class="tarjeta periodo">
         <div class="resumen">
-          <h2>{{ periodo.gradoNumero }}.° · Sección {{ periodo.seccion }} · {{ periodo.fechaInicio.slice(0, 4) }}</h2>
+          <h2>
+            {{
+              conAnhio(formatearSeccionCompleta(periodo.gradoNumero, periodo.seccion), periodo.fechaInicio.slice(0, 4))
+            }}
+          </h2>
           <span class="estado" :class="periodo.actasCerradas ? 'oficial' : 'borrador'">
             {{ periodo.actasCerradas ? 'Actas cerradas · Libreta oficial' : 'Actas abiertas · Informe preliminar' }}
           </span>

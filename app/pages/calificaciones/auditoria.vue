@@ -193,7 +193,10 @@ function fechaVisible(valor: string): string {
 }
 
 function periodoEtiqueta(periodo: PeriodoAcademico): string {
-  return `${periodo.numeroGrado}.° ${periodo.nivelEducativo} · Sección ${periodo.seccion} · ${periodo.fechaInicio.slice(0, 4)}`
+  return conAnhio(
+    formatearSeccionCompleta(periodo.numeroGrado, periodo.seccion, periodo.nivelEducativo),
+    periodo.fechaInicio.slice(0, 4),
+  )
 }
 
 function periodoVisible(id: number | null): string {

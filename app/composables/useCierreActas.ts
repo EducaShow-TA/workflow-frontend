@@ -1,3 +1,4 @@
+import { formatearSeccion } from '~/composables/useNombresSeccion'
 import { useApi } from '~/composables/useApi'
 import { formatearFecha } from '~/composables/useFechas'
 import type { CierreActas } from '~/types/cierreActas'
@@ -13,7 +14,7 @@ export function formatearMomentoCierre(momento: string | null): string {
 }
 
 export function nombrePeriodo(periodo: PeriodoAcademico): string {
-  return `${periodo.numeroGrado}.° ${periodo.seccion}`
+  return formatearSeccion(periodo.numeroGrado, periodo.seccion)
 }
 
 export function ordenarPeriodos(periodos: PeriodoAcademico[]): PeriodoAcademico[] {

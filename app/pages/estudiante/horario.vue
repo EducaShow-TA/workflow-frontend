@@ -15,7 +15,7 @@ const DIAS = [
 ] as const
 
 const { obtenerFicha, consultarHorario } = usePortalEstudiante()
-const anioActual = new Date().getFullYear()
+const anioActual = ahoraSistema().getFullYear()
 const anio = ref(anioActual)
 const ficha = ref<FichaEstudiante | null>(null)
 const sesiones = ref<HorarioEstudiante[]>([])
@@ -46,7 +46,7 @@ const periodoAnio = computed(
 )
 
 const nombreSeccion = computed(() =>
-  periodoAnio.value ? `${periodoAnio.value.gradoNumero}.° ${periodoAnio.value.seccion}` : '',
+  periodoAnio.value ? formatearSeccionCompleta(periodoAnio.value.gradoNumero, periodoAnio.value.seccion) : '',
 )
 
 const sesionesPorDia = computed(

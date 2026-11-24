@@ -1,7 +1,20 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import type { ErroresSeccion, Seccion, SolicitudSeccion } from '~/types/seccion'
-import type { ErroresAperturaAnhio, PeriodoAcademico, SolicitudAperturaAnhio } from '~/types/periodoAcademico'
+import type {
+  ErroresAperturaAnhio,
+  FechasBimestre,
+  PeriodoAcademico,
+  SolicitudAperturaAnhio,
+} from '~/types/periodoAcademico'
+import type { BimestreAcademico } from '~/types/bimestre'
+import {
+  obtenerEtiquetaEstadoBimestre,
+  obtenerVarianteEstadoBimestre,
+  proponerBimestres,
+  useBimestres,
+  validarBimestres,
+} from '~/composables/useBimestres'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
 import { formatearFecha, obtenerFechaHoyIso } from '~/composables/useFechas'
 import { usePeriodoMatricula } from '~/composables/usePeriodoMatricula'
@@ -20,6 +33,7 @@ import {
 import { usePeriodosAcademicos } from '~/composables/usePeriodosAcademicos'
 import {
   GRADOS_SECUNDARIA,
+  calcularConfirmados,
   calcularPorcentajeOcupacion,
   calcularVacantesDisponibles,
   obtenerEstadoCupos,
@@ -39,6 +53,7 @@ definePageMeta({
 const { listarSecciones, registrarSeccion, actualizarVacantes } = useSecciones()
 const { listar: listarPeriodosAcademicos, abrirAnhio, actualizarAnhio } = usePeriodosAcademicos()
 const { listarPeriodos } = usePeriodoMatricula()
+const { listar: listarBimestres, cerrar: cerrarBimestre } = useBimestres()
 const ruta = useRoute()
 const enrutador = useRouter()
 
@@ -117,6 +132,70 @@ function obtenerPeriodosDelAnhio(anhio: number): PeriodoAcademico[] {
 const periodosDelAnhio = computed(() => obtenerPeriodosDelAnhio(anhioActual.value))
 const anhioAbierto = computed(() => periodosDelAnhio.value.length > 0)
 const diasNoLectivosAbierto = ref(false)
+
+// Calendario de bimestres del año: se configura al abrir o editar el año y se cierra uno por uno.
+const bimestresAnhio = ref<BimestreAcademico[]>([])
+const bimestresAbierto = ref(false)
+const bimestreAConfirmar = ref<number | null>(null)
+const cerrandoBimestre = ref(false)
+const errorBimestres = ref('')
+
+async function cargarBimestres(): Promise<void> {
+  if (!anhioAbierto.value) {
+    bimestresAnhio.value = []
+    return
+  }
+  try {
+    bimestresAnhio.value = await listarBimestres(anhioActual.value)
+  } catch {
+    bimestresAnhio.value = []
+  }
+}
+
+watch([anhioActual, anhioAbierto], () => void cargarBimestres())
+
+const bimestreVigente = computed(
+  () =>
+    bimestresAnhio.value.find((bimestre) => bimestre.estado === 'EN_CURSO') ??
+    bimestresAnhio.value.find((bimestre) => bimestre.estado === 'POR_CERRAR'),
+)
+const bimestreParaCerrar = computed(() =>
+  bimestresAnhio.value.find(
+    (bimestre, indice) =>
+      bimestre.estado === 'POR_CERRAR' &&
+      bimestresAnhio.value.slice(0, indice).every((anterior) => anterior.estado === 'CERRADO'),
+  ),
+)
+
+function abrirBimestres(): void {
+  bimestreAConfirmar.value = null
+  errorBimestres.value = ''
+  bimestresAbierto.value = true
+}
+
+async function confirmarCierreBimestre(numero: number): Promise<void> {
+  cerrandoBimestre.value = true
+  errorBimestres.value = ''
+  try {
+    const resultado = await cerrarBimestre(anhioActual.value, numero)
+    bimestreAConfirmar.value = null
+    bimestresAbierto.value = false
+    mensajeExito.value =
+      resultado.notasCompletadas === 0
+        ? `Bimestre ${numero} cerrado.`
+        : `Bimestre ${numero} cerrado: ${resultado.notasCompletadas === 1 ? '1 nota faltante se registró' : `${resultado.notasCompletadas} notas faltantes se registraron`} como C.`
+    await cargarBimestres()
+  } catch (error: unknown) {
+    errorBimestres.value = obtenerMensajeError(error, 'No se pudo cerrar el bimestre.')
+  } finally {
+    cerrandoBimestre.value = false
+  }
+}
+
+function editarFechasBimestres(): void {
+  bimestresAbierto.value = false
+  editarPeriodoAnhio()
+}
 const resumenAnhio = computed(() => resumirAnhio(anhioActual.value, periodosDelAnhio.value, fechaHoy))
 const secciones = computed(() => convertirEnSecciones(periodosDelAnhio.value))
 
@@ -132,18 +211,23 @@ const resumen = computed(() => {
 
   return {
     capacidad: lista.reduce((total, seccion) => total + seccion.vacantesTotales, 0),
-    matriculados: lista.reduce((total, seccion) => total + seccion.cantidadMatriculados, 0),
+    matriculados: lista.reduce((total, seccion) => total + calcularConfirmados(seccion), 0),
+    porConfirmar: lista.reduce((total, seccion) => total + (seccion.porConfirmar ?? 0), 0),
     vacantes: lista.reduce((total, seccion) => total + calcularVacantesDisponibles(seccion), 0),
     seccionesLlenas: lista.filter((seccion) => calcularVacantesDisponibles(seccion) === 0).length,
   }
 })
+
+const matriculasSinConfirmar = computed(() =>
+  secciones.value.reduce((total, seccion) => total + (seccion.porConfirmar ?? 0), 0),
+)
 
 const tituloResumen = computed(() =>
   gradoFiltro.value === '' ? 'Resumen general' : `Resumen de ${obtenerNombreGrado(gradoFiltro.value)}`,
 )
 
 function describirSeccion(seccion: Pick<Seccion, 'gradoNumero' | 'nombre'>): string {
-  return `${obtenerNombreGrado(seccion.gradoNumero)} – Sección ${seccion.nombre}`
+  return formatearSeccionCompleta(seccion.gradoNumero, seccion.nombre)
 }
 
 // Edicion de la capacidad maxima (US-1.7, criterio 2)
@@ -276,6 +360,46 @@ const abriendo = ref(false)
 const errorApertura = ref('')
 const formularioApertura = reactive<SolicitudAperturaAnhio>({ anhio: 0, fechaInicio: '', fechaFin: '' })
 const erroresApertura = reactive<ErroresAperturaAnhio>({})
+const fechasBimestres = ref<FechasBimestre[]>([])
+const bimestresEditados = ref(false)
+const errorFechasBimestres = ref('')
+
+function fechasValidasDelAnhio(): boolean {
+  return Boolean(
+    formularioApertura.fechaInicio &&
+    formularioApertura.fechaFin &&
+    formularioApertura.fechaFin > formularioApertura.fechaInicio,
+  )
+}
+
+/** Bloqueos de cada bimestre al editar: el cerrado no cambia y el que ya empezó conserva su inicio. */
+function bloqueoBimestre(numero: number): { cerrado: boolean; inicioFijo: boolean } {
+  const guardado = editandoAnhio.value ? bimestresAnhio.value.find((bimestre) => bimestre.numero === numero) : undefined
+  return {
+    cerrado: guardado?.estado === 'CERRADO',
+    inicioFijo: Boolean(guardado && guardado.fechaInicio <= fechaHoy),
+  }
+}
+
+watch(
+  () => [formularioApertura.fechaInicio, formularioApertura.fechaFin],
+  () => {
+    errorFechasBimestres.value = ''
+    if (!fechasValidasDelAnhio()) return
+    const algunoEmpezo = [1, 2, 3, 4].some((numero) => bloqueoBimestre(numero).inicioFijo)
+    if (!fechasBimestres.value.length || (!bimestresEditados.value && !algunoEmpezo)) {
+      fechasBimestres.value = proponerBimestres(formularioApertura.fechaInicio, formularioApertura.fechaFin)
+      return
+    }
+    fechasBimestres.value[0]!.fechaInicio = formularioApertura.fechaInicio
+    fechasBimestres.value[3]!.fechaFin = formularioApertura.fechaFin
+  },
+)
+
+function marcarBimestresEditados(): void {
+  bimestresEditados.value = true
+  errorFechasBimestres.value = ''
+}
 
 function obtenerPendientes(anhio: number): Seccion[] {
   return obtenerSeccionesPendientes(seccionesRegistradas.value, obtenerPeriodosDelAnhio(anhio))
@@ -302,6 +426,9 @@ function abrirApertura(): void {
   formularioApertura.anhio = anhio ?? anhioActual.value
   formularioApertura.fechaInicio = ''
   formularioApertura.fechaFin = ''
+  fechasBimestres.value = []
+  bimestresEditados.value = false
+  errorFechasBimestres.value = ''
   erroresApertura.fechaInicio = undefined
   erroresApertura.fechaFin = undefined
   errorApertura.value = ''
@@ -311,12 +438,19 @@ function abrirApertura(): void {
 function editarPeriodoAnhio(): void {
   if (!resumenAnhio.value || anhioFinalizado.value) return
   formularioApertura.anhio = anhioActual.value
+  editandoAnhio.value = true
+  fechasBimestres.value = bimestresAnhio.value.map(({ numero, fechaInicio, fechaFin }) => ({
+    numero,
+    fechaInicio,
+    fechaFin,
+  }))
+  bimestresEditados.value = bimestresAnhio.value.some((bimestre) => bimestre.configurado)
+  errorFechasBimestres.value = ''
   formularioApertura.fechaInicio = resumenAnhio.value.fechaInicio
   formularioApertura.fechaFin = resumenAnhio.value.fechaFin
   erroresApertura.fechaInicio = undefined
   erroresApertura.fechaFin = undefined
   errorApertura.value = ''
-  editandoAnhio.value = true
   aperturaAbierta.value = true
 }
 
@@ -329,19 +463,27 @@ async function confirmarApertura(): Promise<void> {
   if (tieneErrores(erroresApertura)) {
     return
   }
+  errorFechasBimestres.value = validarBimestres(
+    fechasBimestres.value,
+    formularioApertura.fechaInicio,
+    formularioApertura.fechaFin,
+  )
+  if (errorFechasBimestres.value) {
+    return
+  }
 
   abriendo.value = true
 
   try {
-    const creados = editandoAnhio.value
-      ? await actualizarAnhio({ ...formularioApertura })
-      : await abrirAnhio({ ...formularioApertura })
+    const solicitud = { ...formularioApertura, bimestres: fechasBimestres.value.map((bimestre) => ({ ...bimestre })) }
+    const creados = editandoAnhio.value ? await actualizarAnhio(solicitud) : await abrirAnhio(solicitud)
     aperturaAbierta.value = false
     anhioSeleccionado.value = formularioApertura.anhio
     mensajeExito.value = editandoAnhio.value
       ? `Periodo del año escolar ${formularioApertura.anhio} actualizado en ${creados.length} secciones.`
       : `Año escolar ${formularioApertura.anhio} abierto: se ${creados.length === 1 ? 'creó 1 periodo' : `crearon ${creados.length} periodos`}.`
     await cargarSecciones()
+    await cargarBimestres()
   } catch (error: unknown) {
     errorApertura.value = obtenerMensajeError(error, 'No se pudo abrir el año escolar.')
   } finally {
@@ -386,6 +528,18 @@ async function confirmarApertura(): Promise<void> {
     </EncabezadoPagina>
 
     <AvisoMensaje v-if="mensajeExito" :mensaje="mensajeExito" tipo="exito" cerrable @cerrar="mensajeExito = ''" />
+    <div v-if="!cargando && matriculasSinConfirmar" class="aviso-por-confirmar" role="status">
+      <span>
+        <strong
+          >{{ matriculasSinConfirmar }}
+          {{ matriculasSinConfirmar === 1 ? 'matrícula sin confirmar' : 'matrículas sin confirmar' }} en
+          {{ anhioActual }}.</strong
+        >
+        Reservan su vacante, pero esos alumnos aún no aparecen en tareas, asistencia ni notas hasta confirmar su
+        compromiso de pago.
+      </span>
+      <NuxtLink to="/matriculas/nueva">Confirmar ahora →</NuxtLink>
+    </div>
 
     <PanelEstadoCarga :cargando="cargando" :error="errorCarga" @reintentar="cargarSecciones">
       <section class="panel-filtros" aria-label="Filtros de secciones">
@@ -415,11 +569,16 @@ async function confirmarApertura(): Promise<void> {
             :texto="obtenerEtiquetaEstadoAnhio(resumenAnhio.estado)"
             :variante="obtenerVarianteEstadoAnhio(resumenAnhio.estado)"
           />
+          <span v-if="bimestreVigente" class="bimestre-vigente">
+            · Bimestre {{ bimestreVigente.numero }}
+            {{ obtenerEtiquetaEstadoBimestre(bimestreVigente.estado).toLowerCase() }}
+          </span>
           <small v-if="anhioFinalizado" class="nota-finalizado"
             >Solo consulta: sus fechas ya no se pueden cambiar.</small
           >
         </p>
 
+        <BotonAccion v-if="anhioAbierto" variante="secundario" @click="abrirBimestres">Bimestres</BotonAccion>
         <BotonAccion v-if="anhioAbierto" variante="secundario" @click="diasNoLectivosAbierto = true">
           Días no lectivos
         </BotonAccion>
@@ -454,6 +613,7 @@ async function confirmarApertura(): Promise<void> {
           <div class="indicador">
             <span>Matriculados</span>
             <strong>{{ resumen.matriculados }}</strong>
+            <small v-if="resumen.porConfirmar" class="por-confirmar">+{{ resumen.porConfirmar }} por confirmar</small>
           </div>
 
           <div class="indicador destacado">
@@ -488,7 +648,12 @@ async function confirmarApertura(): Promise<void> {
                   <td class="sin-salto">{{ obtenerNombreGrado(seccion.gradoNumero) }}</td>
                   <td class="dato-destacado">{{ seccion.nombre }}</td>
                   <td>{{ seccion.vacantesTotales }}</td>
-                  <td>{{ seccion.cantidadMatriculados }}</td>
+                  <td>
+                    {{ calcularConfirmados(seccion) }}
+                    <small v-if="seccion.porConfirmar" class="por-confirmar"
+                      >+{{ seccion.porConfirmar }} por confirmar</small
+                    >
+                  </td>
                   <td class="dato-destacado">{{ calcularVacantesDisponibles(seccion) }}</td>
                   <td>
                     <div class="celda-ocupacion">
@@ -549,8 +714,11 @@ async function confirmarApertura(): Promise<void> {
         @submit.prevent="guardarCapacidad"
       >
         <p class="dato-informativo">
-          Alumnos matriculados actualmente: <strong>{{ seccionEnEdicion.cantidadMatriculados }}</strong>. La nueva
-          capacidad no puede ser menor que esta cantidad.
+          Vacantes ocupadas actualmente: <strong>{{ seccionEnEdicion.cantidadMatriculados }}</strong>
+          <template v-if="seccionEnEdicion.porConfirmar">
+            ({{ calcularConfirmados(seccionEnEdicion) }} matriculados y {{ seccionEnEdicion.porConfirmar }} por
+            confirmar)</template
+          >. La nueva capacidad no puede ser menor que esta cantidad.
         </p>
 
         <div class="campo">
@@ -768,6 +936,49 @@ async function confirmarApertura(): Promise<void> {
           </div>
         </div>
 
+        <fieldset v-if="fechasBimestres.length" class="bimestres-anhio">
+          <legend>Bimestres</legend>
+          <p class="ayuda">
+            Se proponen solos al elegir las fechas de clases, con dos semanas de vacaciones a mitad de año. Ajústalos
+            solo si tu calendario es distinto.
+          </p>
+          <div v-for="(bimestre, indice) in fechasBimestres" :key="bimestre.numero" class="fila-bimestre">
+            <strong>Bimestre {{ bimestre.numero }}</strong>
+            <input
+              v-model="bimestre.fechaInicio"
+              type="date"
+              :aria-label="`Inicio del bimestre ${bimestre.numero}`"
+              :disabled="
+                indice === 0 || bloqueoBimestre(bimestre.numero).cerrado || bloqueoBimestre(bimestre.numero).inicioFijo
+              "
+              @input="marcarBimestresEditados"
+            />
+            <span>al</span>
+            <input
+              v-model="bimestre.fechaFin"
+              type="date"
+              :aria-label="`Fin del bimestre ${bimestre.numero}`"
+              :disabled="indice === fechasBimestres.length - 1 || bloqueoBimestre(bimestre.numero).cerrado"
+              @input="marcarBimestresEditados"
+            />
+            <span
+              v-if="bloqueoBimestre(bimestre.numero).cerrado"
+              class="candado"
+              title="Bimestre cerrado: sus fechas ya no se pueden cambiar"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M7 10V7a5 5 0 0 1 10 0v3h1a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h1Zm2 0h6V7a3 3 0 0 0-6 0v3Z"
+                />
+              </svg>
+              Cerrado
+            </span>
+            <span v-else />
+          </div>
+          <small class="ayuda">El bimestre 1 empieza y el 4 termina con las clases.</small>
+          <small v-if="errorFechasBimestres" class="error" role="alert">{{ errorFechasBimestres }}</small>
+        </fieldset>
+
         <div v-if="!editandoAnhio" class="lista-por-crear">
           <strong>
             Se
@@ -805,6 +1016,94 @@ async function confirmarApertura(): Promise<void> {
       </template>
     </VentanaModal>
 
+    <VentanaModal
+      :abierta="bimestresAbierto"
+      :titulo="`Bimestres de ${anhioActual}`"
+      descripcion="Fechas de cada bimestre y su cierre. Un bimestre cerrado no admite notas ni evaluaciones nuevas."
+      :bloqueada="cerrandoBimestre"
+      @cerrar="bimestresAbierto = false"
+    >
+      <div class="tabla-desplazable">
+        <table class="tabla-bimestres">
+          <thead>
+            <tr>
+              <th scope="col">Bimestre</th>
+              <th scope="col">Inicio</th>
+              <th scope="col">Fin</th>
+              <th scope="col">Estado</th>
+              <th scope="col"><span class="solo-lectores">Acción</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="bimestre in bimestresAnhio" :key="bimestre.numero">
+              <td>
+                <strong>Bimestre {{ bimestre.numero }}</strong>
+              </td>
+              <td>
+                <svg
+                  v-if="bimestre.estado === 'CERRADO'"
+                  class="candado-mini"
+                  viewBox="0 0 24 24"
+                  role="img"
+                  aria-label="Fechas bloqueadas"
+                >
+                  <path
+                    d="M7 10V7a5 5 0 0 1 10 0v3h1a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h1Zm2 0h6V7a3 3 0 0 0-6 0v3Z"
+                  />
+                </svg>
+                {{ formatearFecha(bimestre.fechaInicio) }}
+              </td>
+              <td>{{ formatearFecha(bimestre.fechaFin) }}</td>
+              <td>
+                <InsigniaEstado
+                  :texto="obtenerEtiquetaEstadoBimestre(bimestre.estado)"
+                  :variante="obtenerVarianteEstadoBimestre(bimestre.estado)"
+                />
+              </td>
+              <td>
+                <button
+                  v-if="bimestreParaCerrar?.numero === bimestre.numero && bimestreAConfirmar === null"
+                  type="button"
+                  class="boton-cerrar-bimestre"
+                  @click="bimestreAConfirmar = bimestre.numero"
+                >
+                  Cerrar bimestre
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div v-if="bimestreAConfirmar !== null" class="confirmar-cierre" role="alert">
+        <p>
+          <strong>¿Cerrar el bimestre {{ bimestreAConfirmar }}?</strong> Las notas de evaluaciones parciales que falten
+          se registrarán como C. Los docentes ya no podrán registrar ni rectificar notas de este bimestre; el
+          administrador sí podrá rectificarlas. No se puede deshacer.
+        </p>
+        <div class="acciones-confirmar">
+          <BotonAccion variante="secundario" :deshabilitado="cerrandoBimestre" @click="bimestreAConfirmar = null">
+            Cancelar
+          </BotonAccion>
+          <BotonAccion :deshabilitado="cerrandoBimestre" @click="confirmarCierreBimestre(bimestreAConfirmar)">
+            {{ cerrandoBimestre ? 'Cerrando...' : `Sí, cerrar bimestre ${bimestreAConfirmar}` }}
+          </BotonAccion>
+        </div>
+      </div>
+      <AvisoMensaje v-if="errorBimestres" :mensaje="errorBimestres" tipo="error" />
+      <template #pie>
+        <BotonAccion variante="secundario" :deshabilitado="cerrandoBimestre" @click="bimestresAbierto = false">
+          Listo
+        </BotonAccion>
+        <BotonAccion
+          variante="secundario"
+          :deshabilitado="cerrandoBimestre || anhioFinalizado"
+          @click="editarFechasBimestres"
+        >
+          Editar fechas
+        </BotonAccion>
+      </template>
+    </VentanaModal>
+
     <ModalDiasNoLectivos
       :abierta="diasNoLectivosAbierto"
       :anhio="anhioActual"
@@ -814,6 +1113,157 @@ async function confirmarApertura(): Promise<void> {
 </template>
 
 <style scoped>
+.por-confirmar {
+  display: block;
+  color: #92400e;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.aviso-por-confirmar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  border: 1px solid #fcd34d;
+  border-radius: 10px;
+  background: #fffbeb;
+  color: #78350f;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.aviso-por-confirmar a {
+  flex-shrink: 0;
+  color: #004ac6;
+  font-weight: 600;
+  text-decoration: none;
+}
+.bimestre-vigente {
+  color: #434655;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.bimestres-anhio {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid #c3c6d7;
+  border-radius: 8px;
+}
+
+.bimestres-anhio legend {
+  padding: 0 4px;
+  color: #191c1e;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.bimestres-anhio .ayuda {
+  margin: 0;
+}
+
+.fila-bimestre {
+  display: grid;
+  grid-template-columns: 5.6rem minmax(0, 1fr) auto minmax(0, 1fr) 4.6rem;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.fila-bimestre input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 7px 9px;
+  border: 1px solid #c3c6d7;
+  border-radius: 7px;
+  font: inherit;
+}
+
+.fila-bimestre input:disabled {
+  background: #f2f4f6;
+  color: #737686;
+}
+
+.candado {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #737686;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.candado svg,
+.candado-mini {
+  width: 14px;
+  height: 14px;
+  fill: #737686;
+  vertical-align: -2px;
+}
+
+.tabla-bimestres {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  text-align: left;
+}
+
+.tabla-bimestres th {
+  padding: 8px 6px;
+  background: #f2f4f6;
+  color: #434655;
+  font-size: 12px;
+}
+
+.tabla-bimestres td {
+  padding: 10px 6px;
+  border-top: 1px solid #e5e7eb;
+  white-space: nowrap;
+}
+
+.boton-cerrar-bimestre {
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: #004ac6;
+  color: white;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.confirmar-cierre {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid #fcd34d;
+  border-radius: 8px;
+  background: #fffbeb;
+  color: #78350f;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.confirmar-cierre p {
+  margin: 0;
+}
+
+.acciones-confirmar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
 .pagina-secciones {
   display: flex;
   flex-direction: column;

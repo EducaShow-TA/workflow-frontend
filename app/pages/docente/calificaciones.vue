@@ -7,7 +7,9 @@ import { useCalificaciones } from '~/composables/useCalificaciones'
 import { useEvaluacionesParciales } from '~/composables/useEvaluacionesParciales'
 import type { EvaluacionParcial, NotaEvaluacionParcial } from '~/types/evaluacionParcial'
 import { NOTAS, claveClase, nombreClase, useMisClases } from '~/composables/useMisClases'
+import { obtenerEtiquetaEstadoBimestre, useBimestres } from '~/composables/useBimestres'
 import { useAutenticacionStore } from '~/stores/autenticacion'
+import type { BimestreAcademico } from '~/types/bimestre'
 
 definePageMeta({ layout: 'docente', middleware: 'autenticacion' })
 
@@ -19,6 +21,7 @@ const autenticacion = useAutenticacionStore()
 const { listar: listarClases, listarAlumnos, obtenerRiesgo } = useMisClases()
 const { listar: listarNotas, descargarEvidencia } = useCalificaciones()
 const { listar: listarEvaluaciones, listarNotas: listarNotasParciales } = useEvaluacionesParciales()
+const { listar: listarBimestres } = useBimestres()
 const ruta = useRoute()
 const esDocente = computed(() => autenticacion.usuario?.rol === 'DOCENTE')
 
@@ -29,6 +32,11 @@ const competenciaElegida = ref('')
 const alumnos = ref<AlumnoClase[]>([])
 const notasPorCompetencia = ref<Record<string, Calificacion[]>>({})
 const riesgoAcademico = ref<RiesgoAcademico | null>(null)
+const bimestresClase = ref<BimestreAcademico[]>([])
+const bimestreElegido = ref<number | null>(null)
+const bimestreVisto = computed(() => bimestreElegido.value ?? riesgoAcademico.value?.bimestre ?? 1)
+const datosBimestreVisto = computed(() => bimestresClase.value.find((item) => item.numero === bimestreVisto.value))
+const bimestreCerrado = computed(() => datosBimestreVisto.value?.estado === 'CERRADO')
 const busqueda = ref('')
 const filtroNota = ref<FiltroNota>('')
 const cargando = ref(true)
@@ -64,7 +72,7 @@ const competencia = computed(
 )
 const notas = computed(() => notasPorCompetencia.value[competenciaElegida.value] ?? [])
 const evaluacionesBimestre = computed(() =>
-  evaluacionesCompetencia.value.filter((item) => item.bimestre === riesgoAcademico.value?.bimestre),
+  evaluacionesCompetencia.value.filter((item) => item.bimestre === bimestreVisto.value),
 )
 const modoParcial = computed(() => evaluacionesBimestre.value.length > 0)
 const ponderacionBimestre = computed(() =>
@@ -107,7 +115,7 @@ const alumnosFiltrados = computed(() => {
 const pendientes = computed(() => alumnos.value.filter((alumno) => !notaPorMatricula.value.has(alumno.matriculaId)))
 const contexto = computed(() =>
   clase.value && competencia.value
-    ? `${clase.value.areaNombre} ${nombreClase(clase.value)} · ${competencia.value.nombre}`
+    ? `${clase.value.areaNombre} · ${formatearSeccionCompleta(clase.value.gradoNumero, clase.value.seccionCodigo)} · ${competencia.value.nombre}`
     : '',
 )
 const haySiguiente = computed(() =>
@@ -138,7 +146,7 @@ async function cargarParciales(): Promise<void> {
   cargandoParciales.value = true
   try {
     const lista = await listarEvaluaciones(actual.periodoId, codigo)
-    const bimestre = riesgoAcademico.value?.bimestre
+    const bimestre = bimestreVisto.value
     const delBimestre = lista.filter((item) => item.bimestre === bimestre)
     const notas = await Promise.all(delBimestre.map((item) => listarNotasParciales(item.id)))
     if (turno !== solicitudParciales) return
@@ -167,7 +175,7 @@ async function alGuardarParcial(): Promise<void> {
   try {
     const [notasEvaluacion, logros] = await Promise.all([
       listarNotasParciales(ventana.evaluacion.id),
-      listarNotas(actual.periodoId, competenciaElegida.value, riesgoAcademico.value?.bimestre ?? 1),
+      listarNotas(actual.periodoId, competenciaElegida.value, bimestreVisto.value),
     ])
     notasParciales.value = { ...notasParciales.value, [ventana.evaluacion.id]: notasEvaluacion }
     notasPorCompetencia.value = { ...notasPorCompetencia.value, [competenciaElegida.value]: logros }
@@ -257,10 +265,12 @@ async function cargarClase(): Promise<void> {
   alumnos.value = []
   notasPorCompetencia.value = {}
   riesgoAcademico.value = null
+  bimestreElegido.value = null
   try {
-    const [lista, riesgo] = await Promise.all([
+    const [lista, riesgo, calendario] = await Promise.all([
       listarAlumnos(actual.periodoId),
       obtenerRiesgo(actual.periodoId, actual.areaCodigo),
+      listarBimestres(actual.anhio).catch(() => []),
     ])
     const porCompetencia = await Promise.all(
       actual.competencias.map((item) => listarNotas(actual.periodoId, item.codigo, riesgo.bimestre)),
@@ -268,12 +278,35 @@ async function cargarClase(): Promise<void> {
     if (claveClase(actual) !== claseElegida.value) return
     alumnos.value = lista
     riesgoAcademico.value = riesgo
+    bimestresClase.value = calendario
     notasPorCompetencia.value = Object.fromEntries(
       actual.competencias.map((item, indice) => [item.codigo, porCompetencia[indice] ?? []]),
     )
     void cargarParciales()
   } catch (fallo: unknown) {
     error.value = obtenerMensajeError(fallo, 'No se pudo cargar la lista de alumnos.')
+  } finally {
+    cargandoClase.value = false
+  }
+}
+
+async function verBimestre(numero: number): Promise<void> {
+  const actual = clase.value
+  if (!actual || numero === bimestreVisto.value) return
+  bimestreElegido.value = numero
+  cargandoClase.value = true
+  error.value = ''
+  try {
+    const porCompetencia = await Promise.all(
+      actual.competencias.map((item) => listarNotas(actual.periodoId, item.codigo, numero)),
+    )
+    if (claveClase(actual) !== claseElegida.value || bimestreVisto.value !== numero) return
+    notasPorCompetencia.value = Object.fromEntries(
+      actual.competencias.map((item, indice) => [item.codigo, porCompetencia[indice] ?? []]),
+    )
+    void cargarParciales()
+  } catch (fallo: unknown) {
+    error.value = obtenerMensajeError(fallo, 'No se pudieron cargar las notas del bimestre.')
   } finally {
     cargandoClase.value = false
   }
@@ -464,12 +497,15 @@ onMounted(async () => {
 
       <section v-if="clase" class="docente-tarjeta" :aria-busy="cargandoClase" aria-labelledby="titulo-clase">
         <div class="docente-tarjeta__titulo docente-tarjeta__titulo--wrap">
-          <h2 id="titulo-clase">{{ clase.areaNombre }} · {{ nombreClase(clase) }} · {{ clase.anhio }}</h2>
+          <h2 id="titulo-clase">
+            {{ clase.areaNombre }} · {{ formatearSeccionCompleta(clase.gradoNumero, clase.seccionCodigo) }} ·
+            {{ clase.anhio }}
+          </h2>
           <button
             v-if="!modoParcial"
             type="button"
             class="docente-boton"
-            :disabled="cargandoClase || !competencia || !pendientes.length"
+            :disabled="cargandoClase || !competencia || !pendientes.length || bimestreCerrado"
             @click="calificarPendientes"
           >
             {{ pendientes.length ? `Calificar pendientes (${pendientes.length})` : 'Todos calificados' }}
@@ -499,6 +535,28 @@ onMounted(async () => {
               el curso
             </small>
           </div>
+
+          <div v-if="bimestresClase.length" class="bimestres-clase" role="group" aria-label="Bimestre">
+            <span class="bimestres-clase__etiqueta">Bimestre</span>
+            <div class="bimestres-clase__chips">
+              <button
+                v-for="item in bimestresClase"
+                :key="item.numero"
+                type="button"
+                :class="['chip-bimestre', { 'chip-bimestre--activo': item.numero === bimestreVisto }]"
+                :aria-pressed="item.numero === bimestreVisto"
+                :disabled="item.estado === 'PROXIMO' || cargandoClase"
+                @click="verBimestre(item.numero)"
+              >
+                Bimestre {{ item.numero }} · {{ obtenerEtiquetaEstadoBimestre(item.estado).toLowerCase() }}
+              </button>
+            </div>
+          </div>
+          <AvisoMensaje
+            v-if="bimestreCerrado && datosBimestreVisto"
+            tipo="informacion"
+            :mensaje="`Bimestre ${datosBimestreVisto.numero} cerrado${datosBimestreVisto.fechaCierre ? ` el ${formatearFecha(datosBimestreVisto.fechaCierre.slice(0, 10)).slice(0, 5)}` : ''}: las notas se muestran en solo lectura. Si hay un error, el administrador puede rectificarlo.`"
+          />
 
           <p v-if="cargandoClase" class="docente-texto-secundario" role="status">Cargando alumnos y notas…</p>
 
@@ -578,7 +636,7 @@ onMounted(async () => {
             <template v-else-if="modoParcial">
               <AvisoMensaje
                 tipo="advertencia"
-                :mensaje="`Esta competencia se calcula con las evaluaciones parciales del bimestre ${riesgoAcademico?.bimestre} que definió el administrador (${ponderacionBimestre}). Califica cada evaluación; el logro del bimestre se obtiene automáticamente.`"
+                :mensaje="`Esta competencia se calcula con las evaluaciones parciales del bimestre ${bimestreVisto} que definió el administrador (${ponderacionBimestre}). Califica cada evaluación; el logro del bimestre se obtiene automáticamente.`"
               />
               <div class="docente-tabla-contenedor tabla-desplazable">
                 <table class="docente-tabla tabla-parciales">
@@ -613,6 +671,7 @@ onMounted(async () => {
                           v-if="notaParcial(evaluacion.id, alumno.matriculaId) || evaluacion.tareaId"
                           type="button"
                           class="celda-nota"
+                          :disabled="bimestreCerrado"
                           :aria-label="`${evaluacion.titulo} de ${alumno.nombreCompleto}`"
                           @click="abrirParcial(evaluacion, alumno)"
                         >
@@ -632,6 +691,7 @@ onMounted(async () => {
                           v-else
                           type="button"
                           class="docente-boton boton-calificar"
+                          :disabled="bimestreCerrado"
                           @click="abrirParcial(evaluacion, alumno)"
                         >
                           Calificar
@@ -753,6 +813,7 @@ onMounted(async () => {
                           'docente-boton',
                           { 'docente-boton--secundario': notaPorMatricula.has(alumno.matriculaId) },
                         ]"
+                        :disabled="bimestreCerrado"
                         @click="abrir(alumno)"
                       >
                         {{ notaPorMatricula.has(alumno.matriculaId) ? 'Rectificar' : 'Registrar' }}
@@ -773,7 +834,7 @@ onMounted(async () => {
       :alumno="alumnoEnEdicion"
       :contexto="contexto"
       :periodo-id="clase.periodoId"
-      :bimestre="riesgoAcademico?.bimestre ?? 1"
+      :bimestre="bimestreVisto"
       :competencia-codigo="competencia.codigo"
       :actual="null"
       :hay-siguiente="haySiguiente"
@@ -787,7 +848,7 @@ onMounted(async () => {
       :alumno="alumnoEnEdicion"
       :contexto="contexto"
       :periodo-id="clase.periodoId"
-      :bimestre="riesgoAcademico?.bimestre ?? 1"
+      :bimestre="bimestreVisto"
       :competencia-codigo="competencia.codigo"
       :actual="alumnoEnEdicion ? (notaPorMatricula.get(alumnoEnEdicion.matriculaId) ?? null) : null"
       @cerrar="rectificacionAbierta = false"
@@ -812,7 +873,7 @@ onMounted(async () => {
       :abierta="historialAbierto"
       :alumno="alumnoEnEdicion"
       :contexto="contexto"
-      :bimestre="riesgoAcademico?.bimestre ?? 1"
+      :bimestre="bimestreVisto"
       :actual="alumnoEnEdicion ? (notaPorMatricula.get(alumnoEnEdicion.matriculaId) ?? null) : null"
       @cerrar="historialAbierto = false"
       @rectificar="rectificarDesdeHistorial"
@@ -821,6 +882,48 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.bimestres-clase {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.bimestres-clase__etiqueta {
+  color: #191c1e;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.bimestres-clase__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip-bimestre {
+  padding: 6px 12px;
+  border: 1px solid #c3c6d7;
+  border-radius: 999px;
+  background: white;
+  color: #434655;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chip-bimestre--activo {
+  border-color: #004ac6;
+  background: #004ac6;
+  color: white;
+}
+
+.chip-bimestre:disabled {
+  background: #f2f4f6;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
 .tabla-parciales th {
   vertical-align: bottom;
 }

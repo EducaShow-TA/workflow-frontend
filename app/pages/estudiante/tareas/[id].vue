@@ -30,7 +30,7 @@ const reemplazando = ref(false)
 const arrastrando = ref(false)
 const descargando = ref(false)
 const entrada = ref<HTMLInputElement | null>(null)
-const ahora = ref(new Date())
+const ahora = ref(ahoraSistema())
 let reloj: ReturnType<typeof setInterval> | undefined
 
 const tareaId = computed(() => Number(ruta.params.id))
@@ -76,7 +76,7 @@ async function cargar(): Promise<void> {
   error.value = ''
   try {
     tarea.value = await obtener(tareaId.value)
-    ahora.value = new Date()
+    ahora.value = ahoraSistema()
   } catch (fallo: unknown) {
     error.value = obtenerMensajeError(fallo, 'No se pudo cargar la tarea.')
   } finally {
@@ -129,7 +129,7 @@ async function enviar(): Promise<void> {
     if (errorArchivo.value.includes('fecha límite')) void cargar()
   } finally {
     progreso.value = null
-    ahora.value = new Date()
+    ahora.value = ahoraSistema()
   }
 }
 
@@ -148,7 +148,7 @@ async function descargar(): Promise<void> {
 onMounted(() => {
   void cargar()
   reloj = setInterval(() => {
-    ahora.value = new Date()
+    ahora.value = ahoraSistema()
   }, 60_000)
 })
 onBeforeUnmount(() => clearInterval(reloj))

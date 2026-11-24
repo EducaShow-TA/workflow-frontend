@@ -50,7 +50,7 @@ const consulta = ref('')
 const desplegableAbierto = ref(false)
 const indiceActivo = ref(0)
 const errorCarga = ref(false)
-const ahora = ref(Date.now())
+const ahora = ref(ahoraSistema().getTime())
 let reloj: ReturnType<typeof setInterval> | undefined
 
 const resultados = computed(() => buscarEnPanelDocente(panel.datos.value, consulta.value))
@@ -98,7 +98,7 @@ async function cargarDatos(forzar = false): Promise<void> {
   } catch {
     errorCarga.value = true
   }
-  ahora.value = Date.now()
+  ahora.value = ahoraSistema().getTime()
 }
 
 function moverSeleccion(paso: number): void {

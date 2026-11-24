@@ -38,7 +38,7 @@ const periodosDelAnhio = computed(() =>
 const grados = computed(() => {
   const mapa = new Map<number, string>()
   for (const periodo of periodosDelAnhio.value) {
-    mapa.set(periodo.numeroGrado, `${periodo.numeroGrado}.° de ${periodo.nivelEducativo.toLowerCase()}`)
+    mapa.set(periodo.numeroGrado, formatearGrado(periodo.numeroGrado, periodo.nivelEducativo))
   }
   return [...mapa.entries()].map(([numero, nombre]) => ({ numero, nombre }))
 })
@@ -53,7 +53,7 @@ const cerradas = computed(
 const resumen = computed(() => {
   if (!periodosVisibles.value.length) return ''
   const total = periodosVisibles.value.length
-  const ambito = grado.value === TODOS_LOS_GRADOS ? 'En el año' : `En ${grado.value}.°`
+  const ambito = grado.value === TODOS_LOS_GRADOS ? 'En el año' : `En ${formatearGrado(Number(grado.value))}`
   return `${ambito}: ${cerradas.value} de ${total} ${total === 1 ? 'sección' : 'secciones'} con actas cerradas.`
 })
 const clasesEnCurso = computed(() => (periodoACerrar.value ? fechaHoy <= periodoACerrar.value.fechaFin : false))

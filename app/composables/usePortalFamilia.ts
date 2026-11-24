@@ -1,3 +1,4 @@
+import { formatearSeccionCompleta } from '~/composables/useNombresSeccion'
 import { useApi } from '~/composables/useApi'
 import { useAutenticacionStore } from '~/stores/autenticacion'
 import type {
@@ -122,7 +123,7 @@ export function periodoVigente(hijo: HijoVinculado, hoy: string): PeriodoVincula
 }
 
 export function describirSeccionHijo(periodo: PeriodoVinculado | undefined): string {
-  return periodo ? `${periodo.gradoNumero}.° grado · Sección ${periodo.seccion}` : 'Sin matrícula registrada'
+  return periodo ? formatearSeccionCompleta(periodo.gradoNumero, periodo.seccion) : 'Sin matrícula registrada'
 }
 
 /** Consultas del portal del apoderado. El back limita todo a los hijos vinculados a su cuenta. */

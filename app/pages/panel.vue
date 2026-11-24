@@ -26,7 +26,7 @@ const autenticacion = useAutenticacionStore()
 const panel = ref<PanelAdministrador | null>(null)
 const cargando = ref(true)
 const error = ref('')
-const ahora = ref(new Date())
+const ahora = ref(ahoraSistema())
 
 const accesos = [
   {
@@ -45,16 +45,16 @@ const saludo = computed(() => saludoPanel(ahora.value, autenticacion.usuario?.no
 const ventana = computed(() => {
   const datos = panel.value
   if (!datos?.ventanaMatricula) return null
-  const { estado, fechaInicio, fechaLimite } = datos.ventanaMatricula
+  const { estado, fechaInicio, fechaLimite, anhioEscolar } = datos.ventanaMatricula
   if (estado === 'PENDIENTE') {
     const fecha = new Intl.DateTimeFormat('es-PE', { day: 'numeric', month: 'long' }).format(
       fechaLocalPanel(fechaInicio),
     )
-    return { texto: `Matrícula abre el ${fecha}`, abierta: false }
+    return { texto: `Matrícula ${anhioEscolar} abre el ${fecha}`, abierta: false }
   }
   const dias = diasEntrePanel(datos.fecha, fechaLimite)
   const cierre = dias === 0 ? 'cierra hoy' : dias === 1 ? 'cierra mañana' : `cierra en ${dias} días`
-  return { texto: `Matrícula abierta · ${cierre}`, abierta: true }
+  return { texto: `Matrícula ${anhioEscolar} abierta · ${cierre}`, abierta: true }
 })
 
 const pendientes = computed(() => (panel.value ? listarPendientesPanel(panel.value) : []))
@@ -65,15 +65,16 @@ const indicadores = computed(() => {
   const i = datos.indicadores
   const mes = new Intl.DateTimeFormat('es-PE', { month: 'long' }).format(fechaLocalPanel(datos.fecha)).toLowerCase()
   const ocupacion = Math.round(porcentajePanel(i.estudiantesMatriculados, i.vacantesTotales))
+  const porConfirmar = i.estudiantesMatriculados - i.estudiantesConfirmados
   const cobro = Math.round(porcentajePanel(i.pensionMesCobrada, i.pensionMesEmitida))
   const asistencia = porcentajePanel(i.presentesSemana, i.asistenciasSemana)
   const docentes = porcentajePanel(i.docentesPresentesHoy, i.docentesConClaseHoy)
   return [
     {
-      titulo: 'Estudiantes matriculados',
-      valor: String(i.estudiantesMatriculados),
+      titulo: `Estudiantes matriculados ${datos.anio}`,
+      valor: String(i.estudiantesConfirmados),
       detalle: i.vacantesTotales
-        ? `de ${i.vacantesTotales} vacantes · ${ocupacion} % de ocupación`
+        ? `${porConfirmar ? `+${porConfirmar} por confirmar · ` : ''}de ${i.vacantesTotales} vacantes · ${ocupacion} % ocupado`
         : 'Sin secciones registradas este año',
       avance: ocupacion,
       tono: 'azul',
@@ -126,7 +127,7 @@ function resumenMes(m: CobranzaMesPanel): string {
 }
 
 function nombreGrado(g: OcupacionGradoPanel): string {
-  return `${g.grado}.° ${g.nivelEducativo.toLowerCase()}`
+  return formatearGrado(g.grado, g.nivelEducativo)
 }
 
 function tonoOcupacion(g: OcupacionGradoPanel): string {
@@ -141,7 +142,7 @@ async function cargar(): Promise<void> {
   error.value = ''
   try {
     panel.value = await api.consultar()
-    ahora.value = new Date()
+    ahora.value = ahoraSistema()
   } catch (causa) {
     error.value = obtenerMensajeError(causa, 'No se pudo cargar el resumen del colegio.')
   } finally {

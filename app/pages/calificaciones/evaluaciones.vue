@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { obtenerEtiquetaEstadoBimestre, useBimestres } from '~/composables/useBimestres'
 import { useCompetencias } from '~/composables/useCompetencias'
 import { useEvaluacionesParciales } from '~/composables/useEvaluacionesParciales'
 import { usePeriodosAcademicos } from '~/composables/usePeriodosAcademicos'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
+import type { BimestreAcademico } from '~/types/bimestre'
 import type { Competencia, Area } from '~/types/competencia'
 import type { PeriodoAcademico } from '~/types/periodoAcademico'
 import type { EvaluacionParcial, SolicitudEvaluacionParcial } from '~/types/evaluacionParcial'
@@ -18,10 +20,12 @@ const BIMESTRES = [1, 2, 3, 4]
 const { listar: listarPeriodos } = usePeriodosAcademicos()
 const { listarAreas } = useCompetencias()
 const { listar, crear, actualizar } = useEvaluacionesParciales()
+const { listar: listarBimestres } = useBimestres()
 
 const periodos = ref<PeriodoAcademico[]>([])
 const areas = ref<Area[]>([])
 const evaluaciones = ref<EvaluacionParcial[]>([])
+const calendario = ref<BimestreAcademico[]>([])
 const periodoId = ref<number | null>(null)
 const competenciaCodigo = ref('')
 const editandoId = ref<number | null>(null)
@@ -33,6 +37,7 @@ const errorLista = ref('')
 const errorFormulario = ref('')
 const aviso = ref('')
 let secuenciaLista = 0
+let secuenciaCalendario = 0
 
 const competencias = computed<CompetenciaOpcion[]>(() =>
   areas.value
@@ -49,6 +54,11 @@ const nombreCompetencia = computed(
 )
 const evaluacionesSinBimestre = computed(() => evaluaciones.value.filter((item) => item.bimestre === null).length)
 
+const anhioPeriodo = computed(() => {
+  const periodo = periodos.value.find((item) => item.periodoId === periodoId.value)
+  return periodo ? Number(periodo.fechaInicio.slice(0, 4)) : null
+})
+
 const formulario = reactive<{
   titulo: string
   descripcion: string
@@ -61,8 +71,24 @@ const formulario = reactive<{
   bimestre: '',
 })
 
+function datosBimestre(numero: number | null): BimestreAcademico | undefined {
+  return calendario.value.find((item) => item.numero === numero)
+}
+
+function estaCerrado(numero: number | null): boolean {
+  return datosBimestre(numero)?.estado === 'CERRADO'
+}
+
+function describirBimestre(numero: number): string {
+  const datos = datosBimestre(numero)
+  return `Bimestre ${numero}${datos ? ` · ${obtenerEtiquetaEstadoBimestre(datos.estado).toLowerCase()}` : ''}`
+}
+
 function descripcionPeriodo(periodo: PeriodoAcademico): string {
-  return `${periodo.numeroGrado}.° ${periodo.nivelEducativo} · Sección ${periodo.seccion} · ${periodo.fechaInicio.slice(0, 4)}`
+  return conAnhio(
+    formatearSeccionCompleta(periodo.numeroGrado, periodo.seccion, periodo.nivelEducativo),
+    periodo.fechaInicio.slice(0, 4),
+  )
 }
 
 function limpiarFormulario(): void {
@@ -100,6 +126,17 @@ async function cargarEvaluaciones(): Promise<void> {
     if (turno === secuenciaLista) {
       cargandoEvaluaciones.value = false
     }
+  }
+}
+
+/** Si el calendario no se puede leer, la pantalla sigue disponible: el bloqueo lo garantiza el backend. */
+async function cargarCalendario(): Promise<void> {
+  const turno = ++secuenciaCalendario
+  calendario.value = []
+  if (anhioPeriodo.value === null) return
+  const resultado = await listarBimestres(anhioPeriodo.value).catch(() => [])
+  if (turno === secuenciaCalendario) {
+    calendario.value = resultado
   }
 }
 
@@ -156,6 +193,10 @@ async function guardar(): Promise<void> {
     errorFormulario.value = 'Selecciona el bimestre al que pertenece esta evaluación.'
     return
   }
+  if (estaCerrado(formulario.bimestre)) {
+    errorFormulario.value = `El bimestre ${formulario.bimestre} está cerrado; no se pueden crear ni cambiar sus evaluaciones.`
+    return
+  }
 
   const solicitud: SolicitudEvaluacionParcial = {
     periodoId: periodoId.value,
@@ -185,6 +226,8 @@ async function guardar(): Promise<void> {
     guardando.value = false
   }
 }
+
+watch(anhioPeriodo, () => void cargarCalendario())
 
 watch([periodoId, competenciaCodigo], () => {
   limpiarFormulario()
@@ -238,7 +281,9 @@ onMounted(cargarCatalogos)
           Bimestre *
           <select v-model.number="formulario.bimestre" required>
             <option value="">Selecciona un bimestre</option>
-            <option v-for="bimestre in BIMESTRES" :key="bimestre" :value="bimestre">Bimestre {{ bimestre }}</option>
+            <option v-for="bimestre in BIMESTRES" :key="bimestre" :value="bimestre" :disabled="estaCerrado(bimestre)">
+              {{ describirBimestre(bimestre) }}
+            </option>
           </select>
         </label>
         <label>
@@ -286,13 +331,17 @@ onMounted(cargarCatalogos)
             <strong>{{ evaluacion.titulo }}</strong>
             <p>{{ evaluacion.descripcion || 'Sin descripción' }}</p>
             <small>
-              {{ evaluacion.bimestre === null ? 'Sin bimestre asignado' : `Bimestre ${evaluacion.bimestre}` }}
+              {{ evaluacion.bimestre === null ? 'Sin bimestre asignado' : describirBimestre(evaluacion.bimestre) }}
               · Ponderación {{ evaluacion.ponderacion }}%
             </small>
             <span v-if="evaluacion.tareaId" class="tarea-vinculada">Tarea · “{{ evaluacion.tareaTitulo }}”</span>
             <small v-else class="sin-tarea">Se califica en Calificaciones</small>
           </div>
-          <BotonAccion variante="secundario" :deshabilitado="guardando" @click="editar(evaluacion)">
+          <BotonAccion
+            variante="secundario"
+            :deshabilitado="guardando || estaCerrado(evaluacion.bimestre)"
+            @click="editar(evaluacion)"
+          >
             {{ evaluacion.bimestre === null ? 'Asignar bimestre' : 'Editar' }}
           </BotonAccion>
         </li>

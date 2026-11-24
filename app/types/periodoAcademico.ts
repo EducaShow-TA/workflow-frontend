@@ -12,16 +12,25 @@ export interface PeriodoAcademico {
   fechaFin: string
   vacantesTotales: number
   matriculasActivas: number
+  /** Matrículas registradas sin confirmar: reservan vacante, pero aún no son alumnos del aula. */
+  matriculasPendientes: number
   vacantesDisponibles: number
   hayVacantes: boolean
   estado: EstadoPeriodoAcademico
   actasCerradas: boolean
 }
 
+export interface FechasBimestre {
+  numero: number
+  fechaInicio: string
+  fechaFin: string
+}
+
 export interface SolicitudAperturaAnhio {
   anhio: number
   fechaInicio: string
   fechaFin: string
+  bimestres?: FechasBimestre[]
 }
 
 export type ErroresAperturaAnhio = Partial<Record<keyof SolicitudAperturaAnhio, string>>

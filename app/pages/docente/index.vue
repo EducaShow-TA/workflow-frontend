@@ -12,7 +12,7 @@ const autenticacion = useAutenticacionStore()
 const { datos, cargar } = usePanelDocente()
 const cargando = ref(false)
 const error = ref('')
-const ahora = ref(Date.now())
+const ahora = ref(ahoraSistema().getTime())
 let reloj: ReturnType<typeof setInterval> | undefined
 
 const nombre = computed(() => autenticacion.usuario?.nombreCompleto?.trim().split(/\s+/)[0] || 'docente')
@@ -142,7 +142,7 @@ onMounted(() => {
   if (autenticacion.usuario?.rol !== 'DOCENTE') return
   void actualizar(true)
   reloj = setInterval(() => {
-    ahora.value = Date.now()
+    ahora.value = ahoraSistema().getTime()
   }, 30_000)
 })
 

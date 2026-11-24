@@ -5,7 +5,7 @@ import type { EntregaTarea, SolicitudTarea, Tarea } from '~/types/tarea'
 import type { EvaluacionParcial } from '~/types/evaluacionParcial'
 import { useTareas } from '~/composables/useTareas'
 import { useEvaluacionesParciales } from '~/composables/useEvaluacionesParciales'
-import { claveClase, nombreClase, useMisClases } from '~/composables/useMisClases'
+import { claveClase, useMisClases } from '~/composables/useMisClases'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
 import { cuentaRegresivaTarea, formatearFechaTarea } from '~/composables/useTareasEstudiante'
 
@@ -58,7 +58,7 @@ const vista = ref<'vigentes' | 'vencidas'>('vigentes')
 const modalAbierto = ref(false)
 const entregasAbiertas = ref(new Set<number>())
 const consignasCompletas = ref(new Set<number>())
-const ahora = ref(new Date())
+const ahora = ref(ahoraSistema())
 let reloj: ReturnType<typeof setInterval> | undefined
 const cursos = computed(() =>
   [...new Map(clases.value.map((clase) => [clase.areaCodigo, clase.areaNombre])).entries()].sort((a, b) =>
@@ -371,7 +371,7 @@ function alGuardarVentana(resultado: { tarea: Tarea | null }): void {
 onMounted(() => {
   void cargarClases()
   reloj = setInterval(() => {
-    ahora.value = new Date()
+    ahora.value = ahoraSistema()
   }, 60_000)
 })
 onBeforeUnmount(() => clearInterval(reloj))
@@ -418,7 +418,7 @@ onBeforeUnmount(() => clearInterval(reloj))
             <label for="seccion-tareas">Sección</label>
             <select id="seccion-tareas" v-model="claseElegida" @change="alCambiarClase">
               <option v-for="clase in clasesDelCurso" :key="claveClase(clase)" :value="claveClase(clase)">
-                {{ nombreClase(clase) }} · {{ clase.anhio }}
+                {{ conAnhio(formatearSeccionCompleta(clase.gradoNumero, clase.seccionCodigo), clase.anhio) }}
               </option>
             </select>
           </div>
@@ -431,7 +431,8 @@ onBeforeUnmount(() => clearInterval(reloj))
         <section aria-labelledby="listado-tarea-docente" class="listado">
           <div class="listado__encabezado">
             <h2 id="listado-tarea-docente">
-              Tareas de {{ claseActual?.areaNombre }} · {{ claseActual ? nombreClase(claseActual) : '' }}
+              Tareas de {{ claseActual?.areaNombre }} ·
+              {{ claseActual ? formatearSeccionCompleta(claseActual.gradoNumero, claseActual.seccionCodigo) : '' }}
             </h2>
             <div class="segmento" role="tablist" aria-label="Estado de las tareas">
               <button
@@ -628,7 +629,7 @@ onBeforeUnmount(() => clearInterval(reloj))
       titulo="Nueva tarea"
       :descripcion="
         claseActual
-          ? `${claseActual.areaNombre} · ${nombreClase(claseActual)} · ${cantidadAlumnos} ${cantidadAlumnos === 1 ? 'alumno recibirá' : 'alumnos recibirán'} la tarea`
+          ? `${claseActual.areaNombre} · ${formatearSeccionCompleta(claseActual.gradoNumero, claseActual.seccionCodigo)} · ${cantidadAlumnos} ${cantidadAlumnos === 1 ? 'alumno recibirá' : 'alumnos recibirán'} la tarea`
           : ''
       "
       :bloqueada="guardando"

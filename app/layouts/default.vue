@@ -4,6 +4,7 @@
 
     <div class="contenido-administrador">
       <BarraSuperiorAdministrador />
+      <BannerFechaSistema />
 
       <div class="zona-contenido">
         <slot />

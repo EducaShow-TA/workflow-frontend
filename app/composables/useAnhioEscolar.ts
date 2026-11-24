@@ -16,7 +16,7 @@ export function obtenerAnhio(fechaIso: string): number {
 
 /**
  * Año escolar que deben mostrar las pantallas de matrícula y vacantes, sin años fijos en el código:
- * 1) el de la fecha límite de la ventana de matrícula vigente o, si no hay, de la próxima;
+ * 1) el que matricula la ventana vigente o, si no hay, la próxima (lo calcula el backend);
  * 2) si no hay ventanas, el año más reciente que tenga periodos;
  * 3) si tampoco, el año del calendario.
  */
@@ -32,10 +32,29 @@ export function determinarAnhioEscolar(
   const ventana = vigente ?? proxima
 
   if (ventana) {
-    return obtenerAnhio(ventana.fechaLimite)
+    return ventana.anhioEscolar
   }
 
   return anhiosAbiertos.length > 0 ? Math.max(...anhiosAbiertos) : obtenerAnhio(fechaHoy)
+}
+
+/**
+ * Misma regla del backend, para anticipar el año al crear una ventana: si las clases del año en que
+ * empieza ya empezaron, la ventana es para el año siguiente.
+ */
+export function anticiparAnhioDeVentana(
+  inicioVentana: string,
+  periodos: Pick<PeriodoAcademico, 'fechaInicio'>[],
+): { anhio: number; inicioClases: string | null } {
+  const anhio = obtenerAnhio(inicioVentana)
+  const inicioClases =
+    periodos
+      .map((periodo) => periodo.fechaInicio)
+      .filter((fecha) => obtenerAnhio(fecha) === anhio)
+      .sort()[0] ?? null
+  return inicioClases && inicioClases <= inicioVentana
+    ? { anhio: anhio + 1, inicioClases }
+    : { anhio, inicioClases: null }
 }
 
 export function obtenerAnhiosAbiertos(periodos: PeriodoAcademico[]): number[] {
@@ -106,6 +125,7 @@ export function convertirEnSecciones(periodosDelAnhio: PeriodoAcademico[]): Secc
         nombre: periodo.seccion,
         vacantesTotales: periodo.vacantesTotales,
         cantidadMatriculados: periodo.matriculasActivas,
+        porConfirmar: periodo.matriculasPendientes,
       })
     }
   }

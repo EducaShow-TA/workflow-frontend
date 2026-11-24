@@ -1,4 +1,5 @@
 import { useApi } from '~/composables/useApi'
+import { ahoraSistema } from '~/composables/useFechas'
 import { useAutenticacionStore } from '~/stores/autenticacion'
 import type { CuentaRegresivaTarea, GrupoTareasEstudiante, TareaEstudiante } from '~/types/tareaEstudiante'
 
@@ -43,7 +44,7 @@ function hora(fecha: Date): string {
 }
 
 /** "hoy, 23:59", "mañana, 18:00" o "vie 21 nov, 18:00". */
-export function formatearFechaTarea(valor: string, ahora: Date = new Date()): string {
+export function formatearFechaTarea(valor: string, ahora: Date = ahoraSistema()): string {
   const fecha = aFecha(valor)
   const dias = diasCalendario(ahora, fecha)
   if (dias === 0) return `hoy, ${hora(fecha)}`
@@ -62,7 +63,7 @@ export function formatearFechaLargaTarea(valor: string): string {
 }
 
 /** Cuenta regresiva: horas el mismo día, "Mañana", días hasta una semana y luego "Vence en N días". */
-export function cuentaRegresivaTarea(valor: string, ahora: Date = new Date()): CuentaRegresivaTarea {
+export function cuentaRegresivaTarea(valor: string, ahora: Date = ahoraSistema()): CuentaRegresivaTarea {
   const fecha = aFecha(valor)
   const restante = fecha.getTime() - ahora.getTime()
   if (restante < 0) return { texto: 'Vencida', nivel: 'vencida' }
@@ -80,7 +81,10 @@ export function cuentaRegresivaTarea(valor: string, ahora: Date = new Date()): C
 }
 
 /** Agrupa las tareas por entregar en "Vence hoy", "Esta semana" y "Más adelante". */
-export function agruparTareasPorEntregar(tareas: TareaEstudiante[], ahora: Date = new Date()): GrupoTareasEstudiante[] {
+export function agruparTareasPorEntregar(
+  tareas: TareaEstudiante[],
+  ahora: Date = ahoraSistema(),
+): GrupoTareasEstudiante[] {
   const grupos: GrupoTareasEstudiante[] = [
     { cercania: 'hoy', titulo: 'Vence hoy', tareas: [] },
     { cercania: 'semana', titulo: 'Esta semana', tareas: [] },

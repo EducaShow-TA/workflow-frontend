@@ -10,7 +10,6 @@ import type { PeriodoAcademico } from '~/types/periodoAcademico'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
 import { useEstudiantesMatriculables } from '~/composables/useEstudiantesMatriculables'
 import { useMatriculas } from '~/composables/useMatriculas'
-import { obtenerAnhio } from '~/composables/useAnhioEscolar'
 import { usePeriodoMatricula } from '~/composables/usePeriodoMatricula'
 import { usePeriodosAcademicos } from '~/composables/usePeriodosAcademicos'
 import { ErrorSolicitudApi } from '~/types/api'
@@ -35,12 +34,13 @@ const aviso = ref('')
 const avisoSeleccion = ref('')
 const confirmacionExitosa = ref(false)
 const modalCompromisoAbierto = ref(false)
+const avisoPendientes = ref('')
 const errorCompromiso = ref('')
 const incidenciasCompromiso = ref<IncidenciaConfirmacionMatricula[]>([])
 const seleccionPendientes = ref<number[]>([])
 const estudiantesSeleccionados = ref<number[]>([])
 
-const anhioMatricula = computed(() => (ventanaVigente.value ? obtenerAnhio(ventanaVigente.value.fechaLimite) : null))
+const anhioMatricula = computed(() => ventanaVigente.value?.anhioEscolar ?? null)
 const grados = computed(() => [...new Set(periodos.value.map((periodo) => periodo.numeroGrado))].sort((a, b) => a - b))
 const periodosDelGrado = computed(() =>
   periodos.value.filter((periodo) => periodo.numeroGrado === gradoSeleccionado.value),
@@ -89,6 +89,7 @@ const resultadosBusqueda = computed(() => {
 const vacantesDisponibles = computed(() => periodoSeleccionado.value?.vacantesDisponibles ?? 0)
 const capacidadMaxima = computed(() => periodoSeleccionado.value?.vacantesTotales ?? 0)
 const matriculados = computed(() => periodoSeleccionado.value?.matriculasActivas ?? 0)
+const porConfirmar = computed(() => periodoSeleccionado.value?.matriculasPendientes ?? 0)
 const ocupacion = computed(() =>
   capacidadMaxima.value > 0 ? Math.min(100, Math.round((matriculados.value / capacidadMaxima.value) * 100)) : 0,
 )
@@ -118,12 +119,14 @@ const disponiblesSinAgregar = computed(() =>
     (estudiante) => !estudiantesSeleccionados.value.includes(estudiante.estudianteId),
   ),
 )
-const seccionCorta = computed(() =>
-  periodoSeleccionado.value ? `${periodoSeleccionado.value.numeroGrado}.° ${periodoSeleccionado.value.seccion}` : '',
+const nombreSeccionDestino = computed(() =>
+  periodoSeleccionado.value
+    ? formatearSeccionCompleta(periodoSeleccionado.value.numeroGrado, periodoSeleccionado.value.seccion)
+    : '',
 )
 const destinoConfirmacion = computed(() =>
   periodoSeleccionado.value
-    ? `${periodoSeleccionado.value.numeroGrado}.° ${periodoSeleccionado.value.seccion} · año escolar ${anhioMatricula.value ?? ''}`
+    ? `${formatearSeccionCompleta(periodoSeleccionado.value.numeroGrado, periodoSeleccionado.value.seccion)} · año escolar ${anhioMatricula.value ?? ''}`
     : '',
 )
 
@@ -234,10 +237,7 @@ async function cargarDatos(): Promise<void> {
       return
     }
 
-    const [estudiantesCargados, periodosCargados] = await Promise.all([
-      listar(),
-      listarPorAnhio(obtenerAnhio(vigente.fechaLimite)),
-    ])
+    const [estudiantesCargados, periodosCargados] = await Promise.all([listar(), listarPorAnhio(vigente.anhioEscolar)])
     estudiantes.value = estudiantesCargados
     periodos.value = periodosCargados
     gradoSeleccionado.value = periodosCargados.some((periodo) => periodo.numeroGrado === 1)
@@ -267,10 +267,13 @@ async function registrarSeleccion(): Promise<void> {
   avisoSeleccion.value = ''
   confirmacionExitosa.value = false
   try {
-    const resultados = await registrarMasivamente(periodoSeleccionado.value.periodoId, estudiantesSeleccionados.value)
+    const registrados = [...estudiantesSeleccionados.value]
+    await registrarMasivamente(periodoSeleccionado.value.periodoId, registrados)
     estudiantesSeleccionados.value = []
     await cargarDatos()
-    aviso.value = `Se registraron ${resultados.length} matrículas en la sección seleccionada; quedan pendientes de confirmación.`
+    seleccionPendientes.value = registrados
+    errorCompromiso.value = ''
+    modalCompromisoAbierto.value = true
   } catch (fallo: unknown) {
     error.value = obtenerMensajeError(fallo, 'No se pudieron registrar las matrículas seleccionadas.')
   } finally {
@@ -299,6 +302,7 @@ async function confirmarSeleccion(compromiso: SolicitudCompromisoPago): Promise<
     modalCompromisoAbierto.value = false
     seleccionPendientes.value = []
     incidenciasCompromiso.value = []
+    avisoPendientes.value = ''
     await cargarDatos()
     aviso.value =
       resultados.length === 1
@@ -319,6 +323,13 @@ async function confirmarSeleccion(compromiso: SolicitudCompromisoPago): Promise<
   } finally {
     guardando.value = false
   }
+}
+
+function cerrarCompromiso(): void {
+  modalCompromisoAbierto.value = false
+  const cantidad = seleccionPendientes.value.length
+  if (!cantidad) return
+  avisoPendientes.value = `${cantidad === 1 ? 'Quedó 1 matrícula' : `Quedaron ${cantidad} matrículas`} sin confirmar. Reservan su vacante, pero no aparecen en tareas, asistencia ni notas hasta que confirmes su compromiso de pago.`
 }
 
 async function cancelar(): Promise<void> {
@@ -360,7 +371,7 @@ onMounted(cargarDatos)
           <div class="campo">
             <label for="grado-matricula">Grado</label>
             <select id="grado-matricula" v-model.number="gradoSeleccionado">
-              <option v-for="grado in grados" :key="grado" :value="grado">{{ grado }}.° de secundaria</option>
+              <option v-for="grado in grados" :key="grado" :value="grado">{{ formatearGrado(grado) }}</option>
             </select>
           </div>
           <div class="campo">
@@ -381,12 +392,13 @@ onMounted(cargarDatos)
             :aria-valuenow="ocupacion"
             aria-valuemin="0"
             aria-valuemax="100"
-            :aria-label="`Ocupación de ${seccionCorta}`"
+            :aria-label="`Ocupación de ${nombreSeccionDestino}`"
           >
             <div class="avance-progreso" :class="estadoCupos" :style="{ width: `${ocupacion}%` }" />
           </div>
           <p class="resumen-cupos" role="status" aria-live="polite">
-            <strong>{{ matriculados }}</strong> de {{ capacidadMaxima }} matriculados ·
+            <strong>{{ matriculados - porConfirmar }}</strong> de {{ capacidadMaxima }} matriculados
+            <template v-if="porConfirmar"> · {{ porConfirmar }} por confirmar</template> ·
             <strong>{{ vacantesDisponibles }}</strong> vacantes
           </p>
           <p v-if="estadoCupos !== 'disponible'" class="mensaje-disponibilidad" :class="estadoCupos">
@@ -399,7 +411,8 @@ onMounted(cargarDatos)
     <section class="tarjeta" aria-labelledby="titulo-estudiante">
       <div class="encabezado-tarjeta">
         <h2 id="titulo-estudiante">
-          <span class="numero-paso" aria-hidden="true">2</span>Estudiantes para {{ seccionCorta || 'la sección' }}
+          <span class="numero-paso" aria-hidden="true">2</span>Estudiantes para
+          {{ nombreSeccionDestino || 'la sección' }}
         </h2>
         <p>Busca por nombre, apellido o DNI, o agrega a todos los disponibles hasta completar las vacantes.</p>
       </div>
@@ -479,7 +492,7 @@ onMounted(cargarDatos)
               :disabled="guardando || !estudiantesSeleccionados.length"
               @click="registrarSeleccion"
             >
-              {{ guardando ? 'Registrando...' : `Registrar seleccionados (${estudiantesSeleccionados.length})` }}
+              {{ guardando ? 'Matriculando...' : `Matricular seleccionados (${estudiantesSeleccionados.length})…` }}
             </button>
           </div>
         </div>
@@ -494,16 +507,22 @@ onMounted(cargarDatos)
       <AvisoMensaje :mensaje="aviso" tipo="exito" />
       <NuxtLink v-if="confirmacionExitosa" to="/finanzas" class="enlace-finanzas">Ver boletas en Finanzas →</NuxtLink>
     </div>
+    <AvisoMensaje
+      v-if="avisoPendientes && pendientesDeConfirmacion.length"
+      :mensaje="avisoPendientes"
+      tipo="advertencia"
+    />
     <section v-if="pendientesDeConfirmacion.length" class="tarjeta" aria-labelledby="titulo-pendientes">
       <div class="encabezado-tarjeta">
         <h2 id="titulo-pendientes">
           <span class="numero-paso" aria-hidden="true">3</span>Pendientes de confirmación en
-          {{ seccionCorta || 'la sección' }}
+          {{ nombreSeccionDestino || 'la sección' }}
         </h2>
       </div>
       <div class="contenido-tarjeta">
         <p class="ayuda-pendientes">
-          Al confirmar se definen los términos del compromiso de pago y se emite la primera boleta.
+          Reservan su vacante, pero todavía no aparecen en tareas, asistencia ni notas. Al confirmar se definen los
+          términos del compromiso de pago y se emite la primera boleta.
         </p>
         <button type="button" class="boton-agregar" :disabled="guardando" @click="alternarSeleccionPendientes">
           {{ todosPendientesSeleccionados ? 'Quitar selección' : 'Seleccionar todos' }}
@@ -563,7 +582,7 @@ onMounted(cargarDatos)
       :error="errorCompromiso"
       :incidencias="incidenciasCompromiso"
       @confirmar="confirmarSeleccion"
-      @cerrar="modalCompromisoAbierto = false"
+      @cerrar="cerrarCompromiso"
     />
   </main>
 </template>
