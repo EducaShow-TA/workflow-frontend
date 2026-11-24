@@ -26,7 +26,7 @@ const autenticacion = useAutenticacionStore()
 const panel = ref<PanelAdministrador | null>(null)
 const cargando = ref(true)
 const error = ref('')
-const ahora = ref(new Date())
+const ahora = ref(ahoraSistema())
 
 const accesos = [
   {
@@ -141,7 +141,7 @@ async function cargar(): Promise<void> {
   error.value = ''
   try {
     panel.value = await api.consultar()
-    ahora.value = new Date()
+    ahora.value = ahoraSistema()
   } catch (causa) {
     error.value = obtenerMensajeError(causa, 'No se pudo cargar el resumen del colegio.')
   } finally {

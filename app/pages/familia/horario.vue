@@ -19,7 +19,7 @@ const ruta = useRoute()
 const { listarHijos, consultarHorario } = usePortalFamilia()
 const hijos = ref<HijoVinculado[]>([])
 const estudianteId = ref<number | ''>('')
-const anio = ref(new Date().getFullYear())
+const anio = ref(ahoraSistema().getFullYear())
 const sesiones = ref<HorarioEstudiante[]>([])
 const cargandoHijos = ref(true)
 const cargando = ref(false)
@@ -101,8 +101,8 @@ async function cargarHijos(): Promise<void> {
       ? indicado
       : (hijos.value[0]?.estudianteId ?? '')
     if (anios.value.length && !anios.value.includes(anio.value)) {
-      anio.value = anios.value.includes(new Date().getFullYear())
-        ? new Date().getFullYear()
+      anio.value = anios.value.includes(ahoraSistema().getFullYear())
+        ? ahoraSistema().getFullYear()
         : (anios.value.at(-1) ?? anio.value)
     }
   } catch (fallo: unknown) {

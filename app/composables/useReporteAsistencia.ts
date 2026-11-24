@@ -1,4 +1,5 @@
 import { useApi } from '~/composables/useApi'
+import { ahoraSistema } from '~/composables/useFechas'
 import { useAutenticacionStore } from '~/stores/autenticacion'
 import type { FiltrosReporteAsistencia, ReporteAsistencia, SeccionReporteAsistencia } from '~/types/reporteAsistencia'
 
@@ -11,7 +12,7 @@ function fechaLocal(fecha: Date): string {
 }
 
 /** Valor inicial del filtro: del primer día del mes en curso a hoy (no es una regla de negocio). */
-export function crearFiltrosReporteAsistencia(hoy: Date = new Date()): FiltrosReporteAsistencia {
+export function crearFiltrosReporteAsistencia(hoy: Date = ahoraSistema()): FiltrosReporteAsistencia {
   return {
     desde: fechaLocal(new Date(hoy.getFullYear(), hoy.getMonth(), 1)),
     hasta: fechaLocal(hoy),

@@ -4,6 +4,18 @@ const FORMATO_FECHA_ISO = /^\d{4}-\d{2}-\d{2}$/
 
 const MILISEGUNDOS_POR_DIA = 24 * 60 * 60 * 1000
 
+let desfaseSistemaMs = 0
+
+/** Diferencia entre la fecha del sistema (que el administrador puede simular para una demostración) y la del navegador. */
+export function fijarDesfaseSistema(milisegundos: number): void {
+  desfaseSistemaMs = Number.isFinite(milisegundos) ? milisegundos : 0
+}
+
+/** Fecha y hora con las que trabaja el sistema; coincide con la del navegador salvo que se simule otra. */
+export function ahoraSistema(): Date {
+  return new Date(Date.now() + desfaseSistemaMs)
+}
+
 export function esFechaIsoValida(valor: string): boolean {
   if (!FORMATO_FECHA_ISO.test(valor)) {
     return false
@@ -16,7 +28,7 @@ export function esFechaIsoValida(valor: string): boolean {
 }
 
 /** Fecha local de hoy en formato yyyy-MM-dd. No se usa toISOString() porque convierte a UTC y en Lima cambia el dia. */
-export function obtenerFechaHoyIso(fecha: Date = new Date()): string {
+export function obtenerFechaHoyIso(fecha: Date = ahoraSistema()): string {
   const anhio = fecha.getFullYear()
   const mes = String(fecha.getMonth() + 1).padStart(2, '0')
   const dia = String(fecha.getDate()).padStart(2, '0')

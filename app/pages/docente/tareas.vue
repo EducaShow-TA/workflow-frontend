@@ -58,7 +58,7 @@ const vista = ref<'vigentes' | 'vencidas'>('vigentes')
 const modalAbierto = ref(false)
 const entregasAbiertas = ref(new Set<number>())
 const consignasCompletas = ref(new Set<number>())
-const ahora = ref(new Date())
+const ahora = ref(ahoraSistema())
 let reloj: ReturnType<typeof setInterval> | undefined
 const cursos = computed(() =>
   [...new Map(clases.value.map((clase) => [clase.areaCodigo, clase.areaNombre])).entries()].sort((a, b) =>
@@ -371,7 +371,7 @@ function alGuardarVentana(resultado: { tarea: Tarea | null }): void {
 onMounted(() => {
   void cargarClases()
   reloj = setInterval(() => {
-    ahora.value = new Date()
+    ahora.value = ahoraSistema()
   }, 60_000)
 })
 onBeforeUnmount(() => clearInterval(reloj))

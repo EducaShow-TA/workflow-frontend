@@ -7,6 +7,7 @@ import '~/assets/css/docente.css'
     <BarraLateralFamilia />
     <div class="portal-docente__contenido">
       <BarraSuperiorFamilia />
+      <BannerFechaSistema />
       <div class="portal-docente__pagina">
         <slot />
       </div>

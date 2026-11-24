@@ -34,6 +34,7 @@ const NOMBRES_PAGINA: [string, string][] = [
   ['/usuarios', 'Usuarios'],
   ['/roles-permisos', 'Roles y permisos'],
   ['/logs-sistema', 'Logs del sistema'],
+  ['/parametros-sistema', 'Parámetros del sistema'],
   ['/sesiones-clase', 'Sesiones de clase'],
   ['/asistencia-docentes', 'Asistencia docente'],
   ['/finanzas', 'Finanzas'],
