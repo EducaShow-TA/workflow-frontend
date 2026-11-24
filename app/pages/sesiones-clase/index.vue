@@ -56,7 +56,7 @@ const INSIGNIAS: Record<SituacionSesion, { texto: string; variante: VarianteInsi
 }
 
 function etiquetaSeccion(seccion: Seccion): string {
-  return `${seccion.gradoNumero}.° ${seccion.nombre}`
+  return formatearSeccionCompleta(seccion.gradoNumero, seccion.nombre)
 }
 
 async function cargarSesiones(): Promise<void> {

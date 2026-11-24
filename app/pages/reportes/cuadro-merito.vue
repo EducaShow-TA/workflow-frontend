@@ -95,7 +95,10 @@ async function descargarArchivo(formato: FormatoCuadroMerito): Promise<void> {
 }
 
 function etiquetaPeriodo(periodo: PeriodoAcademico): string {
-  return `${periodo.numeroGrado}.° ${periodo.nivelEducativo.toLowerCase()} · Sección ${periodo.seccion} · ${periodo.fechaInicio.slice(0, 4)}`
+  return conAnhio(
+    formatearSeccionCompleta(periodo.numeroGrado, periodo.seccion, periodo.nivelEducativo),
+    periodo.fechaInicio.slice(0, 4),
+  )
 }
 
 onMounted(() => {
@@ -148,7 +151,7 @@ onUnmounted(() => {
       <div class="encabezado-resultados">
         <div>
           <h2 id="titulo-resultados">
-            {{ cuadro.gradoNumero }}.° {{ cuadro.nivelEducativo.toLowerCase() }} · Sección {{ cuadro.seccion }}
+            {{ formatearSeccionCompleta(cuadro.gradoNumero, cuadro.seccion, cuadro.nivelEducativo) }}
           </h2>
           <p>Año escolar {{ cuadro.anhioEscolar }} · Actas cerradas</p>
         </div>

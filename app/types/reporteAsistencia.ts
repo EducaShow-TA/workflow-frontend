@@ -11,6 +11,7 @@ export interface FilaReporteAsistencia extends TotalesAsistencia {
   estudianteId: number
   nombreCompleto: string
   gradoId: number
+  gradoNumero: number
   grado: string
   seccionId: number
   seccion: string
@@ -29,6 +30,7 @@ export interface SeccionReporteAsistencia {
   seccionId: number
   seccion: string
   gradoId: number
+  gradoNumero: number
   grado: string
 }
 

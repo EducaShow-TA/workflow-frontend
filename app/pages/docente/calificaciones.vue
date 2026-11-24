@@ -115,7 +115,7 @@ const alumnosFiltrados = computed(() => {
 const pendientes = computed(() => alumnos.value.filter((alumno) => !notaPorMatricula.value.has(alumno.matriculaId)))
 const contexto = computed(() =>
   clase.value && competencia.value
-    ? `${clase.value.areaNombre} ${nombreClase(clase.value)} · ${competencia.value.nombre}`
+    ? `${clase.value.areaNombre} · ${formatearSeccionCompleta(clase.value.gradoNumero, clase.value.seccionCodigo)} · ${competencia.value.nombre}`
     : '',
 )
 const haySiguiente = computed(() =>
@@ -497,7 +497,10 @@ onMounted(async () => {
 
       <section v-if="clase" class="docente-tarjeta" :aria-busy="cargandoClase" aria-labelledby="titulo-clase">
         <div class="docente-tarjeta__titulo docente-tarjeta__titulo--wrap">
-          <h2 id="titulo-clase">{{ clase.areaNombre }} · {{ nombreClase(clase) }} · {{ clase.anhio }}</h2>
+          <h2 id="titulo-clase">
+            {{ clase.areaNombre }} · {{ formatearSeccionCompleta(clase.gradoNumero, clase.seccionCodigo) }} ·
+            {{ clase.anhio }}
+          </h2>
           <button
             v-if="!modoParcial"
             type="button"

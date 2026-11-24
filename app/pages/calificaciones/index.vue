@@ -104,7 +104,10 @@ const competenciaSeleccionada = computed(() =>
 const totalCalificados = computed(() => calificaciones.value.length)
 
 function descripcionPeriodo(periodo: PeriodoAcademico): string {
-  return `${periodo.numeroGrado}.° ${periodo.nivelEducativo} — Sección ${periodo.seccion} (${periodo.fechaInicio.slice(0, 4)})`
+  return conAnhio(
+    formatearSeccionCompleta(periodo.numeroGrado, periodo.seccion, periodo.nivelEducativo),
+    periodo.fechaInicio.slice(0, 4),
+  )
 }
 function formatearFecha(fecha: string): string {
   const valor = new Date(fecha)

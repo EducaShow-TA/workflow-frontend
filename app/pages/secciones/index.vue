@@ -227,7 +227,7 @@ const tituloResumen = computed(() =>
 )
 
 function describirSeccion(seccion: Pick<Seccion, 'gradoNumero' | 'nombre'>): string {
-  return `${obtenerNombreGrado(seccion.gradoNumero)} – Sección ${seccion.nombre}`
+  return formatearSeccionCompleta(seccion.gradoNumero, seccion.nombre)
 }
 
 // Edicion de la capacidad maxima (US-1.7, criterio 2)

@@ -64,7 +64,9 @@ const filtrados = computed(() =>
 
 function nombreHijo(hijo: HijoVinculado): string {
   const periodo = periodoVigente(hijo, fechaHoy)
-  return periodo ? `${hijo.nombreCompleto} · ${periodo.gradoNumero}.° ${periodo.seccion}` : hijo.nombreCompleto
+  return periodo
+    ? `${hijo.nombreCompleto} · ${formatearSeccion(periodo.gradoNumero, periodo.seccion)}`
+    : hijo.nombreCompleto
 }
 
 function elegirAtajo(valor: AtajoRango): void {

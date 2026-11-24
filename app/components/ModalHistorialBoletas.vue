@@ -156,7 +156,7 @@ async function generar(): Promise<void> {
 
         <section v-for="matricula in historial.matriculas" :key="matricula.matriculaId" class="matricula">
           <h4>
-            {{ matricula.anio }} · {{ matricula.grado }}.º {{ matricula.seccion }}
+            {{ matricula.anio }} · {{ formatearSeccion(matricula.grado, matricula.seccion) }}
             <span v-if="matricula.estado === 'RETIRADA'" class="estado">Retirada</span>
           </h4>
           <p v-if="!matricula.compromiso" class="ayuda">Sin compromiso de pago</p>

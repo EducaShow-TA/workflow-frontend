@@ -1,3 +1,4 @@
+import { formatearSeccion } from '~/composables/useNombresSeccion'
 import { useApi } from '~/composables/useApi'
 import type { AlumnoClase, MiClase, NotaCualitativa, RiesgoAcademico } from '~/types/calificacion'
 
@@ -10,9 +11,9 @@ export const NOTAS: { valor: NotaCualitativa; descripcion: string }[] = [
   { valor: 'C', descripcion: 'En inicio' },
 ]
 
-/** "3.° A" a partir del grado y la sección de la clase. */
+/** "3.º A" a partir del grado y la sección de la clase. */
 export function nombreClase(clase: Pick<MiClase, 'gradoNumero' | 'seccionCodigo'>): string {
-  return `${clase.gradoNumero}.° ${clase.seccionCodigo}`
+  return formatearSeccion(clase.gradoNumero, clase.seccionCodigo)
 }
 
 export function claveClase(clase: Pick<MiClase, 'periodoId' | 'areaCodigo'>): string {

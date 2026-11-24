@@ -1,3 +1,4 @@
+import { formatearGrado } from '~/composables/useNombresSeccion'
 import { useApi } from '~/composables/useApi'
 import type { VarianteInsignia } from '~/types/interfaz'
 import type {
@@ -69,8 +70,7 @@ export function obtenerVarianteEstadoCupos(estado: EstadoCupos): VarianteInsigni
 
 /** Convierte Grado.numero en el texto usado en pantalla, igual que en la pantalla de matricula. */
 export function obtenerNombreGrado(gradoNumero: number): string {
-  const ordinales: Record<number, string> = { 1: '1ro', 2: '2do', 3: '3ro', 4: '4to', 5: '5to' }
-  return `${ordinales[gradoNumero] ?? `${gradoNumero}.º`} Secundaria`
+  return formatearGrado(gradoNumero)
 }
 
 function esEnteroPositivo(valor: number): boolean {
@@ -106,7 +106,7 @@ export function validarSeccion(solicitud: SolicitudSeccion, seccionesExistentes:
   const errores: ErroresSeccion = {}
 
   if (!(GRADOS_SECUNDARIA as readonly number[]).includes(solicitud.gradoNumero)) {
-    errores.gradoNumero = 'Selecciona un grado de 1ro a 5to de secundaria.'
+    errores.gradoNumero = 'Selecciona un grado del 1.º al 5.º de secundaria.'
   }
 
   if (!FORMATO_NOMBRE_SECCION.test(solicitud.nombre)) {

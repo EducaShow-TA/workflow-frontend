@@ -119,12 +119,14 @@ const disponiblesSinAgregar = computed(() =>
     (estudiante) => !estudiantesSeleccionados.value.includes(estudiante.estudianteId),
   ),
 )
-const seccionCorta = computed(() =>
-  periodoSeleccionado.value ? `${periodoSeleccionado.value.numeroGrado}.° ${periodoSeleccionado.value.seccion}` : '',
+const nombreSeccionDestino = computed(() =>
+  periodoSeleccionado.value
+    ? formatearSeccionCompleta(periodoSeleccionado.value.numeroGrado, periodoSeleccionado.value.seccion)
+    : '',
 )
 const destinoConfirmacion = computed(() =>
   periodoSeleccionado.value
-    ? `${periodoSeleccionado.value.numeroGrado}.° ${periodoSeleccionado.value.seccion} · año escolar ${anhioMatricula.value ?? ''}`
+    ? `${formatearSeccionCompleta(periodoSeleccionado.value.numeroGrado, periodoSeleccionado.value.seccion)} · año escolar ${anhioMatricula.value ?? ''}`
     : '',
 )
 
@@ -369,7 +371,7 @@ onMounted(cargarDatos)
           <div class="campo">
             <label for="grado-matricula">Grado</label>
             <select id="grado-matricula" v-model.number="gradoSeleccionado">
-              <option v-for="grado in grados" :key="grado" :value="grado">{{ grado }}.° de secundaria</option>
+              <option v-for="grado in grados" :key="grado" :value="grado">{{ formatearGrado(grado) }}</option>
             </select>
           </div>
           <div class="campo">
@@ -390,7 +392,7 @@ onMounted(cargarDatos)
             :aria-valuenow="ocupacion"
             aria-valuemin="0"
             aria-valuemax="100"
-            :aria-label="`Ocupación de ${seccionCorta}`"
+            :aria-label="`Ocupación de ${nombreSeccionDestino}`"
           >
             <div class="avance-progreso" :class="estadoCupos" :style="{ width: `${ocupacion}%` }" />
           </div>
@@ -409,7 +411,8 @@ onMounted(cargarDatos)
     <section class="tarjeta" aria-labelledby="titulo-estudiante">
       <div class="encabezado-tarjeta">
         <h2 id="titulo-estudiante">
-          <span class="numero-paso" aria-hidden="true">2</span>Estudiantes para {{ seccionCorta || 'la sección' }}
+          <span class="numero-paso" aria-hidden="true">2</span>Estudiantes para
+          {{ nombreSeccionDestino || 'la sección' }}
         </h2>
         <p>Busca por nombre, apellido o DNI, o agrega a todos los disponibles hasta completar las vacantes.</p>
       </div>
@@ -513,7 +516,7 @@ onMounted(cargarDatos)
       <div class="encabezado-tarjeta">
         <h2 id="titulo-pendientes">
           <span class="numero-paso" aria-hidden="true">3</span>Pendientes de confirmación en
-          {{ seccionCorta || 'la sección' }}
+          {{ nombreSeccionDestino || 'la sección' }}
         </h2>
       </div>
       <div class="contenido-tarjeta">

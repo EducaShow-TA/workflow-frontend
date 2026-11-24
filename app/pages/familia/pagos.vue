@@ -86,7 +86,9 @@ function sumar(boletas: BoletaFamilia[]): number {
 
 function describirHijo(item: PagosHijo): string {
   const reciente = item.compromisos[0]
-  return reciente ? `${item.nombreCompleto} · ${reciente.gradoNumero}.° ${reciente.seccion}` : item.nombreCompleto
+  return reciente
+    ? `${item.nombreCompleto} · ${formatearSeccion(reciente.gradoNumero, reciente.seccion)}`
+    : item.nombreCompleto
 }
 
 function alternarTodas(): void {

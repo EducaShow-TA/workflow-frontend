@@ -46,7 +46,7 @@ const periodoAnio = computed(
 )
 
 const nombreSeccion = computed(() =>
-  periodoAnio.value ? `${periodoAnio.value.gradoNumero}.° ${periodoAnio.value.seccion}` : '',
+  periodoAnio.value ? formatearSeccionCompleta(periodoAnio.value.gradoNumero, periodoAnio.value.seccion) : '',
 )
 
 const sesionesPorDia = computed(

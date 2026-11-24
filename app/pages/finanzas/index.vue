@@ -155,7 +155,8 @@ onMounted(async () => {
             >Período académico<select v-model="filtros.periodoId" :disabled="cargandoCatalogos || !!errorCatalogos">
               <option value="">Todos los períodos</option>
               <option v-for="periodo in periodos" :key="periodo.periodoId" :value="String(periodo.periodoId)">
-                {{ periodo.numeroGrado }}.º {{ periodo.seccion }} · {{ formatearFecha(periodo.fechaInicio) }} —
+                {{ formatearSeccionCompleta(periodo.numeroGrado, periodo.seccion) }} ·
+                {{ formatearFecha(periodo.fechaInicio) }} —
                 {{ formatearFecha(periodo.fechaFin) }}
               </option>
             </select></label
@@ -227,7 +228,7 @@ onMounted(async () => {
                 <td>
                   {{ boleta.estudiante }}<small>{{ boleta.apoderado }}</small>
                 </td>
-                <td>{{ boleta.grado }}.º / {{ boleta.seccion }}</td>
+                <td>{{ formatearSeccion(boleta.grado, boleta.seccion) }}</td>
                 <td>{{ boleta.mesCobro }}</td>
                 <td>{{ formatearFecha(boleta.fechaVencimiento) }}</td>
                 <td>

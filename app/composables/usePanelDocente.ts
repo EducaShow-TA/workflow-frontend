@@ -1,3 +1,4 @@
+import { formatearSeccion } from '~/composables/useNombresSeccion'
 import { ref } from 'vue'
 import { obtenerFechaHoyIso } from '~/composables/useFechas'
 import { useMiAsistenciaDocente } from '~/composables/useMiAsistenciaDocente'
@@ -244,7 +245,7 @@ export function listarPendientesDocente(panel: DatosPanelDocente, ahora = Date.n
       cantidad: abiertas.length,
       tono: 'rojo',
       titulo: abiertas.length === 1 ? 'Asistencia por tomar ahora' : 'Asistencias por tomar ahora',
-      detalle: `${primera.areaNombre} · ${primera.gradoNumero}.° ${primera.seccionCodigo} · hasta las ${horaDeMomento(primera.ventanaCierre)}`,
+      detalle: `${primera.areaNombre} · ${formatearSeccion(primera.gradoNumero, primera.seccionCodigo)} · hasta las ${horaDeMomento(primera.ventanaCierre)}`,
       enlace: 'Tomar',
       destino: abiertas.length === 1 ? `/docente/asistencia/${primera.id}` : '/docente/asistencia',
     })
@@ -311,7 +312,9 @@ export function buscarEnPanelDocente(panel: DatosPanelDocente | null, consulta: 
     }))
   if (soloNumeros) return alumnos
   const clases = (panel?.clases ?? [])
-    .filter((item) => incluye(`${item.nombre} ${item.clase.gradoNumero}° ${item.clase.seccionCodigo}`, criterio))
+    .filter((item) =>
+      incluye(`${item.nombre} ${formatearSeccion(item.clase.gradoNumero, item.clase.seccionCodigo)}`, criterio),
+    )
     .slice(0, 3)
     .map((item) => ({
       tipo: 'clase' as const,

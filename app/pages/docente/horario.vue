@@ -58,7 +58,7 @@ function hora(valor: string): string {
   return valor.slice(0, 5)
 }
 function descripcion(bloque: BloqueHorarioDocente): string {
-  return `${bloque.gradoNumero}.° Secundaria · Sección ${bloque.seccionCodigo}`
+  return formatearSeccionCompleta(bloque.gradoNumero, bloque.seccionCodigo)
 }
 async function cargar(): Promise<void> {
   cargando.value = true

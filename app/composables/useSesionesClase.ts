@@ -1,3 +1,4 @@
+import { formatearSeccion } from '~/composables/useNombresSeccion'
 import { useApi } from '~/composables/useApi'
 import { esFechaIsoValida } from '~/composables/useFechas'
 import type {
@@ -43,7 +44,7 @@ export function describirMomento(momento: string): string {
 }
 
 export function nombreSeccion(sesion: Pick<SesionClaseResumen, 'gradoNumero' | 'seccionCodigo'>): string {
-  return `${sesion.gradoNumero}.° ${sesion.seccionCodigo}`
+  return formatearSeccion(sesion.gradoNumero, sesion.seccionCodigo)
 }
 
 /** El back guarda horas locales sin zona; se comparan con la hora local del navegador. */
