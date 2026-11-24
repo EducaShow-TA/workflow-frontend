@@ -24,9 +24,9 @@ vi.mock('~/stores/autenticacion', () => ({
 const filtros: FiltrosReporteAsistencia = { desde: '2026-11-01', hasta: '2026-11-17', gradoId: null, seccionId: null }
 
 const secciones: SeccionReporteAsistencia[] = [
-  { seccionId: 7, seccion: 'A', gradoId: 3, grado: '3.° Secundaria' },
-  { seccionId: 8, seccion: 'B', gradoId: 3, grado: '3.° Secundaria' },
-  { seccionId: 9, seccion: 'A', gradoId: 4, grado: '4.° Secundaria' },
+  { seccionId: 7, seccion: 'A', gradoId: 3, gradoNumero: 3, grado: '3.º de secundaria' },
+  { seccionId: 8, seccion: 'B', gradoId: 3, gradoNumero: 3, grado: '3.º de secundaria' },
+  { seccionId: 9, seccion: 'A', gradoId: 4, gradoNumero: 4, grado: '4.º de secundaria' },
 ]
 
 function respuestaCsv(cabeceras: Record<string, string>, estado = 200, cuerpo: BodyInit = 'Alumno\r\n'): Response {
@@ -136,8 +136,8 @@ describe('reporte de asistencia US-2.6', () => {
     expect(seccionesDelGrado(secciones, 3).map((s) => s.seccionId)).toEqual([7, 8])
     expect(seccionesDelGrado(secciones, null)).toEqual(secciones)
     expect(gradosDisponibles(secciones)).toEqual([
-      { gradoId: 3, grado: '3.° Secundaria' },
-      { gradoId: 4, grado: '4.° Secundaria' },
+      { gradoId: 3, grado: '3.º de secundaria' },
+      { gradoId: 4, grado: '4.º de secundaria' },
     ])
   })
 

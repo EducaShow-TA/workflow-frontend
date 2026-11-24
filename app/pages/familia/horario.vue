@@ -48,7 +48,7 @@ const periodoAnio = computed(
       .sort((a, b) => b.fechaInicio.localeCompare(a.fechaInicio))[0] ?? null,
 )
 const nombreSeccion = computed(() =>
-  periodoAnio.value ? `${periodoAnio.value.gradoNumero}.° ${periodoAnio.value.seccion}` : '',
+  periodoAnio.value ? formatearSeccionCompleta(periodoAnio.value.gradoNumero, periodoAnio.value.seccion) : '',
 )
 const sesionesPorDia = computed(
   () =>
@@ -173,7 +173,9 @@ onUnmounted(() => {
             <div>
               <h3>{{ sesion.areaNombre }}</h3>
               <p>{{ sesion.docenteNombre }}</p>
-              <small>Aula {{ sesion.aulaCodigo }} · {{ sesion.gradoNumero }}.° {{ sesion.seccionCodigo }}</small>
+              <small
+                >Aula {{ sesion.aulaCodigo }} · {{ formatearSeccion(sesion.gradoNumero, sesion.seccionCodigo) }}</small
+              >
             </div>
           </article>
         </section>

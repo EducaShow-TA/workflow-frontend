@@ -1,3 +1,4 @@
+import { formatearSeccion } from '~/composables/useNombresSeccion'
 import { useApi } from '~/composables/useApi'
 import { normalizarParaComparar } from '~/composables/useCompetencias'
 import type { RespuestaPagina } from '~/types/matricula'
@@ -201,7 +202,9 @@ export function useBusquedaAdministrador() {
     aulas ??= solicitar<PeriodoBusquedaApi[]>('/api/v1/periodos')
       .then(
         (periodos) =>
-          new Map(periodos.map((periodo) => [periodo.periodoId, `${periodo.numeroGrado}.° ${periodo.seccion}`])),
+          new Map(
+            periodos.map((periodo) => [periodo.periodoId, formatearSeccion(periodo.numeroGrado, periodo.seccion)]),
+          ),
       )
       .catch(() => {
         aulas = null

@@ -127,7 +127,7 @@ function resumenMes(m: CobranzaMesPanel): string {
 }
 
 function nombreGrado(g: OcupacionGradoPanel): string {
-  return `${g.grado}.° ${g.nivelEducativo.toLowerCase()}`
+  return formatearGrado(g.grado, g.nivelEducativo)
 }
 
 function tonoOcupacion(g: OcupacionGradoPanel): string {

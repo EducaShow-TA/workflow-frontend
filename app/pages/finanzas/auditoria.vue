@@ -70,7 +70,7 @@ const secciones = computed(() =>
 )
 
 function nombrarGrado(numero: number, nivel: string): string {
-  return `${numero}.° de ${nivel.toLowerCase()}`
+  return formatearGrado(numero, nivel)
 }
 
 function claseAccion(evento: EventoAuditoriaFinanciera): string {
@@ -355,7 +355,7 @@ onUnmounted(() => {
                 </td>
                 <td>
                   <strong>{{ evento.estudianteNombre }}</strong>
-                  <small>{{ evento.gradoNumero }}.° grado · {{ evento.seccionCodigo }}</small>
+                  <small>{{ formatearSeccion(evento.gradoNumero, evento.seccionCodigo) }}</small>
                   <small>Apoderado: {{ evento.apoderadoNombre }}</small>
                 </td>
                 <td>
@@ -442,8 +442,8 @@ onUnmounted(() => {
         <dd>
           {{ seleccionado.estudianteNombre }}
           <small
-            >DNI {{ seleccionado.estudianteDni }} · {{ seleccionado.gradoNumero }}.° grado · Sección
-            {{ seleccionado.seccionCodigo }}</small
+            >DNI {{ seleccionado.estudianteDni }} ·
+            {{ formatearSeccionCompleta(seleccionado.gradoNumero, seleccionado.seccionCodigo) }}</small
           >
         </dd>
         <dt>Apoderado titular</dt>

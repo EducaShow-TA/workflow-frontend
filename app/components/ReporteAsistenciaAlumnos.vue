@@ -167,7 +167,7 @@ onMounted(async () => {
             <select v-model="filtros.seccionId" :disabled="!!errorCatalogo">
               <option :value="null">Todas las secciones</option>
               <option v-for="seccion in seccionesFiltradas" :key="seccion.seccionId" :value="seccion.seccionId">
-                {{ seccion.seccion }} · {{ seccion.grado }}
+                {{ formatearSeccionCompleta(seccion.gradoNumero, seccion.seccion) }}
               </option>
             </select>
           </label>
@@ -272,7 +272,7 @@ onMounted(async () => {
                   :class="{ 'fila--riesgo': alumno.porcentajeInasistencia >= UMBRAL_RESALTADO }"
                 >
                   <td>{{ alumno.nombreCompleto }}</td>
-                  <td>{{ alumno.grado }} / {{ alumno.seccion }}</td>
+                  <td>{{ formatearSeccion(alumno.gradoNumero, alumno.seccion) }}</td>
                   <td class="numero">{{ alumno.presentes }}</td>
                   <td class="numero">{{ alumno.tardanzas }}</td>
                   <td class="numero">{{ alumno.inasistencias }}</td>

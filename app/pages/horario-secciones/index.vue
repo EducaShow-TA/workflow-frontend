@@ -57,7 +57,7 @@ const coloresArea = computed(() => {
 })
 
 function nombreSeccion(item: Seccion): string {
-  return `${item.gradoNumero}.° ${item.nombre}`
+  return formatearSeccionCompleta(item.gradoNumero, item.nombre)
 }
 
 function franja(bloque: BloqueGrilla): string {

@@ -99,7 +99,7 @@ onMounted(cargar)
         </div>
         <div>
           <dt>Grado y sección</dt>
-          <dd>{{ boleta.grado }}.º / {{ boleta.seccion }}</dd>
+          <dd>{{ formatearSeccion(boleta.grado, boleta.seccion) }}</dd>
         </div>
         <div>
           <dt>Mes de cobro</dt>

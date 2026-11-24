@@ -53,7 +53,7 @@ const resumenFiltros = computed(() => {
   const grado = grados.value.find((opcion) => String(opcion.id) === aplicados.gradoId)
   const periodo = periodos.value.find((opcion) => String(opcion.seccionId) === aplicados.seccionId)
   return [
-    grado ? `${grado.numero}.º de secundaria` : 'Todos los grados',
+    grado ? formatearGrado(grado.numero) : 'Todos los grados',
     periodo ? `Sección ${periodo.seccion}` : 'Todas las secciones',
     aplicados.estado === 'PENDIENTE'
       ? 'Pendientes'
@@ -167,7 +167,7 @@ onMounted(async () => {
             <select v-model="filtros.gradoId" :disabled="cargandoCatalogo || !!errorCatalogo">
               <option value="">Todos los grados</option>
               <option v-for="grado in grados" :key="grado.id" :value="String(grado.id)">
-                {{ grado.numero }}.º de secundaria
+                {{ formatearGrado(grado.numero) }}
               </option>
             </select>
           </label>
@@ -176,7 +176,7 @@ onMounted(async () => {
             <select v-model="filtros.seccionId" :disabled="cargandoCatalogo || !!errorCatalogo">
               <option value="">Todas las secciones</option>
               <option v-for="seccion in secciones" :key="seccion.id" :value="String(seccion.id)">
-                {{ seccion.nombre }} · {{ seccion.grado }}.º de secundaria
+                {{ formatearSeccionCompleta(seccion.grado, seccion.nombre) }}
               </option>
             </select>
           </label>
@@ -290,7 +290,7 @@ onMounted(async () => {
                   <td>#{{ boleta.id }}</td>
                   <td>{{ boleta.estudiante }}</td>
                   <td>{{ boleta.apoderado }}</td>
-                  <td>{{ boleta.grado }}.º / {{ boleta.seccion }}</td>
+                  <td>{{ formatearSeccion(boleta.grado, boleta.seccion) }}</td>
                   <td>{{ boleta.mesCobro }}</td>
                   <td>{{ formatearFecha(boleta.fechaVencimiento) }}</td>
                   <td>

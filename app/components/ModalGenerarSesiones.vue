@@ -98,7 +98,7 @@ const progreso = computed(() =>
 )
 
 function nombre(periodo: PeriodoAcademico): string {
-  return `${periodo.numeroGrado}.° ${periodo.seccion}`
+  return formatearSeccionCompleta(periodo.numeroGrado, periodo.seccion)
 }
 
 function enlaceHorario(periodo: PeriodoAcademico): string {
