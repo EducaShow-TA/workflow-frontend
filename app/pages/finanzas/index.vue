@@ -29,11 +29,16 @@ const totalBoletas = ref(0)
 const visibles = computed(() => boletas.value)
 const boletaManualAbierta = ref(false)
 const avisoBoletaManual = ref('')
+const historialAbierto = ref(false)
+
+async function recargar(): Promise<void> {
+  await Promise.all([cargarCatalogos(), consultar()])
+}
 
 async function alGenerarBoletaManual(boleta: BoletaPension): Promise<void> {
   boletaManualAbierta.value = false
   avisoBoletaManual.value = `Se generó la boleta #${boleta.id} de ${boleta.estudiante} para ${boleta.mesCobro} (manual).`
-  await Promise.all([cargarCatalogos(), consultar()])
+  await recargar()
 }
 
 async function cargarCatalogos(): Promise<void> {
@@ -104,7 +109,12 @@ onMounted(async () => {
         <h1>Boletas de pensiones</h1>
         <p>Consulta las boletas generadas, registra pagos recibidos y revisa el reporte de cobranza.</p>
       </div>
-      <button type="button" class="boton primario" @click="boletaManualAbierta = true">+ Generar boleta manual</button>
+      <div class="acciones-encabezado">
+        <button type="button" class="boton" @click="historialAbierto = true">Generar historial</button>
+        <button type="button" class="boton primario" @click="boletaManualAbierta = true">
+          + Generar boleta manual
+        </button>
+      </div>
     </header>
     <AvisoMensaje
       v-if="avisoBoletaManual"
@@ -119,6 +129,7 @@ onMounted(async () => {
       @cerrar="boletaManualAbierta = false"
       @generada="alGenerarBoletaManual"
     />
+    <ModalHistorialBoletas :abierta="historialAbierto" @cerrar="historialAbierto = false" @actualizada="recargar" />
     <section class="tarjeta" aria-labelledby="filtros-boletas">
       <h2 id="filtros-boletas">Consultar boletas</h2>
       <p class="ayuda">
@@ -269,6 +280,11 @@ header {
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
+}
+.acciones-encabezado {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 h1 {
   font-size: 28px;
