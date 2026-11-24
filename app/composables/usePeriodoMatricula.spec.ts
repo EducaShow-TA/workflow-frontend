@@ -8,6 +8,7 @@ const periodoExistente: PeriodoMatricula = {
   fechaLimite: '2026-10-31',
   estado: 'VIGENTE',
   tieneMatriculas: false,
+  anhioEscolar: 2027,
 }
 
 describe('lógica de períodos de matrícula', () => {

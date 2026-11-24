@@ -10,7 +10,6 @@ import type { PeriodoAcademico } from '~/types/periodoAcademico'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
 import { useEstudiantesMatriculables } from '~/composables/useEstudiantesMatriculables'
 import { useMatriculas } from '~/composables/useMatriculas'
-import { obtenerAnhio } from '~/composables/useAnhioEscolar'
 import { usePeriodoMatricula } from '~/composables/usePeriodoMatricula'
 import { usePeriodosAcademicos } from '~/composables/usePeriodosAcademicos'
 import { ErrorSolicitudApi } from '~/types/api'
@@ -41,7 +40,7 @@ const incidenciasCompromiso = ref<IncidenciaConfirmacionMatricula[]>([])
 const seleccionPendientes = ref<number[]>([])
 const estudiantesSeleccionados = ref<number[]>([])
 
-const anhioMatricula = computed(() => (ventanaVigente.value ? obtenerAnhio(ventanaVigente.value.fechaLimite) : null))
+const anhioMatricula = computed(() => ventanaVigente.value?.anhioEscolar ?? null)
 const grados = computed(() => [...new Set(periodos.value.map((periodo) => periodo.numeroGrado))].sort((a, b) => a - b))
 const periodosDelGrado = computed(() =>
   periodos.value.filter((periodo) => periodo.numeroGrado === gradoSeleccionado.value),
@@ -236,10 +235,7 @@ async function cargarDatos(): Promise<void> {
       return
     }
 
-    const [estudiantesCargados, periodosCargados] = await Promise.all([
-      listar(),
-      listarPorAnhio(obtenerAnhio(vigente.fechaLimite)),
-    ])
+    const [estudiantesCargados, periodosCargados] = await Promise.all([listar(), listarPorAnhio(vigente.anhioEscolar)])
     estudiantes.value = estudiantesCargados
     periodos.value = periodosCargados
     gradoSeleccionado.value = periodosCargados.some((periodo) => periodo.numeroGrado === 1)
