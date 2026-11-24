@@ -43,3 +43,48 @@ export interface ComprobanteBoleta {
   medioPago: MedioPago
   numeroComprobante: string
 }
+
+/** Contrato del backend HistorialBoletasResponse. */
+export interface HistorialBoletas {
+  estudianteId: number
+  estudiante: string
+  mesCorte: string
+  boletasGeneradas: number
+  boletasEnMora: number
+  totales: TotalesHistorial
+  matriculas: MatriculaHistorial[]
+}
+
+export interface TotalesHistorial {
+  pagado: number
+  pendiente: number
+  enMora: number
+}
+
+export interface MatriculaHistorial {
+  matriculaId: number
+  anio: number
+  grado: number
+  seccion: string
+  fechaMatricula: string
+  estado: 'EN_REGISTRO' | 'CONFIRMADA' | 'RETIRADA' | 'FINALIZADA'
+  compromiso: CompromisoHistorial | null
+  boletas: BoletaHistorial[]
+}
+
+export interface CompromisoHistorial {
+  id: number
+  concepto: string
+  numeroCuotas: number
+  mesInicio: string
+}
+
+export interface BoletaHistorial {
+  id: number
+  mesCobro: string
+  fechaVencimiento: string
+  montoTotal: number
+  estadoPago: EstadoBoleta
+  mecanismoGeneracion: 'AUTOMATICO' | 'MANUAL'
+  numeroComprobante: string | null
+}
