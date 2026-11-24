@@ -35,6 +35,7 @@ const aviso = ref('')
 const avisoSeleccion = ref('')
 const confirmacionExitosa = ref(false)
 const modalCompromisoAbierto = ref(false)
+const avisoPendientes = ref('')
 const errorCompromiso = ref('')
 const incidenciasCompromiso = ref<IncidenciaConfirmacionMatricula[]>([])
 const seleccionPendientes = ref<number[]>([])
@@ -89,6 +90,7 @@ const resultadosBusqueda = computed(() => {
 const vacantesDisponibles = computed(() => periodoSeleccionado.value?.vacantesDisponibles ?? 0)
 const capacidadMaxima = computed(() => periodoSeleccionado.value?.vacantesTotales ?? 0)
 const matriculados = computed(() => periodoSeleccionado.value?.matriculasActivas ?? 0)
+const porConfirmar = computed(() => periodoSeleccionado.value?.matriculasPendientes ?? 0)
 const ocupacion = computed(() =>
   capacidadMaxima.value > 0 ? Math.min(100, Math.round((matriculados.value / capacidadMaxima.value) * 100)) : 0,
 )
@@ -267,10 +269,13 @@ async function registrarSeleccion(): Promise<void> {
   avisoSeleccion.value = ''
   confirmacionExitosa.value = false
   try {
-    const resultados = await registrarMasivamente(periodoSeleccionado.value.periodoId, estudiantesSeleccionados.value)
+    const registrados = [...estudiantesSeleccionados.value]
+    await registrarMasivamente(periodoSeleccionado.value.periodoId, registrados)
     estudiantesSeleccionados.value = []
     await cargarDatos()
-    aviso.value = `Se registraron ${resultados.length} matrículas en la sección seleccionada; quedan pendientes de confirmación.`
+    seleccionPendientes.value = registrados
+    errorCompromiso.value = ''
+    modalCompromisoAbierto.value = true
   } catch (fallo: unknown) {
     error.value = obtenerMensajeError(fallo, 'No se pudieron registrar las matrículas seleccionadas.')
   } finally {
@@ -299,6 +304,7 @@ async function confirmarSeleccion(compromiso: SolicitudCompromisoPago): Promise<
     modalCompromisoAbierto.value = false
     seleccionPendientes.value = []
     incidenciasCompromiso.value = []
+    avisoPendientes.value = ''
     await cargarDatos()
     aviso.value =
       resultados.length === 1
@@ -319,6 +325,13 @@ async function confirmarSeleccion(compromiso: SolicitudCompromisoPago): Promise<
   } finally {
     guardando.value = false
   }
+}
+
+function cerrarCompromiso(): void {
+  modalCompromisoAbierto.value = false
+  const cantidad = seleccionPendientes.value.length
+  if (!cantidad) return
+  avisoPendientes.value = `${cantidad === 1 ? 'Quedó 1 matrícula' : `Quedaron ${cantidad} matrículas`} sin confirmar. Reservan su vacante, pero no aparecen en tareas, asistencia ni notas hasta que confirmes su compromiso de pago.`
 }
 
 async function cancelar(): Promise<void> {
@@ -386,7 +399,8 @@ onMounted(cargarDatos)
             <div class="avance-progreso" :class="estadoCupos" :style="{ width: `${ocupacion}%` }" />
           </div>
           <p class="resumen-cupos" role="status" aria-live="polite">
-            <strong>{{ matriculados }}</strong> de {{ capacidadMaxima }} matriculados ·
+            <strong>{{ matriculados - porConfirmar }}</strong> de {{ capacidadMaxima }} matriculados
+            <template v-if="porConfirmar"> · {{ porConfirmar }} por confirmar</template> ·
             <strong>{{ vacantesDisponibles }}</strong> vacantes
           </p>
           <p v-if="estadoCupos !== 'disponible'" class="mensaje-disponibilidad" :class="estadoCupos">
@@ -479,7 +493,7 @@ onMounted(cargarDatos)
               :disabled="guardando || !estudiantesSeleccionados.length"
               @click="registrarSeleccion"
             >
-              {{ guardando ? 'Registrando...' : `Registrar seleccionados (${estudiantesSeleccionados.length})` }}
+              {{ guardando ? 'Matriculando...' : `Matricular seleccionados (${estudiantesSeleccionados.length})…` }}
             </button>
           </div>
         </div>
@@ -494,6 +508,11 @@ onMounted(cargarDatos)
       <AvisoMensaje :mensaje="aviso" tipo="exito" />
       <NuxtLink v-if="confirmacionExitosa" to="/finanzas" class="enlace-finanzas">Ver boletas en Finanzas →</NuxtLink>
     </div>
+    <AvisoMensaje
+      v-if="avisoPendientes && pendientesDeConfirmacion.length"
+      :mensaje="avisoPendientes"
+      tipo="advertencia"
+    />
     <section v-if="pendientesDeConfirmacion.length" class="tarjeta" aria-labelledby="titulo-pendientes">
       <div class="encabezado-tarjeta">
         <h2 id="titulo-pendientes">
@@ -503,7 +522,8 @@ onMounted(cargarDatos)
       </div>
       <div class="contenido-tarjeta">
         <p class="ayuda-pendientes">
-          Al confirmar se definen los términos del compromiso de pago y se emite la primera boleta.
+          Reservan su vacante, pero todavía no aparecen en tareas, asistencia ni notas. Al confirmar se definen los
+          términos del compromiso de pago y se emite la primera boleta.
         </p>
         <button type="button" class="boton-agregar" :disabled="guardando" @click="alternarSeleccionPendientes">
           {{ todosPendientesSeleccionados ? 'Quitar selección' : 'Seleccionar todos' }}
@@ -563,7 +583,7 @@ onMounted(cargarDatos)
       :error="errorCompromiso"
       :incidencias="incidenciasCompromiso"
       @confirmar="confirmarSeleccion"
-      @cerrar="modalCompromisoAbierto = false"
+      @cerrar="cerrarCompromiso"
     />
   </main>
 </template>

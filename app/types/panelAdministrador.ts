@@ -6,6 +6,8 @@ export interface VentanaMatriculaPanel {
 
 export interface PendientesPanelAdministrador {
   matriculasPorConfirmar: number
+  /** Años escolares de las matrículas por confirmar. */
+  anhiosPorConfirmar: number[]
   familiasEnMora: number
   montoEnMora: number
   docentesSinMarcar: number
@@ -14,7 +16,9 @@ export interface PendientesPanelAdministrador {
 }
 
 export interface IndicadoresPanelAdministrador {
+  /** Vacantes ocupadas del año: confirmados y por confirmar. */
   estudiantesMatriculados: number
+  estudiantesConfirmados: number
   vacantesTotales: number
   pensionMesEmitida: number
   pensionMesCobrada: number
@@ -39,6 +43,7 @@ export interface OcupacionGradoPanel {
   secciones: number
   matriculados: number
   vacantes: number
+  pendientes: number
 }
 
 export type TipoActividadPanel = 'PAGO' | 'MORA' | 'RECTIFICACION'

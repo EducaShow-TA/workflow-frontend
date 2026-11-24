@@ -8,6 +8,7 @@ export interface SituacionPeriodo {
 export interface ResumenVacantes {
   capacidad: number
   matriculados: number
+  porConfirmar: number
   vacantes: number
   seccionesSinVacantes: number
 }

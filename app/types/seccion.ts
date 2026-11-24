@@ -10,6 +10,8 @@ export interface Seccion {
   vacantesTotales: number
   /** Equivale a Seccion.getCantidadMatriculados(). */
   cantidadMatriculados: number
+  /** De esos, los que aún no confirman su matrícula (reservan vacante). */
+  porConfirmar?: number
 }
 
 /** Cuerpo de POST /api/v1/secciones. */

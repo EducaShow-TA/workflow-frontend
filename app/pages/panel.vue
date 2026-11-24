@@ -65,15 +65,16 @@ const indicadores = computed(() => {
   const i = datos.indicadores
   const mes = new Intl.DateTimeFormat('es-PE', { month: 'long' }).format(fechaLocalPanel(datos.fecha)).toLowerCase()
   const ocupacion = Math.round(porcentajePanel(i.estudiantesMatriculados, i.vacantesTotales))
+  const porConfirmar = i.estudiantesMatriculados - i.estudiantesConfirmados
   const cobro = Math.round(porcentajePanel(i.pensionMesCobrada, i.pensionMesEmitida))
   const asistencia = porcentajePanel(i.presentesSemana, i.asistenciasSemana)
   const docentes = porcentajePanel(i.docentesPresentesHoy, i.docentesConClaseHoy)
   return [
     {
-      titulo: 'Estudiantes matriculados',
-      valor: String(i.estudiantesMatriculados),
+      titulo: `Estudiantes matriculados ${datos.anio}`,
+      valor: String(i.estudiantesConfirmados),
       detalle: i.vacantesTotales
-        ? `de ${i.vacantesTotales} vacantes · ${ocupacion} % de ocupación`
+        ? `${porConfirmar ? `+${porConfirmar} por confirmar · ` : ''}de ${i.vacantesTotales} vacantes · ${ocupacion} % ocupado`
         : 'Sin secciones registradas este año',
       avance: ocupacion,
       tono: 'azul',
