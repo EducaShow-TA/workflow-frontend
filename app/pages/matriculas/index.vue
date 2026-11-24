@@ -196,6 +196,7 @@ const motivoBloqueo = computed(() => {
           <div class="indicador">
             <span>Matriculados</span>
             <strong>{{ resumen.matriculados }}</strong>
+            <small v-if="resumen.porConfirmar" class="por-confirmar">+{{ resumen.porConfirmar }} por confirmar</small>
           </div>
 
           <div class="indicador destacado">
@@ -214,6 +215,11 @@ const motivoBloqueo = computed(() => {
 </template>
 
 <style scoped>
+.por-confirmar {
+  color: #92400e;
+  font-size: 12px;
+  font-weight: 600;
+}
 .pagina-resumen-matricula {
   display: flex;
   flex-direction: column;

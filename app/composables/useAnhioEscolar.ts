@@ -106,6 +106,7 @@ export function convertirEnSecciones(periodosDelAnhio: PeriodoAcademico[]): Secc
         nombre: periodo.seccion,
         vacantesTotales: periodo.vacantesTotales,
         cantidadMatriculados: periodo.matriculasActivas,
+        porConfirmar: periodo.matriculasPendientes,
       })
     }
   }

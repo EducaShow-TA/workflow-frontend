@@ -33,6 +33,7 @@ import {
 import { usePeriodosAcademicos } from '~/composables/usePeriodosAcademicos'
 import {
   GRADOS_SECUNDARIA,
+  calcularConfirmados,
   calcularPorcentajeOcupacion,
   calcularVacantesDisponibles,
   obtenerEstadoCupos,
@@ -210,11 +211,16 @@ const resumen = computed(() => {
 
   return {
     capacidad: lista.reduce((total, seccion) => total + seccion.vacantesTotales, 0),
-    matriculados: lista.reduce((total, seccion) => total + seccion.cantidadMatriculados, 0),
+    matriculados: lista.reduce((total, seccion) => total + calcularConfirmados(seccion), 0),
+    porConfirmar: lista.reduce((total, seccion) => total + (seccion.porConfirmar ?? 0), 0),
     vacantes: lista.reduce((total, seccion) => total + calcularVacantesDisponibles(seccion), 0),
     seccionesLlenas: lista.filter((seccion) => calcularVacantesDisponibles(seccion) === 0).length,
   }
 })
+
+const matriculasSinConfirmar = computed(() =>
+  secciones.value.reduce((total, seccion) => total + (seccion.porConfirmar ?? 0), 0),
+)
 
 const tituloResumen = computed(() =>
   gradoFiltro.value === '' ? 'Resumen general' : `Resumen de ${obtenerNombreGrado(gradoFiltro.value)}`,
@@ -522,6 +528,18 @@ async function confirmarApertura(): Promise<void> {
     </EncabezadoPagina>
 
     <AvisoMensaje v-if="mensajeExito" :mensaje="mensajeExito" tipo="exito" cerrable @cerrar="mensajeExito = ''" />
+    <div v-if="!cargando && matriculasSinConfirmar" class="aviso-por-confirmar" role="status">
+      <span>
+        <strong
+          >{{ matriculasSinConfirmar }}
+          {{ matriculasSinConfirmar === 1 ? 'matrícula sin confirmar' : 'matrículas sin confirmar' }} en
+          {{ anhioActual }}.</strong
+        >
+        Reservan su vacante, pero esos alumnos aún no aparecen en tareas, asistencia ni notas hasta confirmar su
+        compromiso de pago.
+      </span>
+      <NuxtLink to="/matriculas/nueva">Confirmar ahora →</NuxtLink>
+    </div>
 
     <PanelEstadoCarga :cargando="cargando" :error="errorCarga" @reintentar="cargarSecciones">
       <section class="panel-filtros" aria-label="Filtros de secciones">
@@ -595,6 +613,7 @@ async function confirmarApertura(): Promise<void> {
           <div class="indicador">
             <span>Matriculados</span>
             <strong>{{ resumen.matriculados }}</strong>
+            <small v-if="resumen.porConfirmar" class="por-confirmar">+{{ resumen.porConfirmar }} por confirmar</small>
           </div>
 
           <div class="indicador destacado">
@@ -629,7 +648,12 @@ async function confirmarApertura(): Promise<void> {
                   <td class="sin-salto">{{ obtenerNombreGrado(seccion.gradoNumero) }}</td>
                   <td class="dato-destacado">{{ seccion.nombre }}</td>
                   <td>{{ seccion.vacantesTotales }}</td>
-                  <td>{{ seccion.cantidadMatriculados }}</td>
+                  <td>
+                    {{ calcularConfirmados(seccion) }}
+                    <small v-if="seccion.porConfirmar" class="por-confirmar"
+                      >+{{ seccion.porConfirmar }} por confirmar</small
+                    >
+                  </td>
                   <td class="dato-destacado">{{ calcularVacantesDisponibles(seccion) }}</td>
                   <td>
                     <div class="celda-ocupacion">
@@ -690,8 +714,11 @@ async function confirmarApertura(): Promise<void> {
         @submit.prevent="guardarCapacidad"
       >
         <p class="dato-informativo">
-          Alumnos matriculados actualmente: <strong>{{ seccionEnEdicion.cantidadMatriculados }}</strong>. La nueva
-          capacidad no puede ser menor que esta cantidad.
+          Vacantes ocupadas actualmente: <strong>{{ seccionEnEdicion.cantidadMatriculados }}</strong>
+          <template v-if="seccionEnEdicion.porConfirmar">
+            ({{ calcularConfirmados(seccionEnEdicion) }} matriculados y {{ seccionEnEdicion.porConfirmar }} por
+            confirmar)</template
+          >. La nueva capacidad no puede ser menor que esta cantidad.
         </p>
 
         <div class="campo">
@@ -1086,6 +1113,33 @@ async function confirmarApertura(): Promise<void> {
 </template>
 
 <style scoped>
+.por-confirmar {
+  display: block;
+  color: #92400e;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.aviso-por-confirmar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  border: 1px solid #fcd34d;
+  border-radius: 10px;
+  background: #fffbeb;
+  color: #78350f;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.aviso-por-confirmar a {
+  flex-shrink: 0;
+  color: #004ac6;
+  font-weight: 600;
+  text-decoration: none;
+}
 .bimestre-vigente {
   color: #434655;
   font-size: 13px;

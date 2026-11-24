@@ -12,6 +12,8 @@ export interface PeriodoAcademico {
   fechaFin: string
   vacantesTotales: number
   matriculasActivas: number
+  /** Matrículas registradas sin confirmar: reservan vacante, pero aún no son alumnos del aula. */
+  matriculasPendientes: number
   vacantesDisponibles: number
   hayVacantes: boolean
   estado: EstadoPeriodoAcademico

@@ -24,6 +24,11 @@ export function calcularVacantesDisponibles(
   return Math.max(0, seccion.vacantesTotales - seccion.cantidadMatriculados)
 }
 
+/** Alumnos con matrícula confirmada: los que aparecen en tareas, asistencia y notas. */
+export function calcularConfirmados(seccion: Pick<Seccion, 'cantidadMatriculados' | 'porConfirmar'>): number {
+  return Math.max(0, seccion.cantidadMatriculados - (seccion.porConfirmar ?? 0))
+}
+
 export function calcularPorcentajeOcupacion(
   seccion: Pick<Seccion, 'vacantesTotales' | 'cantidadMatriculados'>,
 ): number {

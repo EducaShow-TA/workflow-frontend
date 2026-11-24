@@ -2,7 +2,7 @@ import type { PeriodoMatricula } from '~/types/periodoMatricula'
 import type { ResumenVacantes, SituacionPeriodo } from '~/types/resumenMatricula'
 import type { Seccion } from '~/types/seccion'
 import { calcularDiasEntre } from '~/composables/useFechas'
-import { calcularVacantesDisponibles } from '~/composables/useSecciones'
+import { calcularConfirmados, calcularVacantesDisponibles } from '~/composables/useSecciones'
 
 export function obtenerSituacionPeriodo(periodos: PeriodoMatricula[]): SituacionPeriodo {
   const vigente = periodos.find((periodo) => periodo.estado === 'VIGENTE') ?? null
@@ -32,7 +32,8 @@ export function describirDiasParaInicio(fechaInicio: string, fechaHoy: string): 
 export function calcularResumenVacantes(secciones: Seccion[]): ResumenVacantes {
   return {
     capacidad: secciones.reduce((total, seccion) => total + seccion.vacantesTotales, 0),
-    matriculados: secciones.reduce((total, seccion) => total + seccion.cantidadMatriculados, 0),
+    matriculados: secciones.reduce((total, seccion) => total + calcularConfirmados(seccion), 0),
+    porConfirmar: secciones.reduce((total, seccion) => total + (seccion.porConfirmar ?? 0), 0),
     vacantes: secciones.reduce((total, seccion) => total + calcularVacantesDisponibles(seccion), 0),
     seccionesSinVacantes: secciones.filter((seccion) => calcularVacantesDisponibles(seccion) === 0).length,
   }
