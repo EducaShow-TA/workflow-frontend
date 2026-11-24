@@ -76,7 +76,7 @@ const errores = reactive({
   celular: '',
 })
 
-const fechaActual = new Date()
+const fechaActual = ahoraSistema()
 
 const fechaMaxima = [
   fechaActual.getFullYear(),

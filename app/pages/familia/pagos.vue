@@ -11,6 +11,7 @@ import {
   nombrarMesBoleta,
   usePagosFamilia,
 } from '~/composables/usePagosFamilia'
+import { useEstadoSistema } from '~/composables/useParametrosSistema'
 import { useAutenticacionStore } from '~/stores/autenticacion'
 import type { BoletaFamilia, DeudaFamilia, PagosHijo } from '~/types/familia'
 
@@ -21,6 +22,8 @@ const HISTORIAL_VISIBLE = 5
 const ruta = useRoute()
 const autenticacion = useAutenticacionStore()
 const { listarPagos, descargarComprobante } = usePagosFamilia()
+const { estado: estadoSistema, cargarEstado } = useEstadoSistema()
+const pagoNoDisponible = computed(() => estadoSistema.value?.pagoEnLineaDisponible === false)
 
 const hijos = ref<PagosHijo[]>([])
 const estudianteId = ref<number | null>(null)
@@ -139,7 +142,10 @@ watch(estudianteId, () => {
 
 watch(compromisoId, seleccionarTodas)
 
-onMounted(cargar)
+onMounted(() => {
+  void cargarEstado(true)
+  void cargar()
+})
 </script>
 
 <template>
@@ -249,6 +255,11 @@ onMounted(cargar)
 
           <template v-else>
             <AvisoMensaje
+              v-if="pagoNoDisponible"
+              tipo="advertencia"
+              mensaje="El pago en línea no está disponible en este momento. Puedes pagar en la tesorería del colegio o por transferencia."
+            />
+            <AvisoMensaje
               v-if="enMora"
               tipo="error"
               :mensaje="`Tienes ${enMora} ${enMora === 1 ? 'boleta en mora' : 'boletas en mora'}. Te recomendamos pagar primero las más antiguas.`"
@@ -310,7 +321,7 @@ onMounted(cargar)
                 <button
                   type="button"
                   class="boton-pagar"
-                  :disabled="!seleccionadas.length"
+                  :disabled="!seleccionadas.length || pagoNoDisponible"
                   @click="modalAbierto = true"
                 >
                   {{ seleccionadas.length === porPagar.length ? 'Pagar todas' : 'Pagar seleccionadas' }}

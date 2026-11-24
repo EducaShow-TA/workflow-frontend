@@ -14,7 +14,7 @@ const DIAS = [
   { codigo: 'FRIDAY', nombre: 'Viernes' },
 ] as const
 const api = useApi()
-const anioActual = new Date().getFullYear()
+const anioActual = ahoraSistema().getFullYear()
 const anio = ref(anioActual)
 const vista = ref<'SEMANA' | 'HOY'>('SEMANA')
 const sesiones = ref<BloqueHorarioDocente[]>([])
@@ -39,7 +39,7 @@ const aulasDisponibles = computed(() => [
 const horariosDisponibles = computed(() => [
   ...new Map(sesiones.value.map((item) => [item.horarioId, descripcion(item)])).entries(),
 ])
-const hoy = new Date().getDay()
+const hoy = ahoraSistema().getDay()
 const hoyCodigo = hoy >= 1 && hoy <= 5 ? DIAS[hoy - 1]?.codigo : null
 const nombreHoy = hoyCodigo ? DIAS.find((dia) => dia.codigo === hoyCodigo)?.nombre : ''
 const bloquesHoy = computed(() => sesiones.value.filter((item) => item.dia === hoyCodigo))

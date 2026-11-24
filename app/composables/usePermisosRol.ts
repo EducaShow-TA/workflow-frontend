@@ -248,6 +248,7 @@ export const REGLAS_RUTA: ReglaRuta[] = [
   { prefijo: '/reportes/cuadro-merito', permiso: 'REPORTE_CUADRO_MERITO_VER' },
   { prefijo: '/reportes/asistencia', permiso: 'REPORTE_ASISTENCIA_VER' },
   { prefijo: '/panel', permiso: 'PANEL_VER' },
+  { prefijo: '/parametros-sistema', permiso: 'PANEL_VER' },
   { prefijo: '/estudiantes', permiso: 'ESTUDIANTE_VER' },
   { prefijo: '/estudiantes/nuevo', permiso: 'ESTUDIANTE_REGISTRAR' },
   { prefijo: '/matriculas', permiso: 'MATRICULA_VER' },

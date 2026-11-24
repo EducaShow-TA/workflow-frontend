@@ -29,7 +29,7 @@ const filtroSeccion = ref('')
 const sesiones = ref<SesionClaseResumen[]>([])
 const cargando = ref(true)
 const error = ref('')
-const ahora = ref(Date.now())
+const ahora = ref(ahoraSistema().getTime())
 let reloj: ReturnType<typeof setInterval> | undefined
 
 const descripcionFecha = computed(() => {
@@ -119,7 +119,7 @@ async function cargar(): Promise<void> {
 
   try {
     sesiones.value = await listarMias(fecha.value)
-    ahora.value = Date.now()
+    ahora.value = ahoraSistema().getTime()
   } catch (fallo: unknown) {
     error.value = obtenerMensajeError(fallo, 'No se pudieron cargar tus clases.')
   } finally {
@@ -137,7 +137,7 @@ watch(fecha, (nueva) => {
 
 onMounted(() => {
   void cargar()
-  reloj = setInterval(() => (ahora.value = Date.now()), 30000)
+  reloj = setInterval(() => (ahora.value = ahoraSistema().getTime()), 30000)
 })
 
 onBeforeUnmount(() => clearInterval(reloj))

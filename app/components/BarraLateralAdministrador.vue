@@ -41,6 +41,7 @@ const enlaces: EnlaceMenu[] = [
   { nombre: 'Usuarios', icono: '/icons/menu-usuarios.svg', destino: '/usuarios' },
   { nombre: 'Roles/Permisos', icono: '/icons/menu-roles.svg', destino: '/roles-permisos' },
   { nombre: 'Logs del sistema', icono: '/icons/menu-logs.svg', destino: '/logs-sistema' },
+  { nombre: 'Parámetros del sistema', icono: '/icons/menu-config.svg', destino: '/parametros-sistema' },
 ]
 
 function estaActivo(enlace: EnlaceMenu): boolean {

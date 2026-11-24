@@ -30,7 +30,7 @@ const cargando = ref(true)
 const error = ref('')
 const area = ref('')
 const masAdelanteAbierto = ref(false)
-const ahora = ref(new Date())
+const ahora = ref(ahoraSistema())
 let reloj: ReturnType<typeof setInterval> | undefined
 
 const vista = computed<Vista>(() => {
@@ -83,7 +83,7 @@ async function cargar(): Promise<void> {
   error.value = ''
   try {
     tareas.value = await listar()
-    ahora.value = new Date()
+    ahora.value = ahoraSistema()
   } catch (fallo: unknown) {
     error.value = obtenerMensajeError(fallo, 'No se pudieron cargar tus tareas.')
   } finally {
@@ -94,7 +94,7 @@ async function cargar(): Promise<void> {
 onMounted(() => {
   void cargar()
   reloj = setInterval(() => {
-    ahora.value = new Date()
+    ahora.value = ahoraSistema()
   }, 60_000)
 })
 onBeforeUnmount(() => clearInterval(reloj))
