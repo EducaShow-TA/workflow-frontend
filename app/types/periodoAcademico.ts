@@ -18,10 +18,17 @@ export interface PeriodoAcademico {
   actasCerradas: boolean
 }
 
+export interface FechasBimestre {
+  numero: number
+  fechaInicio: string
+  fechaFin: string
+}
+
 export interface SolicitudAperturaAnhio {
   anhio: number
   fechaInicio: string
   fechaFin: string
+  bimestres?: FechasBimestre[]
 }
 
 export type ErroresAperturaAnhio = Partial<Record<keyof SolicitudAperturaAnhio, string>>
