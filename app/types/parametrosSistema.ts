@@ -18,4 +18,5 @@ export interface EstadoSistema {
 export interface SolicitudFechaSistema {
   fecha: string
   motivo: string
+  contrasenia: string
 }
