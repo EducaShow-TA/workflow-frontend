@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { formatearFecha, obtenerFechaHoyIso } from '~/composables/useFechas'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
 import { obtenerEtiquetaEstadoBimestre, useBimestres } from '~/composables/useBimestres'
@@ -24,11 +24,19 @@ const mensajeExito = ref('')
 const guardando = ref(false)
 
 const modalFecha = ref(false)
+const pasoFecha = ref<1 | 2>(1)
 const fechaNueva = ref('')
 const horaNueva = ref('')
 const motivo = ref('')
+const contrasenia = ref('')
+const campoContrasenia = ref<HTMLInputElement | null>(null)
 const errorModal = ref('')
 const intentoGuardar = ref(false)
+const intentoConfirmar = ref(false)
+const bimestreDestino = ref<BimestreAcademico | null>(null)
+
+const confirmandoFechaReal = ref(false)
+const errorFechaReal = ref('')
 
 const fechaSistema = computed(() =>
   parametros.value ? describirFechaSistema(leerFechaHoraSistema(parametros.value.fechaSistema)) : '',
@@ -77,9 +85,48 @@ const errorMotivo = computed(() =>
     ? `Escribe el motivo (al menos ${MOTIVO_MINIMO} caracteres).`
     : '',
 )
-const errorFecha = computed(() =>
-  intentoGuardar.value && (!fechaNueva.value || !horaNueva.value) ? 'Elige la fecha y la hora.' : '',
+const errorFecha = computed(() => {
+  if (!intentoGuardar.value) return ''
+  if (!fechaNueva.value || !horaNueva.value) return 'Elige la fecha y la hora.'
+  const anhio = Number(fechaNueva.value.slice(0, 4))
+  return anhio < 2020 || anhio > 2100 ? 'Elige una fecha entre 2020 y 2100.' : ''
+})
+const errorContrasenia = computed(() =>
+  intentoConfirmar.value && !contrasenia.value ? 'Escribe tu contraseña para confirmar el cambio.' : '',
 )
+
+function formatearFechaHora(fecha: Date): string {
+  const hora = `${String(fecha.getHours()).padStart(2, '0')}:${String(fecha.getMinutes()).padStart(2, '0')}`
+  return `${formatearFecha(obtenerFechaHoyIso(fecha))} ${hora}`
+}
+
+function contarDias(desde: Date, hasta: Date): number {
+  const inicio = Date.UTC(desde.getFullYear(), desde.getMonth(), desde.getDate())
+  const fin = Date.UTC(hasta.getFullYear(), hasta.getMonth(), hasta.getDate())
+  return Math.round((fin - inicio) / 86_400_000)
+}
+
+const fechaActual = computed(() => (parametros.value ? leerFechaHoraSistema(parametros.value.fechaSistema) : null))
+const fechaDestino = computed(() =>
+  fechaNueva.value && horaNueva.value ? leerFechaHoraSistema(`${fechaNueva.value}T${horaNueva.value}:00`) : null,
+)
+const diferenciaFecha = computed(() => {
+  if (!fechaActual.value || !fechaDestino.value) return ''
+  const dias = contarDias(fechaActual.value, fechaDestino.value)
+  if (dias === 0) return 'Mismo día: solo cambia la hora'
+  const cantidad = `${Math.abs(dias)} ${Math.abs(dias) === 1 ? 'día' : 'días'}`
+  return dias > 0 ? `Avanza ${cantidad}` : `Retrocede ${cantidad}`
+})
+const textoBimestreDestino = computed(() => {
+  const bimestre = bimestreDestino.value
+  return bimestre
+    ? `El bimestre en curso pasa a ser el bimestre ${bimestre.numero} (del ${formatearFecha(bimestre.fechaInicio).slice(0, 5)} al ${formatearFecha(bimestre.fechaFin).slice(0, 5)}).`
+    : 'La fecha no cae dentro de un bimestre de clases (vacaciones o año escolar sin calendario).'
+})
+const mensajeFechaReal = computed(() => {
+  const simulada = fechaActual.value ? formatearFechaHora(fechaActual.value) : ''
+  return `El sistema pasará de la fecha simulada (${simulada}) a la fecha real (${formatearFechaHora(new Date())}). Lo registrado con la fecha simulada se mantiene y el cambio queda en la auditoría.`
+})
 
 async function cargarAnhio() {
   periodos.value = anhioSistema.value ? await listarPorAnhio(anhioSistema.value) : []
@@ -104,40 +151,87 @@ function abrirCambioFecha() {
   fechaNueva.value = obtenerFechaHoyIso(actual)
   horaNueva.value = `${String(actual.getHours()).padStart(2, '0')}:${String(actual.getMinutes()).padStart(2, '0')}`
   motivo.value = ''
+  contrasenia.value = ''
   errorModal.value = ''
   intentoGuardar.value = false
+  intentoConfirmar.value = false
+  pasoFecha.value = 1
   modalFecha.value = true
 }
 
-async function guardarFecha() {
+function cerrarCambioFecha() {
+  modalFecha.value = false
+  contrasenia.value = ''
+}
+
+async function continuarCambioFecha() {
   intentoGuardar.value = true
   if (errorFecha.value || errorMotivo.value) return
+  guardando.value = true
+  errorModal.value = ''
+  try {
+    const lista = await listarBimestres(Number(fechaNueva.value.slice(0, 4)))
+    bimestreDestino.value =
+      lista.find((bimestre) => bimestre.fechaInicio <= fechaNueva.value && fechaNueva.value <= bimestre.fechaFin) ??
+      null
+  } catch {
+    bimestreDestino.value = null
+  } finally {
+    guardando.value = false
+  }
+  contrasenia.value = ''
+  intentoConfirmar.value = false
+  pasoFecha.value = 2
+  await nextTick()
+  campoContrasenia.value?.focus()
+}
+
+function volverAlPasoUno() {
+  contrasenia.value = ''
+  errorModal.value = ''
+  pasoFecha.value = 1
+}
+
+async function guardarFecha() {
+  intentoConfirmar.value = true
+  if (errorContrasenia.value) return
   guardando.value = true
   errorModal.value = ''
   try {
     parametros.value = await simularFecha({
       fecha: `${fechaNueva.value}T${horaNueva.value}:00`,
       motivo: motivo.value.trim(),
+      contrasenia: contrasenia.value,
     })
-    modalFecha.value = false
+    cerrarCambioFecha()
     mensajeExito.value = 'El sistema ahora trabaja con la fecha simulada.'
     await cargarAnhio()
   } catch (causa: unknown) {
     errorModal.value = obtenerMensajeError(causa, 'No se pudo cambiar la fecha del sistema.')
+    contrasenia.value = ''
+    intentoConfirmar.value = false
+    await nextTick()
+    campoContrasenia.value?.focus()
   } finally {
     guardando.value = false
   }
 }
 
+function pedirFechaReal() {
+  errorFechaReal.value = ''
+  confirmandoFechaReal.value = true
+}
+
 async function usarFechaReal() {
   guardando.value = true
-  error.value = ''
+  errorFechaReal.value = ''
   try {
     parametros.value = await volverAFechaReal()
+    confirmandoFechaReal.value = false
     mensajeExito.value = 'El sistema volvió a la fecha real.'
     await cargarAnhio()
   } catch (causa: unknown) {
-    error.value = obtenerMensajeError(causa, 'No se pudo volver a la fecha real.')
+    errorFechaReal.value = obtenerMensajeError(causa, 'No se pudo volver a la fecha real.')
   } finally {
     guardando.value = false
   }
@@ -202,15 +296,15 @@ onMounted(cargar)
                 v-if="parametros.fechaSimulada"
                 variante="secundario"
                 :deshabilitado="guardando"
-                @click="usarFechaReal"
+                @click="pedirFechaReal"
               >
                 Volver a la fecha real
               </BotonAccion>
             </div>
           </template>
           <p v-else class="nota">
-            Este servidor no permite simular la fecha. Para una demostración se habilita con la variable
-            DEMO_FECHA_PERMITIDA=true en el servidor.
+            La fecha simulada está desactivada en este servidor (variable DEMO_FECHA_PERMITIDA=false). Para usarla,
+            quita esa variable o cámbiala a true.
           </p>
         </div>
       </section>
@@ -264,8 +358,8 @@ onMounted(cargar)
               simulado: los datos de la tarjeta no salen del navegador.
             </p>
             <p v-else>
-              Este servidor no permite el pago simulado. Se habilita con la variable PAGOS_SIMULADO_ENABLED=true en el
-              servidor.
+              El pago simulado está desactivado en este servidor (variable PAGOS_SIMULADO_ENABLED=false). Para usarlo,
+              quita esa variable o cámbiala a true.
             </p>
           </div>
         </div>
@@ -274,12 +368,18 @@ onMounted(cargar)
 
     <VentanaModal
       :abierta="modalFecha"
-      titulo="Cambiar fecha del sistema"
-      descripcion="Solo para la demostración"
+      :titulo="pasoFecha === 1 ? 'Cambiar fecha del sistema' : 'Confirma el cambio de fecha'"
+      :descripcion="pasoFecha === 1 ? 'Paso 1 de 2 · Solo para la demostración' : 'Paso 2 de 2'"
       :bloqueada="guardando"
-      @cerrar="modalFecha = false"
+      @cerrar="cerrarCambioFecha"
     >
-      <form id="formulario-fecha-sistema" class="formulario" novalidate @submit.prevent="guardarFecha">
+      <form
+        v-if="pasoFecha === 1"
+        id="formulario-fecha-sistema"
+        class="formulario"
+        novalidate
+        @submit.prevent="continuarCambioFecha"
+      >
         <div class="dos-columnas">
           <div class="campo">
             <label for="fecha-sistema">Fecha <span class="obligatorio">*</span></label>
@@ -308,13 +408,70 @@ onMounted(cargar)
         />
         <AvisoMensaje v-if="errorModal" :mensaje="errorModal" tipo="error" />
       </form>
+      <form v-else id="confirmacion-fecha-sistema" class="formulario" novalidate @submit.prevent="guardarFecha">
+        <div class="cambio-fecha">
+          <div>
+            <small>Fecha actual</small>
+            <strong>{{ fechaActual ? formatearFechaHora(fechaActual) : '' }}</strong>
+          </div>
+          <span class="flecha" aria-hidden="true">→</span>
+          <div>
+            <small>Nueva fecha</small>
+            <strong>{{ fechaDestino ? formatearFechaHora(fechaDestino) : '' }}</strong>
+          </div>
+        </div>
+        <div>
+          <InsigniaEstado :texto="diferenciaFecha" variante="advertencia" />
+        </div>
+        <div>
+          <p class="nota">Al confirmar:</p>
+          <ul class="consecuencias">
+            <li>{{ textoBimestreDestino }}</li>
+            <li>Asistencias, notas, tareas y pagos que se registren quedarán con esta fecha.</li>
+            <li>Todos los usuarios verán el aviso de fecha simulada.</li>
+          </ul>
+        </div>
+        <div class="campo">
+          <label for="contrasenia-fecha">Tu contraseña de administrador <span class="obligatorio">*</span></label>
+          <input
+            id="contrasenia-fecha"
+            ref="campoContrasenia"
+            v-model="contrasenia"
+            type="password"
+            autocomplete="current-password"
+          />
+          <p v-if="errorContrasenia" class="error-campo">{{ errorContrasenia }}</p>
+        </div>
+        <AvisoMensaje v-if="errorModal" :mensaje="errorModal" tipo="error" />
+      </form>
       <template #pie>
-        <BotonAccion variante="secundario" :deshabilitado="guardando" @click="modalFecha = false">Cancelar</BotonAccion>
-        <BotonAccion tipo="submit" form="formulario-fecha-sistema" :deshabilitado="guardando">
-          {{ guardando ? 'Guardando...' : 'Usar esta fecha' }}
-        </BotonAccion>
+        <template v-if="pasoFecha === 1">
+          <BotonAccion variante="secundario" :deshabilitado="guardando" @click="cerrarCambioFecha"
+            >Cancelar</BotonAccion
+          >
+          <BotonAccion tipo="submit" form="formulario-fecha-sistema" :deshabilitado="guardando">
+            {{ guardando ? 'Revisando...' : 'Continuar' }}
+          </BotonAccion>
+        </template>
+        <template v-else>
+          <BotonAccion variante="secundario" :deshabilitado="guardando" @click="volverAlPasoUno">Atrás</BotonAccion>
+          <BotonAccion tipo="submit" form="confirmacion-fecha-sistema" :deshabilitado="guardando">
+            {{ guardando ? 'Guardando...' : 'Confirmar y usar esta fecha' }}
+          </BotonAccion>
+        </template>
       </template>
     </VentanaModal>
+
+    <VentanaConfirmacion
+      :abierta="confirmandoFechaReal"
+      titulo="¿Volver a la fecha real?"
+      :mensaje="mensajeFechaReal"
+      texto-confirmar="Volver a la fecha real"
+      :procesando="guardando"
+      :error="errorFechaReal"
+      @confirmar="usarFechaReal"
+      @cancelar="confirmandoFechaReal = false"
+    />
   </main>
 </template>
 
@@ -438,5 +595,40 @@ onMounted(cargar)
 
 .obligatorio {
   color: #b91c1c;
+}
+
+.cambio-fecha {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 10px;
+  background: #f2f4f6;
+  text-align: center;
+}
+
+.cambio-fecha small {
+  display: block;
+  color: #434655;
+  font-size: 12px;
+}
+
+.cambio-fecha strong {
+  color: #191c1e;
+  font-size: 16px;
+}
+
+.flecha {
+  color: #737686;
+  font-size: 20px;
+}
+
+.consecuencias {
+  margin: 6px 0 0;
+  padding-left: 20px;
+  color: #434655;
+  font-size: 14px;
+  line-height: 1.6;
 }
 </style>
