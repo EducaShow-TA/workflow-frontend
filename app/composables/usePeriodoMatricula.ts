@@ -76,12 +76,16 @@ export function buscarCruce(
   periodosExistentes: PeriodoMatricula[],
   idEnEdicion: number | null = null,
 ): PeriodoMatricula | undefined {
+  const fechaInicio = solicitud.fechaInicio
+  const fechaLimite = solicitud.fechaLimite
+  if (!fechaInicio || !fechaLimite) return undefined
+
   return periodosExistentes.find(
     (periodo) =>
       periodo.id !== idEnEdicion &&
       (solicitud.anhioEscolar === undefined || periodo.anhioEscolar === solicitud.anhioEscolar) &&
-      periodo.fechaInicio <= solicitud.fechaLimite &&
-      periodo.fechaLimite >= solicitud.fechaInicio,
+      periodo.fechaInicio <= fechaLimite &&
+      periodo.fechaLimite >= fechaInicio,
   )
 }
 
@@ -98,23 +102,22 @@ export function validarPeriodoMatricula(
 ): ErroresPeriodoMatricula {
   const errores: ErroresPeriodoMatricula = {}
   const hoy = obtenerFechaHoyIso()
+  const fechaInicio = solicitud.fechaInicio ?? ''
+  const fechaLimite = solicitud.fechaLimite ?? ''
 
-  if (!esFechaIsoValida(solicitud.fechaInicio)) {
+  if (!esFechaIsoValida(fechaInicio)) {
     errores.fechaInicio = 'La fecha de inicio es obligatoria.'
-  } else if (!inicioBloqueado && solicitud.fechaInicio < hoy) {
+  } else if (!inicioBloqueado && fechaInicio < hoy) {
     errores.fechaInicio = 'La fecha de inicio no puede ser anterior a hoy.'
   }
 
-  if (!esFechaIsoValida(solicitud.fechaLimite)) {
+  if (!esFechaIsoValida(fechaLimite)) {
     errores.fechaLimite = 'La fecha límite es obligatoria.'
-  } else if (inicioBloqueado && solicitud.fechaLimite < hoy) {
+  } else if (inicioBloqueado && fechaLimite < hoy) {
     errores.fechaLimite = `La fecha límite no puede ser anterior a hoy (${formatearFecha(hoy)}).`
-  } else if (!errores.fechaInicio && solicitud.fechaLimite <= solicitud.fechaInicio) {
+  } else if (!errores.fechaInicio && fechaLimite <= fechaInicio) {
     errores.fechaLimite = 'La fecha límite debe ser posterior a la fecha de inicio.'
-  } else if (
-    !errores.fechaInicio &&
-    Number(solicitud.fechaInicio.slice(0, 4)) < Number(solicitud.fechaLimite.slice(0, 4)) - 1
-  ) {
+  } else if (!errores.fechaInicio && Number(fechaInicio.slice(0, 4)) < Number(fechaLimite.slice(0, 4)) - 1) {
     errores.fechaInicio = 'El inicio no puede ser más de un año calendario anterior al año escolar de la fecha límite.'
   }
 

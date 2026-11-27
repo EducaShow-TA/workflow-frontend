@@ -14,6 +14,7 @@ function deuda(id: number, fecha: string, estado: EstadoBoletaFamilia = 'PENDIEN
       mora: 0,
       montoTotal: 500,
       estadoPago: estado,
+      tipoCargo: 'PENSION',
       comprobante: null,
     },
   }

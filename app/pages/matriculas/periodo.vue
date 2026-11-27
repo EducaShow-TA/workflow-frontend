@@ -125,8 +125,8 @@ async function guardarPeriodo(): Promise<void> {
   try {
     const solicitud: SolicitudPeriodoMatricula = {
       anhioEscolar: anhio,
-      montoMatricula: montoMatriculaFormulario.value,
-      montoPension: montoPensionFormulario.value,
+      montoMatricula: montoMatriculaFormulario.value ?? undefined,
+      montoPension: montoPensionFormulario.value ?? undefined,
     }
     const esEdicion = idEnEdicion.value !== null
 
@@ -220,11 +220,10 @@ async function confirmarDesactivacion(): Promise<void> {
             <InsigniaEstado :texto="`Matrícula ${periodoVigente.anhioEscolar} abierta`" variante="exito" />
 
             <p>
-              Matrícula para el <strong>año escolar {{ periodoVigente.anhioEscolar }}</strong> · periodo
-              abierta desde <strong>{{ formatearFecha(periodoVigente.fechaInicio) }}</strong> y activa hasta que
-              el administrador la desactive. Matrícula:
-              <strong>{{ formatearSoles(periodoVigente.montoMatricula) }}</strong>; pensión mensual:
-              <strong>{{ formatearSoles(periodoVigente.montoPension) }}</strong>.
+              Matrícula para el <strong>año escolar {{ periodoVigente.anhioEscolar }}</strong> · periodo abierta desde
+              <strong>{{ formatearFecha(periodoVigente.fechaInicio) }}</strong> y activa hasta que el administrador la
+              desactive. Matrícula: <strong>{{ formatearSoles(periodoVigente.montoMatricula) }}</strong>; pensión
+              mensual: <strong>{{ formatearSoles(periodoVigente.montoPension) }}</strong>.
             </p>
           </div>
 
@@ -297,7 +296,8 @@ async function confirmarDesactivacion(): Promise<void> {
 
               <tr v-if="periodos.length === 0">
                 <td colspan="6" class="sin-resultados">
-                  Aún no hay aperturas de matrícula registradas. Usa «Nuevo periodo» después de preparar el año académico.
+                  Aún no hay aperturas de matrícula registradas. Usa «Nuevo periodo» después de preparar el año
+                  académico.
                 </td>
               </tr>
             </tbody>
@@ -329,13 +329,17 @@ async function confirmarDesactivacion(): Promise<void> {
               max="2100"
               :disabled="Boolean(periodoEnEdicion)"
             />
-            <small class="ayuda">
-              La apertura empieza hoy y sigue activa hasta que la desactives.
-            </small>
+            <small class="ayuda"> La apertura empieza hoy y sigue activa hasta que la desactives. </small>
           </div>
           <div class="campo">
             <label for="monto-matricula">Tarifa de matrícula (S/) <span class="obligatorio">*</span></label>
-            <input id="monto-matricula" v-model.number="montoMatriculaFormulario" type="number" min="0.01" step="0.01" />
+            <input
+              id="monto-matricula"
+              v-model.number="montoMatriculaFormulario"
+              type="number"
+              min="0.01"
+              step="0.01"
+            />
           </div>
           <div class="campo">
             <label for="monto-pension">Pensión mensual (S/) <span class="obligatorio">*</span></label>
@@ -344,8 +348,9 @@ async function confirmarDesactivacion(): Promise<void> {
         </div>
 
         <p v-if="anhioPrevisto" class="vista-previa" role="status">
-          La matrícula del <strong>año escolar {{ anhioPrevisto.anhio }}</strong> quedará abierta desde hoy
-          ({{ formatearFecha(anhioPrevisto.fechaInicio) }}) y se cerrará solo al desactivarla.
+          La matrícula del <strong>año escolar {{ anhioPrevisto.anhio }}</strong> quedará abierta desde hoy ({{
+            formatearFecha(anhioPrevisto.fechaInicio)
+          }}) y se cerrará solo al desactivarla.
         </p>
 
         <AvisoMensaje v-if="errorGuardado" :mensaje="errorGuardado" tipo="error" />

@@ -98,7 +98,9 @@ async function cargarCatalogos(): Promise<void> {
       periodos.value = uniqueFamilyPeriods(vinculados)
     } else if (esAlumno.value) {
       const ficha: FichaEstudiante = await obtenerFicha()
-      estudiantes.value = [{ id: ficha.estudianteId, nombre: 'Mi reporte', periodoIds: ficha.periodos.map((p) => p.periodoId) }]
+      estudiantes.value = [
+        { id: ficha.estudianteId, nombre: 'Mi reporte', periodoIds: ficha.periodos.map((p) => p.periodoId) },
+      ]
       periodos.value = ficha.periodos.map((item) => ({
         id: item.periodoId,
         nombre: `${formatearSeccionCompleta(item.gradoNumero, item.seccion)} · ${item.fechaInicio.slice(0, 4)}`,
@@ -227,7 +229,8 @@ onMounted(cargarCatalogos)
         <div>
           <h2>{{ reporte.estudiante }}</h2>
           <p>
-            Año escolar {{ reporte.anhioEscolar }} · {{ formatearSeccionCompleta(reporte.gradoNumero, reporte.seccion) }}
+            Año escolar {{ reporte.anhioEscolar }} ·
+            {{ formatearSeccionCompleta(reporte.gradoNumero, reporte.seccion) }}
           </p>
         </div>
         <span :class="reporte.actasCerradas ? 'oficial' : 'preliminar'">
@@ -245,9 +248,7 @@ onMounted(cargarCatalogos)
             <thead>
               <tr>
                 <th scope="col">Competencia</th>
-                <th v-for="bimestre in reporte.ultimoBimestre" :key="bimestre" scope="col">
-                  Bim. {{ bimestre }}
-                </th>
+                <th v-for="bimestre in reporte.ultimoBimestre" :key="bimestre" scope="col">Bim. {{ bimestre }}</th>
               </tr>
             </thead>
             <tbody>
@@ -265,28 +266,116 @@ onMounted(cargarCatalogos)
 </template>
 
 <style scoped>
-.reporte-anual { max-width: 1280px; margin: auto; padding: 28px; color: #172b42; }
-header { margin-bottom: 20px; }
-h1 { margin: 0 0 8px; }
-header p, .ayuda { color: #5b6675; line-height: 1.5; }
-.panel { margin-bottom: 20px; padding: 22px; border: 1px solid #dfe4eb; border-radius: 14px; background: white; }
-.filtros { display: flex; flex-wrap: wrap; align-items: end; gap: 16px; }
-label { display: grid; min-width: 230px; gap: 7px; font-weight: 600; }
-select, button { min-height: 42px; padding: 8px 12px; border: 1px solid #cbd3df; border-radius: 8px; }
-button { background: #174ea6; color: white; cursor: pointer; font-weight: 700; }
-button:disabled { opacity: .6; cursor: not-allowed; }
-.error { color: #b42318; }
-.resumen { display: flex; justify-content: space-between; gap: 16px; align-items: center; }
-.resumen h2 { margin: 0; }
-.resumen p { margin: 7px 0 0; }
-.oficial, .preliminar { border-radius: 999px; padding: 7px 11px; font-weight: 700; }
-.oficial { background: #e8f6ed; color: #187443; }
-.preliminar { background: #fff3d6; color: #8a5a00; }
-.curso { margin-top: 24px; }
-.curso h3 { margin-bottom: 10px; }
-.tabla { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; }
-th, td { padding: 11px; border-bottom: 1px solid #e6eaf0; text-align: left; }
-thead { background: #f5f7fa; }
-@media (max-width: 640px) { .reporte-anual { padding: 16px; } .panel { padding: 16px; } }
+.reporte-anual {
+  max-width: 1280px;
+  margin: auto;
+  padding: 28px;
+  color: #172b42;
+}
+header {
+  margin-bottom: 20px;
+}
+h1 {
+  margin: 0 0 8px;
+}
+header p,
+.ayuda {
+  color: #5b6675;
+  line-height: 1.5;
+}
+.panel {
+  margin-bottom: 20px;
+  padding: 22px;
+  border: 1px solid #dfe4eb;
+  border-radius: 14px;
+  background: white;
+}
+.filtros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 16px;
+}
+label {
+  display: grid;
+  min-width: 230px;
+  gap: 7px;
+  font-weight: 600;
+}
+select,
+button {
+  min-height: 42px;
+  padding: 8px 12px;
+  border: 1px solid #cbd3df;
+  border-radius: 8px;
+}
+button {
+  background: #174ea6;
+  color: white;
+  cursor: pointer;
+  font-weight: 700;
+}
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.error {
+  color: #b42318;
+}
+.resumen {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+}
+.resumen h2 {
+  margin: 0;
+}
+.resumen p {
+  margin: 7px 0 0;
+}
+.oficial,
+.preliminar {
+  border-radius: 999px;
+  padding: 7px 11px;
+  font-weight: 700;
+}
+.oficial {
+  background: #e8f6ed;
+  color: #187443;
+}
+.preliminar {
+  background: #fff3d6;
+  color: #8a5a00;
+}
+.curso {
+  margin-top: 24px;
+}
+.curso h3 {
+  margin-bottom: 10px;
+}
+.tabla {
+  overflow-x: auto;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+th,
+td {
+  padding: 11px;
+  border-bottom: 1px solid #e6eaf0;
+  text-align: left;
+}
+thead {
+  background: #f5f7fa;
+}
+@media (max-width: 640px) {
+  .reporte-anual {
+    padding: 16px;
+  }
+  .panel {
+    padding: 16px;
+  }
+}
 </style>

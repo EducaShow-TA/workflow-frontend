@@ -1,10 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import {
-  limpiarPanelDocente,
-  listarPendientesDocente,
-  usePanelDocente,
-} from '~/composables/usePanelDocente'
+import { limpiarPanelDocente, listarPendientesDocente, usePanelDocente } from '~/composables/usePanelDocente'
 import { useAutenticacionStore } from '~/stores/autenticacion'
 
 const MINUTOS_ACTUALIZACION = 5

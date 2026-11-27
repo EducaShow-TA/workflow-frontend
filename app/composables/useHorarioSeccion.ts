@@ -47,9 +47,7 @@ export function useHorarioSeccion() {
     listarPlantillas: () => solicitar<PlantillaHorario[]>('/api/v1/horarios/plantillas'),
     listarAulas: () => solicitar<Aula[]>('/api/v1/aulas'),
     listarDisponibilidadDocente: (docenteId: number, anio: number) =>
-      solicitar<DisponibilidadDocenteHorario[]>(
-        `/api/v1/docentes/${docenteId}/disponibilidad?anio=${anio}`,
-      ),
+      solicitar<DisponibilidadDocenteHorario[]>(`/api/v1/docentes/${docenteId}/disponibilidad?anio=${anio}`),
     crearAula: (solicitud: SolicitudAula) =>
       solicitar<Aula>('/api/v1/aulas', {
         metodo: 'POST',

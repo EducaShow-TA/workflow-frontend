@@ -14,10 +14,7 @@ import {
   resumirAnhio,
 } from '~/composables/useAnhioEscolar'
 import { usePeriodosAcademicos } from '~/composables/usePeriodosAcademicos'
-import {
-  calcularResumenVacantes,
-  obtenerSituacionPeriodo,
-} from '~/composables/useResumenMatricula'
+import { calcularResumenVacantes, obtenerSituacionPeriodo } from '~/composables/useResumenMatricula'
 import { formatearFecha, obtenerFechaHoyIso } from '~/composables/useFechas'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
 import { usePermisosRol } from '~/composables/usePermisosRol'
@@ -64,8 +61,9 @@ const situacion = computed(() => obtenerSituacionPeriodo(periodos.value))
 const periodoVigente = computed(() => situacion.value.vigente)
 const proximoPeriodo = computed(() => situacion.value.proximo)
 
-const anhio = computed(() =>
-  periodoVigente.value?.anhioEscolar ??
+const anhio = computed(
+  () =>
+    periodoVigente.value?.anhioEscolar ??
     determinarAnhioEscolar(periodos.value, obtenerAnhiosAbiertos(periodosAcademicos.value), fechaHoy),
 )
 const periodosDelAnhio = computed(() =>
@@ -116,7 +114,9 @@ const motivoBloqueo = computed(() => {
           <p v-if="proximoPeriodo">
             Hay una apertura registrada para el año {{ proximoPeriodo.anhioEscolar }}, pero todavía no está activa.
           </p>
-          <p v-else>El administrador debe abrir la matrícula anual después de preparar las actas, secciones y tarifas.</p>
+          <p v-else>
+            El administrador debe abrir la matrícula anual después de preparar las actas, secciones y tarifas.
+          </p>
         </div>
         <InsigniaEstado :texto="proximoPeriodo ? 'Pendiente de inicio' : 'Cerrada'" variante="advertencia" />
       </section>

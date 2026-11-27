@@ -28,10 +28,7 @@ async function bajarPlantilla(formato: 'csv' | 'xlsx'): Promise<void> {
   error.value = ''
   try {
     const archivo = await descargarPlantilla(propiedades.sesionId, formato)
-    guardarArchivo(
-      archivo,
-      `plantilla-asistencia-sesion-${propiedades.sesionId}.${formato}`,
-    )
+    guardarArchivo(archivo, `plantilla-asistencia-sesion-${propiedades.sesionId}.${formato}`)
   } catch (fallo: unknown) {
     error.value = obtenerMensajeError(fallo, 'No se pudo descargar la plantilla de esta sesión.')
   } finally {

@@ -144,16 +144,68 @@ onMounted(cargar)
 </template>
 
 <style scoped>
-.matricula-familia { max-width: 1000px; margin: auto; padding: 28px; color: #172b42; }
-header { margin-bottom: 20px; }
-header p, .tarjeta p { color: #5b6675; }
-.lista { display: grid; gap: 14px; }
-.tarjeta { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 20px; border: 1px solid #dfe4eb; border-radius: 12px; background: white; }
-.tarjeta h2 { margin: 0 0 8px; font-size: 19px; }
-.tarjeta p { margin: 0; }
-button { padding: 11px 16px; border: 0; border-radius: 8px; background: #174ea6; color: white; cursor: pointer; font-weight: 700; }
-button:disabled { opacity: .6; cursor: not-allowed; }
-.vacio { padding: 20px; border-radius: 12px; background: white; }
-.exito { color: #187443; }
-@media (max-width: 640px) { .matricula-familia { padding: 16px; } .tarjeta { align-items: flex-start; flex-direction: column; } }
+.matricula-familia {
+  max-width: 1000px;
+  margin: auto;
+  padding: 28px;
+  color: #172b42;
+}
+header {
+  margin-bottom: 20px;
+}
+header p,
+.tarjeta p {
+  color: #5b6675;
+}
+.lista {
+  display: grid;
+  gap: 14px;
+}
+.tarjeta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid #dfe4eb;
+  border-radius: 12px;
+  background: white;
+}
+.tarjeta h2 {
+  margin: 0 0 8px;
+  font-size: 19px;
+}
+.tarjeta p {
+  margin: 0;
+}
+button {
+  padding: 11px 16px;
+  border: 0;
+  border-radius: 8px;
+  background: #174ea6;
+  color: white;
+  cursor: pointer;
+  font-weight: 700;
+}
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.vacio {
+  padding: 20px;
+  border-radius: 12px;
+  background: white;
+}
+.exito {
+  color: #187443;
+}
+@media (max-width: 640px) {
+  .matricula-familia {
+    padding: 16px;
+  }
+  .tarjeta {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
 </style>

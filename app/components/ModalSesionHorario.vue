@@ -197,8 +197,8 @@ async function eliminar(): Promise<void> {
           <strong>Horas ya asignadas en {{ anio }}:</strong>
           <ul>
             <li v-for="(ocupada, indice) in disponibilidad" :key="indice">
-              {{ nombreDia(ocupada.dia) }} {{ ocupada.horaInicio }}–{{ ocupada.horaFin }} ·
-              {{ ocupada.seccion }} · {{ ocupada.area }}
+              {{ nombreDia(ocupada.dia) }} {{ ocupada.horaInicio }}–{{ ocupada.horaFin }} · {{ ocupada.seccion }} ·
+              {{ ocupada.area }}
             </li>
           </ul>
         </div>

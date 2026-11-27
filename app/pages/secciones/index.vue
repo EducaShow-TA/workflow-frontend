@@ -1002,11 +1002,7 @@ async function confirmarApertura(): Promise<void> {
         <BotonAccion variante="secundario" :deshabilitado="abriendo" @click="aperturaAbierta = false"
           >Cancelar</BotonAccion
         >
-        <BotonAccion
-          tipo="submit"
-          form="formulario-apertura"
-          :deshabilitado="abriendo"
-        >
+        <BotonAccion tipo="submit" form="formulario-apertura" :deshabilitado="abriendo">
           {{
             abriendo
               ? 'Guardando...'
