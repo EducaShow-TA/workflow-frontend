@@ -29,7 +29,7 @@ export function obtenerEtiquetaEstadoPeriodo(estado: EstadoPeriodo): string {
   const etiquetas: Record<EstadoPeriodo, string> = {
     PENDIENTE: 'Pendiente de inicio',
     VIGENTE: 'Vigente',
-    VENCIDO: 'Vencido',
+    VENCIDO: 'Cerrada',
   }
 
   return etiquetas[estado]
@@ -48,6 +48,13 @@ export function obtenerVarianteEstadoPeriodo(estado: EstadoPeriodo): VarianteIns
 /** Equivale a PeriodoMatricula.estaVigente(). Solo en este estado se permiten matriculas (criterio 4). */
 export function estaPeriodoVigente(periodo: Pick<PeriodoMatricula, 'estado'>): boolean {
   return periodo.estado === 'VIGENTE'
+}
+
+/** Si hay más de un año abierto, se matricula en el más reciente, igual que el Panel. */
+export function elegirPeriodoVigente<T extends Pick<PeriodoMatricula, 'estado' | 'anhioEscolar'>>(
+  periodos: T[],
+): T | null {
+  return periodos.filter(estaPeriodoVigente).sort((a, b) => b.anhioEscolar - a.anhioEscolar)[0] ?? null
 }
 
 /** Nombre corto del periodo a partir de sus fechas, por ejemplo "Dic 2026 – Feb 2027" o "Ene – Feb 2026". */
@@ -158,7 +165,7 @@ export function usePeriodoMatricula() {
 
   async function obtenerPeriodoVigente(): Promise<PeriodoMatricula | null> {
     const periodos = await listarPeriodos()
-    return periodos.find(estaPeriodoVigente) ?? null
+    return elegirPeriodoVigente(periodos)
   }
 
   return {

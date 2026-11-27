@@ -4,7 +4,7 @@ import type { PeriodoMatricula, SolicitudPeriodoMatricula } from '~/types/period
 import { obtenerMensajeError } from '~/composables/useMensajesError'
 import { formatearFecha, obtenerFechaHoyIso } from '~/composables/useFechas'
 import {
-  estaPeriodoVigente,
+  elegirPeriodoVigente,
   obtenerEtiquetaEstadoPeriodo,
   obtenerVarianteEstadoPeriodo,
   usePeriodoMatricula,
@@ -23,7 +23,10 @@ const mensajeExito = ref('')
 
 const fechaHoy = obtenerFechaHoyIso()
 
-const periodoVigente = computed(() => periodos.value.find(estaPeriodoVigente) ?? null)
+/** El back envía soles y formatearSoles trabaja en céntimos. */
+const soles = (monto: number) => formatearSoles(Math.round(monto * 100))
+
+const periodoVigente = computed(() => elegirPeriodoVigente(periodos.value))
 
 const proximoPeriodo = computed(() =>
   periodos.value
@@ -222,8 +225,8 @@ async function confirmarDesactivacion(): Promise<void> {
             <p>
               Matrícula para el <strong>año escolar {{ periodoVigente.anhioEscolar }}</strong> · periodo abierta desde
               <strong>{{ formatearFecha(periodoVigente.fechaInicio) }}</strong> y activa hasta que el administrador la
-              desactive. Matrícula: <strong>{{ formatearSoles(periodoVigente.montoMatricula) }}</strong>; pensión
-              mensual: <strong>{{ formatearSoles(periodoVigente.montoPension) }}</strong>.
+              desactive. Matrícula: <strong>{{ soles(periodoVigente.montoMatricula) }}</strong>; pensión mensual:
+              <strong>{{ soles(periodoVigente.montoPension) }}</strong>.
             </p>
           </div>
 
@@ -259,8 +262,8 @@ async function confirmarDesactivacion(): Promise<void> {
               <tr v-for="periodo in periodos" :key="periodo.id">
                 <td class="dato-destacado">{{ periodo.anhioEscolar }}</td>
                 <td>{{ formatearFecha(periodo.fechaInicio) }}</td>
-                <td>{{ formatearSoles(periodo.montoMatricula) }}</td>
-                <td>{{ formatearSoles(periodo.montoPension) }}</td>
+                <td>{{ soles(periodo.montoMatricula) }}</td>
+                <td>{{ soles(periodo.montoPension) }}</td>
                 <td>
                   <InsigniaEstado
                     :texto="obtenerEtiquetaEstadoPeriodo(periodo.estado)"

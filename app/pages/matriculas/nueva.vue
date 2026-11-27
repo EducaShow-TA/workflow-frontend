@@ -15,6 +15,13 @@ import { usePeriodoMatricula } from '~/composables/usePeriodoMatricula'
 import { usePeriodosAcademicos } from '~/composables/usePeriodosAcademicos'
 import { ErrorSolicitudApi } from '~/types/api'
 import { useConstanciaMatricula } from '~/composables/useConstanciaMatricula'
+import {
+  correspondeAlGrado,
+  etiquetaSituacion,
+  motivoNoCorresponde,
+  useSituacionMatricula,
+} from '~/composables/useSituacionMatricula'
+import type { SituacionMatricula } from '~/types/situacionMatricula'
 
 definePageMeta({ middleware: 'autenticacion' })
 
@@ -28,6 +35,10 @@ const estudiantes = ref<EstudianteMatriculable[]>([])
 const periodos = ref<PeriodoAcademico[]>([])
 const ventanaVigente = ref<Awaited<ReturnType<typeof obtenerPeriodoVigente>>>(null)
 const periodoId = ref<number | null>(null)
+
+const { listarSituaciones } = useSituacionMatricula()
+const situaciones = ref(new Map<number, SituacionMatricula>())
+
 const gradoSeleccionado = ref(1)
 const busquedaEstudiante = ref('')
 const cargando = ref(true)
@@ -56,14 +67,20 @@ const periodoSeleccionado = computed(() =>
 )
 const idsPeriodosDelAnhio = computed(() => new Set(periodos.value.map((periodo) => periodo.periodoId)))
 // Un estudiante con matrícula activa en cualquier sección del año ya no está disponible: el back no impide dos secciones.
-const estudiantesDisponibles = computed(() => {
-  if (!periodoSeleccionado.value) return []
-
-  return estudiantes.value.filter(
+const sinMatriculaEnElAnhio = computed(() =>
+  estudiantes.value.filter(
     (estudiante) =>
       !estudiante.matriculas.some(
         (matricula) => idsPeriodosDelAnhio.value.has(matricula.periodoId) && matricula.estado !== 'RETIRADA',
       ),
+  ),
+)
+const estudiantesDisponibles = computed(() => {
+  if (!periodoSeleccionado.value) return []
+  const grado = periodoSeleccionado.value.numeroGrado
+
+  return sinMatriculaEnElAnhio.value.filter((estudiante) =>
+    correspondeAlGrado(situaciones.value.get(estudiante.estudianteId), grado),
   )
 })
 const pendientesDeConfirmacion = computed(() => {
@@ -90,6 +107,21 @@ const resultadosBusqueda = computed(() => {
     .filter((estudiante) => !estudiantesSeleccionados.value.includes(estudiante.estudianteId))
     .filter((estudiante) => `${nombreCompleto(estudiante)} ${estudiante.dni}`.toLocaleLowerCase().includes(termino))
     .slice(0, 8)
+})
+
+const noCorrespondenBusqueda = computed(() => {
+  const termino = busquedaEstudiante.value.trim().toLocaleLowerCase()
+  if (termino.length < 2 || !periodoSeleccionado.value) return []
+  const grado = periodoSeleccionado.value.numeroGrado
+  return sinMatriculaEnElAnhio.value
+    .filter((estudiante) => `${nombreCompleto(estudiante)} ${estudiante.dni}`.toLocaleLowerCase().includes(termino))
+    .flatMap((estudiante) => {
+      const situacion = situaciones.value.get(estudiante.estudianteId)
+      return situacion && !correspondeAlGrado(situacion, grado)
+        ? [{ estudiante, motivo: motivoNoCorresponde(situacion) }]
+        : []
+    })
+    .slice(0, 3)
 })
 
 const vacantesDisponibles = computed(() => periodoSeleccionado.value?.vacantesDisponibles ?? 0)
@@ -243,7 +275,12 @@ async function cargarDatos(): Promise<void> {
       return
     }
 
-    const [estudiantesCargados, periodosCargados] = await Promise.all([listar(), listarPorAnhio(vigente.anhioEscolar)])
+    const [estudiantesCargados, periodosCargados, situacionesCargadas] = await Promise.all([
+      listar(),
+      listarPorAnhio(vigente.anhioEscolar),
+      listarSituaciones(vigente.anhioEscolar),
+    ])
+    situaciones.value = situacionesCargadas
     estudiantes.value = estudiantesCargados
     periodos.value = periodosCargados
     gradoSeleccionado.value = periodosCargados.some((periodo) => periodo.numeroGrado === 1)
@@ -466,9 +503,14 @@ onMounted(cargarDatos)
           >
           <AvisoMensaje v-if="avisoSeleccion" :mensaje="avisoSeleccion" tipo="advertencia" />
           <p v-if="vacantesDisponibles === 0" class="aviso-neutral">La sección no tiene vacantes disponibles.</p>
-          <ul v-else-if="resultadosBusqueda.length" class="resultados-busqueda">
+          <ul v-else-if="resultadosBusqueda.length || noCorrespondenBusqueda.length" class="resultados-busqueda">
             <li v-for="estudiante in resultadosBusqueda" :key="estudiante.estudianteId">
-              <span>{{ nombreCompleto(estudiante) }} — DNI {{ estudiante.dni }}</span>
+              <span
+                >{{ nombreCompleto(estudiante) }} — DNI {{ estudiante.dni }}
+                <small class="etiqueta-situacion">{{
+                  etiquetaSituacion(situaciones.get(estudiante.estudianteId))
+                }}</small></span
+              >
               <button
                 type="button"
                 class="boton-agregar"
@@ -477,6 +519,14 @@ onMounted(cargarDatos)
               >
                 Agregar
               </button>
+            </li>
+            <li
+              v-for="item in noCorrespondenBusqueda"
+              :key="`no-${item.estudiante.estudianteId}`"
+              class="no-corresponde"
+            >
+              <span>{{ nombreCompleto(item.estudiante) }} — DNI {{ item.estudiante.dni }}</span>
+              <small>No corresponde a {{ periodoSeleccionado?.numeroGrado }}.º: {{ item.motivo }}</small>
             </li>
           </ul>
           <p v-else-if="busquedaEstudiante.trim().length >= 2" class="aviso-neutral">
@@ -494,7 +544,12 @@ onMounted(cargarDatos)
             <p v-if="!estudiantesAgregados.length" class="aviso-neutral">Aún no agregaste estudiantes.</p>
             <ul v-else>
               <li v-for="estudiante in estudiantesAgregados" :key="estudiante.estudianteId">
-                <span>{{ nombreCompleto(estudiante) }} — DNI {{ estudiante.dni }}</span>
+                <span
+                  >{{ nombreCompleto(estudiante) }} — DNI {{ estudiante.dni }}
+                  <small class="etiqueta-situacion">{{
+                    etiquetaSituacion(situaciones.get(estudiante.estudianteId))
+                  }}</small></span
+                >
                 <button
                   type="button"
                   class="boton-quitar"
@@ -1099,5 +1154,24 @@ onMounted(cargarDatos)
   .boton-agregar-todos {
     min-height: 44px;
   }
+}
+
+.etiqueta-situacion {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #e0ecff;
+  color: #1e3a8a;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.no-corresponde {
+  color: #64748b;
+}
+
+.no-corresponde small {
+  font-size: 12px;
 }
 </style>
