@@ -84,12 +84,18 @@ const evaluacionElegida = computed(
 )
 
 function etiquetaCompetencia(competencia: { codigo: string; nombre: string }): string {
-  const uuidDelCodigo = competencia.codigo.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)?.[0]
-  if (!uuidDelCodigo || !competencia.nombre.toLowerCase().endsWith(uuidDelCodigo.toLowerCase())) {
-    return competencia.nombre
+  const nombre = competencia.nombre.trimEnd()
+  const codigoEntreParentesis = `(${competencia.codigo})`
+  if (nombre.toLowerCase().endsWith(codigoEntreParentesis.toLowerCase())) {
+    return nombre.slice(0, -codigoEntreParentesis.length).trimEnd()
   }
 
-  return competencia.nombre.slice(0, -uuidDelCodigo.length).trimEnd()
+  const uuidDelCodigo = competencia.codigo.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)?.[0]
+  if (!uuidDelCodigo || !nombre.toLowerCase().endsWith(uuidDelCodigo.toLowerCase())) {
+    return nombre
+  }
+
+  return nombre.slice(0, -uuidDelCodigo.length).trimEnd()
 }
 
 function limpiarAvisos(): void {
