@@ -3,10 +3,9 @@ import { reactive, ref } from 'vue'
 import PasoApoderados from '~/components/PasoApoderados.vue'
 import PasoConfirmacion from '~/components/PasoConfirmacion.vue'
 import type { RegistroEstudiante } from '~/types/registroEstudiante'
-import type { CredencialApoderado } from '~/types/apoderado'
+import type { CredencialTemporal } from '~/types/credencial'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
 import { useApi } from '~/composables/useApi'
-import { validarPoliticaContrasena } from '~/composables/usePoliticaContrasena'
 import {
   formatearCelular,
   normalizarCelular,
@@ -26,16 +25,20 @@ const pasoApoderados = ref<InstanceType<typeof PasoApoderados> | null>(null)
 const pasos = ['Datos Personales', 'Contacto', 'Apoderados', 'Confirmación']
 const { solicitar } = useApi()
 const enviando = ref(false)
-const credencialesCreadas = ref<CredencialApoderado[]>([])
+const credencialesCreadas = ref<CredencialTemporal[]>([])
 
-interface CuentaApoderadoCreada {
+interface CuentaTemporalCreada {
   dni: string
   username: string
   contrasenhaTemporal: string
 }
 
+interface RespuestaRegistroEstudiante {
+  username: string
+  cuentasApoderados?: CuentaTemporalCreada[]
+}
+
 const formulario = reactive<RegistroEstudiante>({
-  password: '',
   tipoDocumento: 'DNI',
   nombres: '',
   apellidoPaterno: '',
@@ -68,7 +71,6 @@ const errores = reactive({
   apellidoMaterno: '',
   numeroDocumento: '',
   fechaNacimiento: '',
-  password: '',
   correoElectronico: '',
   celular: '',
 })
@@ -155,10 +157,6 @@ function validarDatosPersonales(): boolean {
 }
 
 function validarContacto(): boolean {
-  errores.password = ''
-
-  errores.password = validarPoliticaContrasena(formulario.password) ?? ''
-
   formulario.correoElectronico = normalizarCorreo(formulario.correoElectronico)
 
   formulario.direccion = formulario.direccion.trim()
@@ -176,7 +174,37 @@ function validarContacto(): boolean {
     errores.celular = 'El celular debe tener 9 dígitos y comenzar en 9.'
   }
 
-  return !(errores.password || errores.correoElectronico || errores.celular)
+  return !(errores.correoElectronico || errores.celular)
+}
+
+function generarContrasenaTemporal(): string {
+  const minusculas = 'abcdefghjkmnpqrstuvwxyz'
+  const mayusculas = 'ABCDEFGHJKMNPQRSTUVWXYZ'
+  const numeros = '23456789'
+  const simbolos = '!@#$%&*+-_?'
+  const caracteres = minusculas + mayusculas + numeros + simbolos
+  const valores = new Uint32Array(13)
+  crypto.getRandomValues(valores)
+
+  const resultado = [
+    minusculas[valores[0]! % minusculas.length]!,
+    mayusculas[valores[1]! % mayusculas.length]!,
+    numeros[valores[2]! % numeros.length]!,
+    simbolos[valores[3]! % simbolos.length]!,
+  ]
+
+  for (let indice = 4; indice < valores.length; indice++) {
+    resultado.push(caracteres[valores[indice]! % caracteres.length]!)
+  }
+
+  for (let indice = resultado.length - 1; indice > 0; indice--) {
+    const valor = new Uint32Array(1)
+    crypto.getRandomValues(valor)
+    const destino = valor[0]! % (indice + 1)
+    ;[resultado[indice], resultado[destino]] = [resultado[destino]!, resultado[indice]!]
+  }
+
+  return resultado.join('')
 }
 
 function siguientePaso(): void {
@@ -227,10 +255,11 @@ async function registrarEstudiante(): Promise<void> {
   enviando.value = true
   mensajeEstado.value = ''
   try {
-    const respuesta = await solicitar<{ cuentasApoderados?: CuentaApoderadoCreada[] }>('/api/v1/estudiantes', {
+    const contrasenaEstudiante = generarContrasenaTemporal()
+    const respuesta = await solicitar<RespuestaRegistroEstudiante>('/api/v1/estudiantes', {
       metodo: 'POST',
       cuerpo: {
-        password: formulario.password,
+        password: contrasenaEstudiante,
         tipoDocumento: formulario.tipoDocumento,
         numeroDocumento: formulario.numeroDocumento,
         nombres: formulario.nombres,
@@ -257,8 +286,13 @@ async function registrarEstudiante(): Promise<void> {
     })
     mensajeEstado.value = 'Estudiante registrado correctamente.'
     const cuentas = respuesta?.cuentasApoderados ?? []
-    if (cuentas.length) {
-      credencialesCreadas.value = cuentas.map((cuenta) => {
+    credencialesCreadas.value = [
+      {
+        nombre: `${formulario.nombres} ${formulario.apellidoPaterno} ${formulario.apellidoMaterno}`.trim(),
+        username: respuesta.username,
+        contrasenhaTemporal: contrasenaEstudiante,
+      },
+      ...cuentas.map((cuenta) => {
         const apoderado = formulario.apoderados.find((item) => item.numeroDocumento === cuenta.dni)
         return {
           nombre: apoderado
@@ -267,10 +301,8 @@ async function registrarEstudiante(): Promise<void> {
           username: cuenta.username,
           contrasenhaTemporal: cuenta.contrasenhaTemporal,
         }
-      })
-      return
-    }
-    await navigateTo('/estudiantes')
+      }),
+    ]
   } catch (error: unknown) {
     mensajeEstado.value = obtenerMensajeError(error, 'No se pudo registrar al estudiante.')
   } finally {
@@ -441,23 +473,9 @@ async function registrarEstudiante(): Promise<void> {
         <div v-else-if="pasoActual === 2" class="contenido-formulario">
           <div class="campo ancho-completo aviso-usuario">
             <strong>Usuario generado automáticamente</strong>
-            <small>El sistema creará el usuario a partir del documento de identidad del estudiante.</small>
-          </div>
-          <div class="campo">
-            <label for="password">Contraseña inicial <span class="obligatorio">*</span></label>
-            <input
-              id="password"
-              v-model="formulario.password"
-              type="password"
-              autocomplete="new-password"
-              minlength="8"
-              maxlength="72"
-              required
-              :aria-invalid="Boolean(errores.password)"
-            />
-            <small v-if="errores.password" class="error">{{ errores.password }}</small>
-            <small class="ayuda"
-              >Mínimo 8 caracteres, con minúscula, mayúscula, número y símbolo; máximo 72 bytes UTF-8.</small
+            <small
+              >El usuario se generará a partir del documento de identidad y la contraseña inicial se generará
+              automáticamente.</small
             >
           </div>
           <div class="campo">
@@ -548,7 +566,7 @@ async function registrarEstudiante(): Promise<void> {
     <VentanaModal
       :abierta="credencialesCreadas.length > 0"
       titulo="Estudiante registrado"
-      :descripcion="`${formulario.nombres} ${formulario.apellidoPaterno} ya está en el sistema. Se crearon cuentas para sus apoderados.`"
+      :descripcion="`${formulario.nombres} ${formulario.apellidoPaterno} ya está en el sistema. Guarda las credenciales de acceso generadas.`"
       ancho="amplia"
       bloqueada
       @cerrar="navigateTo('/estudiantes')"
