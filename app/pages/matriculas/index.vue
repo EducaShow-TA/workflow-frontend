@@ -16,8 +16,6 @@ import {
 import { usePeriodosAcademicos } from '~/composables/usePeriodosAcademicos'
 import {
   calcularResumenVacantes,
-  describirDiasParaInicio,
-  describirDiasRestantes,
   obtenerSituacionPeriodo,
 } from '~/composables/useResumenMatricula'
 import { formatearFecha, obtenerFechaHoyIso } from '~/composables/useFechas'
@@ -67,7 +65,8 @@ const periodoVigente = computed(() => situacion.value.vigente)
 const proximoPeriodo = computed(() => situacion.value.proximo)
 
 const anhio = computed(() =>
-  determinarAnhioEscolar(periodos.value, obtenerAnhiosAbiertos(periodosAcademicos.value), fechaHoy),
+  periodoVigente.value?.anhioEscolar ??
+    determinarAnhioEscolar(periodos.value, obtenerAnhiosAbiertos(periodosAcademicos.value), fechaHoy),
 )
 const periodosDelAnhio = computed(() =>
   periodosAcademicos.value.filter((periodo) => obtenerAnhio(periodo.fechaInicio) === anhio.value),
@@ -104,9 +103,8 @@ const motivoBloqueo = computed(() => {
         <div>
           <h2 id="titulo-periodo">Periodo de matrícula vigente</h2>
           <p>
-            Del {{ formatearFecha(periodoVigente.fechaInicio) }} al {{ formatearFecha(periodoVigente.fechaLimite) }}.
-            {{ describirDiasRestantes(periodoVigente.fechaLimite, fechaHoy) }} Las matrículas son para el año escolar
-            {{ anhio }}.
+            Abierto desde {{ formatearFecha(periodoVigente.fechaInicio) }} y activo hasta que el administrador lo
+            desactive. Año escolar {{ periodoVigente.anhioEscolar }}.
           </p>
         </div>
         <InsigniaEstado texto="Vigente" variante="exito" />
@@ -116,14 +114,11 @@ const motivoBloqueo = computed(() => {
         <div>
           <h2 id="titulo-periodo">No hay un periodo de matrícula vigente</h2>
           <p v-if="proximoPeriodo">
-            El próximo periodo va del {{ formatearFecha(proximoPeriodo.fechaInicio) }} al
-            {{ formatearFecha(proximoPeriodo.fechaLimite) }}.
-            {{ describirDiasParaInicio(proximoPeriodo.fechaInicio, fechaHoy) }}
-            Las matrículas solo se registran dentro del periodo.
+            Hay una apertura registrada para el año {{ proximoPeriodo.anhioEscolar }}, pero todavía no está activa.
           </p>
-          <p v-else>Configura el periodo para habilitar el registro de matrículas.</p>
+          <p v-else>El administrador debe abrir la matrícula anual después de preparar las actas, secciones y tarifas.</p>
         </div>
-        <InsigniaEstado :texto="proximoPeriodo ? 'Pendiente' : 'Sin periodo'" variante="advertencia" />
+        <InsigniaEstado :texto="proximoPeriodo ? 'Pendiente de inicio' : 'Cerrada'" variante="advertencia" />
       </section>
 
       <section class="acciones" aria-label="Acciones de matrícula">
@@ -141,7 +136,7 @@ const motivoBloqueo = computed(() => {
 
         <article v-if="puede('PERIODO_CONFIGURAR')" class="tarjeta-accion" :class="{ destacada: !periodoVigente }">
           <h2>Periodo de matrícula</h2>
-          <p>Configura la fecha de inicio y la fecha límite del periodo de matrícula.</p>
+          <p>Abre o desactiva la matrícula anual y define las tarifas del colegio.</p>
 
           <BotonAccion :variante="periodoVigente ? 'secundario' : 'primario'" destino="/matriculas/periodo">
             Configurar periodo

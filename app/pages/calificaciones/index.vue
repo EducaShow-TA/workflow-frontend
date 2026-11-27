@@ -43,7 +43,7 @@ interface ConfirmacionRegistro {
 const { solicitar } = useApi()
 const { listar: listarPeriodos } = usePeriodosAcademicos()
 const { listar: listarEstudiantes } = useEstudiantesMatriculables()
-const { listar, registrar, descargarEvidencia } = useCalificaciones()
+const { listar, registrar, descargarEvidencia, cargaMasiva } = useCalificaciones()
 
 const periodos = ref<PeriodoAcademico[]>([])
 const estudiantes = ref<EstudianteMatriculable[]>([])
@@ -59,11 +59,15 @@ const motivo = ref('')
 const evidenciaUrl = ref('')
 const archivo = ref<File | null>(null)
 const inputArchivo = ref<HTMLInputElement | null>(null)
+const inputCargaMasiva = ref<HTMLInputElement | null>(null)
 const cargando = ref(true)
 const consultando = ref(false)
 const guardando = ref(false)
 const descargandoId = ref<number | null>(null)
+const cargandoMasivo = ref(false)
 const error = ref('')
+const avisoCargaMasiva = ref('')
+const erroresCargaMasiva = ref<string[]>([])
 const confirmacionRegistro = ref<ConfirmacionRegistro | null>(null)
 let secuenciaConsulta = 0
 
@@ -123,6 +127,34 @@ function cambiarArchivo(evento: Event): void {
   const elemento = evento.target as HTMLInputElement
   archivo.value = elemento.files?.[0] ?? null
   limpiarAvisos()
+}
+async function cargarArchivoMasivo(evento: Event): Promise<void> {
+  const entrada = evento.target as HTMLInputElement
+  const archivoSeleccionado = entrada.files?.[0]
+  if (!archivoSeleccionado || periodoId.value === null || !competenciaCodigo.value) return
+  cargandoMasivo.value = true
+  error.value = ''
+  avisoCargaMasiva.value = ''
+  erroresCargaMasiva.value = []
+  try {
+    const resultado = await cargaMasiva(
+      periodoId.value,
+      competenciaCodigo.value,
+      bimestre.value,
+      archivoSeleccionado,
+    )
+    avisoCargaMasiva.value =
+      resultado.filasRechazadas === 0
+        ? `Se cargaron ${resultado.filasValidas} notas; se revisaron ${resultado.totalFilas} filas.`
+        : `Se cargaron ${resultado.filasValidas} notas; ${resultado.filasRechazadas} filas fueron rechazadas.`
+    erroresCargaMasiva.value = resultado.errores
+    await cargarCalificaciones()
+  } catch (fallo: unknown) {
+    error.value = obtenerMensajeError(fallo, 'No se pudo realizar la carga masiva de notas.')
+  } finally {
+    cargandoMasivo.value = false
+    entrada.value = ''
+  }
 }
 function limpiarFormulario(): void {
   nota.value = notaExistente.value?.nota ?? 'A'
@@ -463,6 +495,40 @@ async function descargar(item: Calificacion): Promise<void> {
       </form>
     </section>
 
+    <section class="tarjeta" aria-labelledby="titulo-carga-masiva">
+      <div class="encabezado-seccion">
+        <div>
+          <h2 id="titulo-carga-masiva">Carga masiva de notas</h2>
+          <p class="ayuda">
+            Como administrador, puedes cargar notas para la competencia y el bimestre seleccionados. Se aceptan CSV,
+            XLS y XLSX.
+          </p>
+        </div>
+        <input
+          ref="inputCargaMasiva"
+          class="entrada-oculta"
+          type="file"
+          accept=".csv,.xls,.xlsx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          @change="cargarArchivoMasivo"
+        />
+        <button
+          type="button"
+          class="boton-secundario"
+          :disabled="cargandoMasivo || cargando || !periodoSeleccionado || !competenciaSeleccionada"
+          @click="inputCargaMasiva?.click()"
+        >
+          {{ cargandoMasivo ? 'Cargando notas…' : 'Subir CSV o Excel' }}
+        </button>
+      </div>
+      <p v-if="avisoCargaMasiva" class="aviso aviso-exito" role="status">{{ avisoCargaMasiva }}</p>
+      <ul v-if="erroresCargaMasiva.length" class="errores-carga" aria-label="Filas rechazadas">
+        <li v-for="(detalle, indice) in erroresCargaMasiva.slice(0, 10)" :key="indice">{{ detalle }}</li>
+      </ul>
+      <p v-if="erroresCargaMasiva.length > 10" class="ayuda">
+        Se muestran 10 de {{ erroresCargaMasiva.length }} incidencias.
+      </p>
+    </section>
+
     <section class="tarjeta" aria-labelledby="titulo-seguimiento">
       <div class="encabezado-seccion">
         <div>
@@ -566,6 +632,21 @@ async function descargar(item: Calificacion): Promise<void> {
   border: 1px solid var(--color-border);
   border-radius: 12px;
   box-shadow: 0 2px 9px rgb(0 0 0 / 3%);
+}
+.entrada-oculta {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+.errores-carga {
+  margin: 12px 0 0;
+  padding-left: 22px;
+  color: #a12622;
+  font-size: 13px;
 }
 h2 {
   margin: 0 0 12px;

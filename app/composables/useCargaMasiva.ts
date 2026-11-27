@@ -14,7 +14,15 @@ const RUTA_CARGA = '/api/v1/cuentas-usuario/carga-masiva'
 
 // Reflejan LectorCsvUsuarios y la configuración multipart del backend.
 export const COLUMNAS_OBLIGATORIAS = ['rol', 'dni', 'nombres', 'apellido_paterno', 'apellido_materno', 'correo']
-export const COLUMNAS_OPCIONALES = ['username', 'telefono', 'fecha_nacimiento', 'dni_apoderado', 'parentesco']
+export const COLUMNAS_OPCIONALES = [
+  'username',
+  'telefono',
+  'fecha_nacimiento',
+  'dni_apoderado',
+  'dni_alumno',
+  'parentesco',
+  'es_principal',
+]
 export const ROLES_CARGA = ['DOCENTE', 'ALUMNO', 'APODERADO']
 export const MAXIMO_FILAS = 500
 export const MAXIMO_BYTES = 10 * 1024 * 1024
@@ -88,19 +96,38 @@ export function decodificarArchivo(contenido: ArrayBuffer): string {
   return utf8.includes('�') ? new TextDecoder('windows-1252').decode(contenido) : utf8
 }
 
+export async function convertirArchivoMasivoACsv(archivo: File): Promise<string> {
+  const nombre = archivo.name.toLowerCase()
+  if (!/\.(xls|xlsx)$/i.test(nombre)) {
+    return decodificarArchivo(await archivo.arrayBuffer())
+  }
+  const XLSX = await import('xlsx')
+  const libro = XLSX.read(await archivo.arrayBuffer(), { type: 'array' })
+  const primeraHoja = libro.SheetNames[0]
+  if (!primeraHoja) throw new Error('El archivo Excel no contiene hojas.')
+  const hoja = libro.Sheets[primeraHoja]
+  if (!hoja) throw new Error('No se pudo leer la primera hoja del archivo Excel.')
+  return XLSX.utils.sheet_to_csv(hoja, { FS: ',', RS: '\r\n' })
+}
+
 function plural(cantidad: number, singular: string, varios: string): string {
   return `${cantidad} ${cantidad === 1 ? singular : varios}`
 }
 
 /** Revisión previa en el navegador. Lo que depende de la base de datos lo valida el backend al procesar. */
-export function revisarCsv(nombreArchivo: string, tamano: number, texto: string): RevisionCsv {
+export function revisarCsv(
+  nombreArchivo: string,
+  tamano: number,
+  texto: string,
+  rolEsperado?: string | null,
+): RevisionCsv {
   const errores: string[] = []
   const advertencias: string[] = []
   const csv = leerCsv(texto)
   const conteoPorRol: Record<string, number> = {}
 
-  if (!nombreArchivo.toLowerCase().endsWith('.csv')) {
-    errores.push('El archivo debe tener extensión .csv.')
+  if (!/\.(csv|xls|xlsx)$/i.test(nombreArchivo)) {
+    errores.push('El archivo debe tener extensión .csv, .xls o .xlsx.')
   }
   if (tamano > MAXIMO_BYTES) {
     errores.push('El archivo supera los 10 MB.')
@@ -123,8 +150,13 @@ export function revisarCsv(nombreArchivo: string, tamano: number, texto: string)
 
   let filasIncompletas = 0
   let rolesInvalidos = 0
+  let rolesNoEsperados = 0
   let alumnosSinApoderado = 0
+  let apoderadosSinAlumno = 0
+  let vinculosIncompletos = 0
   let usernamesInvalidos = 0
+  let usernamesAlumno = 0
+  let usernamesDocente = 0
 
   for (const { valores } of csv.filas) {
     const rol = (valores.rol ?? '').toUpperCase()
@@ -136,11 +168,30 @@ export function revisarCsv(nombreArchivo: string, tamano: number, texto: string)
     if (rol && !ROLES_CARGA.includes(rol)) {
       rolesInvalidos++
     }
+    if (rolEsperado && rol !== rolEsperado) {
+      rolesNoEsperados++
+    }
     if (rol === 'ALUMNO' && (!valores.dni_apoderado || !valores.parentesco)) {
       alumnosSinApoderado++
     }
+    if (rolEsperado === 'APODERADO' && rol === 'APODERADO' && !valores.dni_alumno) {
+      apoderadosSinAlumno++
+    }
+    if (
+      valores.dni_alumno &&
+      (!valores.parentesco ||
+        !['SI', 'SÍ', 'NO', 'TRUE', 'FALSE', '1', '0'].includes(valores.es_principal?.toUpperCase() ?? ''))
+    ) {
+      vinculosIncompletos++
+    }
     if (valores.username?.trim() && !FORMATO_USUARIO.test(valores.username.trim())) {
       usernamesInvalidos++
+    }
+    if (rol === 'ALUMNO' && valores.username?.trim()) {
+      usernamesAlumno++
+    }
+    if (rol === 'DOCENTE' && valores.username?.trim()) {
+      usernamesDocente++
     }
   }
 
@@ -152,15 +203,34 @@ export function revisarCsv(nombreArchivo: string, tamano: number, texto: string)
       `${plural(rolesInvalidos, 'fila tiene', 'filas tienen')} un rol distinto de DOCENTE, ALUMNO o APODERADO.`,
     )
   }
+  if (rolesNoEsperados > 0) {
+    errores.push(`${plural(rolesNoEsperados, 'fila no corresponde', 'filas no corresponden')} al rol ${rolEsperado}.`)
+  }
   if (alumnosSinApoderado > 0) {
     advertencias.push(
       `${plural(alumnosSinApoderado, 'alumno no tiene', 'alumnos no tienen')} dni_apoderado o parentesco.`,
+    )
+  }
+  if (apoderadosSinAlumno > 0) {
+    errores.push(
+      `${plural(apoderadosSinAlumno, 'fila de apoderado no tiene', 'filas de apoderados no tienen')} dni_alumno.`,
+    )
+  }
+  if (vinculosIncompletos > 0) {
+    errores.push(
+      `${plural(vinculosIncompletos, 'vínculo necesita', 'vínculos necesitan')} parentesco y es_principal (SI o NO).`,
     )
   }
   if (usernamesInvalidos > 0) {
     advertencias.push(
       `${plural(usernamesInvalidos, 'fila tiene', 'filas tienen')} username inválido; usa solo letras y números.`,
     )
+  }
+  if (usernamesAlumno > 0) {
+    errores.push('No ingreses username para alumnos; el sistema lo genera automáticamente.')
+  }
+  if (usernamesDocente > 0) {
+    errores.push('No ingreses username para docentes; el sistema lo genera automáticamente.')
   }
 
   return { errores, advertencias, csv, conteoPorRol }
@@ -285,19 +355,25 @@ function esResultadoCarga(datos: unknown): datos is ResultadoCargaMasiva {
 
 /** Carga masiva de cuentas desde CSV (US-5.9). */
 export function useCargaMasiva() {
-  const { solicitar } = useApi()
+  const { solicitar, solicitarArchivo } = useApi()
 
-  function obtenerPlantilla(): Promise<string> {
-    return solicitar<string>(`${RUTA_CARGA}/plantilla`)
+  function obtenerPlantilla(rol: string | null, formato: 'csv' | 'xlsx'): Promise<Blob> {
+    const parametros = new URLSearchParams({ formato })
+    if (rol) parametros.set('rol', rol)
+    return solicitarArchivo(`${RUTA_CARGA}/plantilla?${parametros.toString()}`)
   }
 
   /** El backend responde 422 cuando rechaza todas las filas, pero igual envía el resumen: se devuelve como resultado. */
-  async function cargarArchivo(archivo: File): Promise<ResultadoCargaMasiva> {
+  async function cargarArchivo(archivo: File, rolEsperado: string | null): Promise<ResultadoCargaMasiva> {
     const formulario = new FormData()
     formulario.append('archivo', archivo)
+    const parametros = rolEsperado ? `?rol=${encodeURIComponent(rolEsperado)}` : ''
 
     try {
-      return await solicitar<ResultadoCargaMasiva>(RUTA_CARGA, { metodo: 'POST', cuerpo: formulario })
+      return await solicitar<ResultadoCargaMasiva>(`${RUTA_CARGA}${parametros}`, {
+        metodo: 'POST',
+        cuerpo: formulario,
+      })
     } catch (error: unknown) {
       if (error instanceof ErrorSolicitudApi && error.estado === 422 && esResultadoCarga(error.datos)) {
         return error.datos

@@ -23,14 +23,14 @@ function seleccionarArchivo(evento: Event): void {
   error.value = ''
 }
 
-async function bajarPlantilla(): Promise<void> {
+async function bajarPlantilla(formato: 'csv' | 'xlsx'): Promise<void> {
   descargando.value = true
   error.value = ''
   try {
-    const csv = await descargarPlantilla(propiedades.sesionId)
+    const archivo = await descargarPlantilla(propiedades.sesionId, formato)
     guardarArchivo(
-      new Blob([csv], { type: 'text/csv;charset=utf-8' }),
-      `plantilla-asistencia-sesion-${propiedades.sesionId}.csv`,
+      archivo,
+      `plantilla-asistencia-sesion-${propiedades.sesionId}.${formato}`,
     )
   } catch (fallo: unknown) {
     error.value = obtenerMensajeError(fallo, 'No se pudo descargar la plantilla de esta sesión.')
@@ -77,24 +77,34 @@ async function guardarLote(): Promise<void> {
     <summary>Cargar asistencia desde CSV</summary>
     <div class="contenido">
       <p>
-        Descarga la plantilla de esta sesión, completa el estado de cada alumno y valida el archivo antes de guardar. Se
-        aceptan PRESENTE, TARDANZA y AUSENTE; máximo 500 filas.
+        Descarga la plantilla de esta sesión en CSV o Excel, completa el estado de cada alumno y valida antes de
+        guardar. Se aceptan PRESENTE, TARDANZA y AUSENTE; máximo 500 filas.
       </p>
-      <button
-        type="button"
-        class="boton secundario"
-        :disabled="descargando || validando || guardando"
-        @click="bajarPlantilla"
-      >
-        {{ descargando ? 'Descargando…' : 'Descargar plantilla de esta sesión' }}
-      </button>
+      <div class="acciones">
+        <button
+          type="button"
+          class="boton secundario"
+          :disabled="descargando || validando || guardando"
+          @click="bajarPlantilla('csv')"
+        >
+          {{ descargando ? 'Descargando…' : 'Plantilla CSV' }}
+        </button>
+        <button
+          type="button"
+          class="boton secundario"
+          :disabled="descargando || validando || guardando"
+          @click="bajarPlantilla('xlsx')"
+        >
+          {{ descargando ? 'Descargando…' : 'Plantilla Excel' }}
+        </button>
+      </div>
 
-      <label for="archivo-csv-asistencia">Archivo CSV</label>
+      <label for="archivo-csv-asistencia">Archivo CSV o Excel</label>
       <input
         id="archivo-csv-asistencia"
         ref="entradaArchivo"
         type="file"
-        accept=".csv,text/csv"
+        accept=".csv,.xls,.xlsx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         :disabled="validando || guardando"
         @change="seleccionarArchivo"
       />

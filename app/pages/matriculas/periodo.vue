@@ -1,22 +1,14 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
-import type { ErroresPeriodoMatricula, PeriodoMatricula, SolicitudPeriodoMatricula } from '~/types/periodoMatricula'
+import { computed, onMounted, ref } from 'vue'
+import type { PeriodoMatricula, SolicitudPeriodoMatricula } from '~/types/periodoMatricula'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
-import { calcularDiasEntre, esFechaIsoValida, formatearFecha, obtenerFechaHoyIso } from '~/composables/useFechas'
+import { formatearFecha, obtenerFechaHoyIso } from '~/composables/useFechas'
 import {
-  calcularEstadoPeriodo,
-  describirPeriodo,
   estaPeriodoVigente,
   obtenerEtiquetaEstadoPeriodo,
-  esPeriodoSoloLectura,
   obtenerVarianteEstadoPeriodo,
   usePeriodoMatricula,
-  validarPeriodoMatricula,
 } from '~/composables/usePeriodoMatricula'
-import { anticiparAnhioDeVentana } from '~/composables/useAnhioEscolar'
-import { usePeriodosAcademicos } from '~/composables/usePeriodosAcademicos'
-import type { PeriodoAcademico } from '~/types/periodoAcademico'
-import { tieneErrores } from '~/composables/useValidacion'
 
 definePageMeta({
   middleware: 'autenticacion',
@@ -47,9 +39,7 @@ async function cargarPeriodos(): Promise<void> {
   errorCarga.value = ''
 
   try {
-    const [ventanas, academicos] = await Promise.all([listarPeriodos(), listarPeriodosAcademicos().catch(() => [])])
-    periodos.value = ventanas
-    periodosAcademicos.value = academicos
+    periodos.value = await listarPeriodos()
   } catch (error: unknown) {
     errorCarga.value = obtenerMensajeError(error, 'No se pudieron cargar los periodos de matrícula.')
   } finally {
@@ -59,73 +49,53 @@ async function cargarPeriodos(): Promise<void> {
 
 onMounted(cargarPeriodos)
 
-function describirDuracion(periodo: PeriodoMatricula): string {
-  const dias = calcularDiasEntre(periodo.fechaInicio, periodo.fechaLimite) + 1
-  return `${dias} ${dias === 1 ? 'día' : 'días'}`
-}
-
-function describirDiasHasta(fecha: string): string {
-  const dias = calcularDiasEntre(fechaHoy, fecha)
-
-  if (dias === 0) {
-    return 'hoy'
-  }
-
-  return dias === 1 ? 'mañana' : `en ${dias} días`
-}
-
 // Formulario de registro y edicion
 const modalAbierto = ref(false)
 const guardando = ref(false)
 const errorGuardado = ref('')
 const idEnEdicion = ref<number | null>(null)
 
-const formulario = reactive<SolicitudPeriodoMatricula>({
-  fechaInicio: '',
-  fechaLimite: '',
-})
+const anhioFormulario = ref(fechaHoy.slice(0, 4))
+const montoMatriculaFormulario = ref<number | null>(null)
+const montoPensionFormulario = ref<number | null>(null)
 
-const errores = reactive<ErroresPeriodoMatricula>({})
-
-// Un periodo vigente ya abrió la matrícula: su inicio queda fijo y solo se mueve la fecha límite.
-const periodoEnEdicion = computed(() => periodos.value.find((periodo) => periodo.id === idEnEdicion.value) ?? null)
-const inicioBloqueado = computed(() => periodoEnEdicion.value?.estado === 'VIGENTE')
-
-// Vista previa del estado con las fechas ingresadas, antes de guardar.
-const { listar: listarPeriodosAcademicos } = usePeriodosAcademicos()
-const periodosAcademicos = ref<PeriodoAcademico[]>([])
-const anhioPrevisto = computed(() =>
-  esFechaIsoValida(formulario.fechaInicio)
-    ? anticiparAnhioDeVentana(formulario.fechaInicio, periodosAcademicos.value)
-    : null,
+// Un periodo vigente ya abrió la matrícula: su año escolar no se puede cambiar.
+const periodoEnEdicion = computed(
+  () => periodos.value.find((periodo) => periodo.id !== null && periodo.id === idEnEdicion.value) ?? null,
 )
+const anhioPrevisto = computed(() => {
+  const anhio = Number(anhioFormulario.value)
+  if (!Number.isInteger(anhio) || anhio < 2000 || anhio > 2100) return null
 
-const estadoPrevisto = computed(() => {
-  if (!formulario.fechaInicio || !formulario.fechaLimite || formulario.fechaLimite <= formulario.fechaInicio) {
-    return null
+  return {
+    anhio,
+    fechaInicio: periodoEnEdicion.value?.fechaInicio ?? fechaHoy,
   }
-
-  return calcularEstadoPeriodo(formulario.fechaInicio, formulario.fechaLimite, fechaHoy)
 })
 
 function limpiarErrores(): void {
-  errores.fechaInicio = undefined
-  errores.fechaLimite = undefined
   errorGuardado.value = ''
 }
 
 function abrirRegistro(): void {
   idEnEdicion.value = null
-  formulario.fechaInicio = ''
-  formulario.fechaLimite = ''
+  let anhioDisponible = Number(fechaHoy.slice(0, 4))
+  const anhiosRegistrados = new Set(periodos.value.map((periodo) => periodo.anhioEscolar))
+  while (anhiosRegistrados.has(anhioDisponible) && anhioDisponible < 2100) {
+    anhioDisponible += 1
+  }
+  anhioFormulario.value = String(anhioDisponible)
+  montoMatriculaFormulario.value = null
+  montoPensionFormulario.value = null
   limpiarErrores()
   modalAbierto.value = true
 }
 
 function abrirEdicion(periodo: PeriodoMatricula): void {
   idEnEdicion.value = periodo.id
-  formulario.fechaInicio = periodo.fechaInicio
-  formulario.fechaLimite = periodo.fechaLimite
+  anhioFormulario.value = String(periodo.anhioEscolar)
+  montoMatriculaFormulario.value = periodo.montoMatricula
+  montoPensionFormulario.value = periodo.montoPension
   limpiarErrores()
   modalAbierto.value = true
 }
@@ -136,16 +106,28 @@ function cerrarModal(): void {
 
 async function guardarPeriodo(): Promise<void> {
   limpiarErrores()
-  Object.assign(errores, validarPeriodoMatricula(formulario, periodos.value, idEnEdicion.value, inicioBloqueado.value))
-
-  if (tieneErrores(errores)) {
+  const anhio = Number(anhioFormulario.value)
+  if (!Number.isInteger(anhio) || anhio < 2000 || anhio > 2100) {
+    errorGuardado.value = 'Indica un año escolar válido.'
+    return
+  }
+  if (anhio < Number(fechaHoy.slice(0, 4))) {
+    errorGuardado.value = 'No se puede configurar matrícula para un año anterior.'
+    return
+  }
+  if (!(Number(montoMatriculaFormulario.value) > 0) || !(Number(montoPensionFormulario.value) > 0)) {
+    errorGuardado.value = 'Indica una tarifa de matrícula y una pensión mensual mayores que cero.'
     return
   }
 
   guardando.value = true
 
   try {
-    const solicitud: SolicitudPeriodoMatricula = { ...formulario }
+    const solicitud: SolicitudPeriodoMatricula = {
+      anhioEscolar: anhio,
+      montoMatricula: montoMatriculaFormulario.value,
+      montoPension: montoPensionFormulario.value,
+    }
     const esEdicion = idEnEdicion.value !== null
 
     if (esEdicion) {
@@ -155,7 +137,9 @@ async function guardarPeriodo(): Promise<void> {
     }
 
     modalAbierto.value = false
-    mensajeExito.value = `Periodo ${describirPeriodo(solicitud)} ${esEdicion ? 'actualizado' : 'registrado'} correctamente.`
+    mensajeExito.value = esEdicion
+      ? `La apertura de matrícula ${anhio} y sus tarifas se actualizaron.`
+      : `La matrícula ${anhio} quedó abierta hasta que la desactives.`
     await cargarPeriodos()
   } catch (error: unknown) {
     errorGuardado.value = obtenerMensajeError(error, 'No se pudo guardar el periodo de matrícula.')
@@ -176,9 +160,7 @@ const mensajeDesactivacion = computed(() => {
     return ''
   }
 
-  const rango = `del ${formatearFecha(periodo.fechaInicio)} al ${formatearFecha(periodo.fechaLimite)}`
-  const cierre = estaPeriodoVigente(periodo) ? ' La matrícula se cerrará de inmediato.' : ''
-  return `¿Desactivar el periodo ${rango}? Dejará de aparecer en la lista y no se podrán registrar matrículas con él. Las matrículas ya registradas se conservan.${cierre}`
+  return `¿Desactivar la apertura de matrícula ${periodo.anhioEscolar}? Se cerrará de inmediato y no se podrán registrar más matrículas. Las matrículas ya registradas se conservan.`
 })
 
 function solicitarDesactivacion(periodo: PeriodoMatricula): void {
@@ -198,7 +180,7 @@ async function confirmarDesactivacion(): Promise<void> {
   try {
     await desactivarPeriodo(periodo.id)
     periodoPorDesactivar.value = null
-    mensajeExito.value = `Periodo ${describirPeriodo(periodo)} desactivado.`
+    mensajeExito.value = `La matrícula ${periodo.anhioEscolar} fue cerrada.`
     await cargarPeriodos()
   } catch (error: unknown) {
     errorDesactivacion.value = obtenerMensajeError(error, 'No se pudo desactivar el periodo.')
@@ -212,7 +194,7 @@ async function confirmarDesactivacion(): Promise<void> {
   <main class="pagina-periodo">
     <EncabezadoPagina
       titulo="Periodo de Matrícula"
-      descripcion="Define las fechas en las que se pueden registrar matrículas."
+      descripcion="El administrador abre cada matrícula anual después de preparar el año académico y sus tarifas. La apertura permanece activa hasta desactivarla."
     >
       <template #acciones>
         <BotonAccion
@@ -239,10 +221,10 @@ async function confirmarDesactivacion(): Promise<void> {
 
             <p>
               Matrícula para el <strong>año escolar {{ periodoVigente.anhioEscolar }}</strong> · periodo
-              <strong>{{ describirPeriodo(periodoVigente) }}</strong>: del
-              <strong>{{ formatearFecha(periodoVigente.fechaInicio) }}</strong> al
-              <strong>{{ formatearFecha(periodoVigente.fechaLimite) }}</strong>. Cierra
-              {{ describirDiasHasta(periodoVigente.fechaLimite) }}.
+              abierta desde <strong>{{ formatearFecha(periodoVigente.fechaInicio) }}</strong> y activa hasta que
+              el administrador la desactive. Matrícula:
+              <strong>{{ formatearSoles(periodoVigente.montoMatricula) }}</strong>; pensión mensual:
+              <strong>{{ formatearSoles(periodoVigente.montoPension) }}</strong>.
             </p>
           </div>
 
@@ -252,25 +234,23 @@ async function confirmarDesactivacion(): Promise<void> {
             <p>
               No hay un periodo de matrícula vigente, por lo que no se pueden registrar matrículas.
               <template v-if="proximoPeriodo">
-                El próximo periodo inicia el
-                <strong>{{ formatearFecha(proximoPeriodo.fechaInicio) }}</strong>
-                ({{ describirDiasHasta(proximoPeriodo.fechaInicio) }}).
+                Hay una apertura registrada para el año {{ proximoPeriodo.anhioEscolar }}, pero todavía no está activa.
               </template>
+              La matrícula no se habilita automáticamente por la fecha: el administrador debe abrirla.
             </p>
           </div>
         </div>
       </section>
 
-      <section class="panel-tabla" aria-label="Periodos de matrícula registrados">
+      <section class="panel-tabla" aria-label="Periodos de matrícula disponibles">
         <div class="tabla-desplazable">
           <table>
             <thead>
               <tr>
-                <th scope="col">Periodo</th>
                 <th scope="col">Año escolar</th>
-                <th scope="col">Fecha de inicio</th>
-                <th scope="col">Fecha límite</th>
-                <th scope="col">Duración</th>
+                <th scope="col">Apertura</th>
+                <th scope="col">Matrícula</th>
+                <th scope="col">Pensión mensual</th>
                 <th scope="col">Estado</th>
                 <th scope="col">Acciones</th>
               </tr>
@@ -278,11 +258,10 @@ async function confirmarDesactivacion(): Promise<void> {
 
             <tbody>
               <tr v-for="periodo in periodos" :key="periodo.id">
-                <td class="dato-destacado">{{ describirPeriodo(periodo) }}</td>
                 <td class="dato-destacado">{{ periodo.anhioEscolar }}</td>
                 <td>{{ formatearFecha(periodo.fechaInicio) }}</td>
-                <td>{{ formatearFecha(periodo.fechaLimite) }}</td>
-                <td>{{ describirDuracion(periodo) }}</td>
+                <td>{{ formatearSoles(periodo.montoMatricula) }}</td>
+                <td>{{ formatearSoles(periodo.montoPension) }}</td>
                 <td>
                   <InsigniaEstado
                     :texto="obtenerEtiquetaEstadoPeriodo(periodo.estado)"
@@ -290,14 +269,15 @@ async function confirmarDesactivacion(): Promise<void> {
                   />
                 </td>
                 <td>
-                  <p v-if="esPeriodoSoloLectura(periodo)" class="solo-lectura">
-                    <span aria-hidden="true">🔒</span> Solo lectura: tiene matrículas registradas
+                  <p v-if="periodo.tieneMatriculas" class="solo-lectura">
+                    <span aria-hidden="true">🔒</span> Tarifas bloqueadas: tiene matrículas registradas
                   </p>
                   <div v-else class="acciones-fila">
                     <button
                       type="button"
                       class="boton-tabla"
-                      :aria-label="`Editar periodo ${describirPeriodo(periodo)}`"
+                      :aria-label="`Editar matrícula ${periodo.anhioEscolar}`"
+                      :disabled="periodo.tieneMatriculas"
                       @click="abrirEdicion(periodo)"
                     >
                       Editar
@@ -306,7 +286,7 @@ async function confirmarDesactivacion(): Promise<void> {
                     <button
                       type="button"
                       class="boton-tabla"
-                      :aria-label="`Desactivar periodo ${describirPeriodo(periodo)}`"
+                      :aria-label="`Desactivar matrícula ${periodo.anhioEscolar}`"
                       @click="solicitarDesactivacion(periodo)"
                     >
                       Desactivar
@@ -316,8 +296,8 @@ async function confirmarDesactivacion(): Promise<void> {
               </tr>
 
               <tr v-if="periodos.length === 0">
-                <td colspan="7" class="sin-resultados">
-                  Aún no hay periodos de matrícula. Registra el primero con «Nuevo periodo».
+                <td colspan="6" class="sin-resultados">
+                  Aún no hay aperturas de matrícula registradas. Usa «Nuevo periodo» después de preparar el año académico.
                 </td>
               </tr>
             </tbody>
@@ -329,75 +309,43 @@ async function confirmarDesactivacion(): Promise<void> {
     <VentanaModal
       :abierta="modalAbierto"
       :titulo="idEnEdicion === null ? 'Nuevo periodo de matrícula' : 'Editar periodo de matrícula'"
-      descripcion="Las matrículas solo se pueden registrar mientras el periodo esté vigente."
+      descripcion="La matrícula se abre inmediatamente y permanece activa hasta que el administrador la desactive."
       :bloqueada="guardando"
       @cerrar="cerrarModal"
     >
       <form id="formulario-periodo" class="formulario" novalidate @submit.prevent="guardarPeriodo">
-        <div v-if="inicioBloqueado && periodoEnEdicion" class="reglas-fechas" role="note">
-          <strong>Reglas para un periodo vigente</strong>
-          <ul>
-            <li>
-              El inicio no se cambia: la matrícula se abrió el {{ formatearFecha(periodoEnEdicion.fechaInicio) }}.
-            </li>
-            <li>La fecha límite debe ser desde hoy ({{ formatearFecha(fechaHoy) }}).</li>
-          </ul>
+        <div v-if="periodoEnEdicion?.tieneMatriculas" class="reglas-fechas" role="note">
+          Este año ya tiene matrículas registradas. Las tarifas no se pueden modificar.
         </div>
 
         <div class="cuadricula-fechas">
           <div class="campo">
-            <label for="fecha-inicio">Fecha de inicio <span class="obligatorio">*</span></label>
-
+            <label for="anhio-matricula">Año de matrícula <span class="obligatorio">*</span></label>
             <input
-              id="fecha-inicio"
-              v-model="formulario.fechaInicio"
-              type="date"
-              :min="inicioBloqueado ? undefined : fechaHoy"
-              :disabled="inicioBloqueado"
-              :aria-invalid="Boolean(errores.fechaInicio)"
-              :aria-describedby="
-                errores.fechaInicio ? 'error-fecha-inicio' : inicioBloqueado ? 'ayuda-fecha-inicio' : undefined
-              "
-              @input="errores.fechaInicio = undefined"
+              id="anhio-matricula"
+              v-model.number="anhioFormulario"
+              type="number"
+              min="2000"
+              max="2100"
+              :disabled="Boolean(periodoEnEdicion)"
             />
-
-            <small v-if="errores.fechaInicio" id="error-fecha-inicio" class="error">{{ errores.fechaInicio }}</small>
-            <small v-else-if="inicioBloqueado" id="ayuda-fecha-inicio" class="ayuda">La matrícula ya se abrió.</small>
+            <small class="ayuda">
+              La apertura empieza hoy y sigue activa hasta que la desactives.
+            </small>
           </div>
-
           <div class="campo">
-            <label for="fecha-limite">Fecha límite <span class="obligatorio">*</span></label>
-
-            <input
-              id="fecha-limite"
-              v-model="formulario.fechaLimite"
-              type="date"
-              :min="inicioBloqueado ? fechaHoy : formulario.fechaInicio || undefined"
-              :aria-invalid="Boolean(errores.fechaLimite)"
-              :aria-describedby="errores.fechaLimite ? 'error-fecha-limite' : undefined"
-              @input="errores.fechaLimite = undefined"
-            />
-
-            <small v-if="errores.fechaLimite" id="error-fecha-limite" class="error">{{ errores.fechaLimite }}</small>
+            <label for="monto-matricula">Tarifa de matrícula (S/) <span class="obligatorio">*</span></label>
+            <input id="monto-matricula" v-model.number="montoMatriculaFormulario" type="number" min="0.01" step="0.01" />
+          </div>
+          <div class="campo">
+            <label for="monto-pension">Pensión mensual (S/) <span class="obligatorio">*</span></label>
+            <input id="monto-pension" v-model.number="montoPensionFormulario" type="number" min="0.01" step="0.01" />
           </div>
         </div>
 
         <p v-if="anhioPrevisto" class="vista-previa" role="status">
-          <span
-            >Esta ventana será para el <strong>año escolar {{ anhioPrevisto.anhio }}</strong
-            >{{
-              anhioPrevisto.inicioClases
-                ? `, porque las clases de ${anhioPrevisto.anhio - 1} ya empezaron el ${formatearFecha(anhioPrevisto.inicioClases)}.`
-                : '.'
-            }}</span
-          >
-        </p>
-        <p v-if="estadoPrevisto" class="vista-previa" role="status">
-          Con estas fechas, el periodo quedará
-          <InsigniaEstado
-            :texto="obtenerEtiquetaEstadoPeriodo(estadoPrevisto)"
-            :variante="obtenerVarianteEstadoPeriodo(estadoPrevisto)"
-          />
+          La matrícula del <strong>año escolar {{ anhioPrevisto.anhio }}</strong> quedará abierta desde hoy
+          ({{ formatearFecha(anhioPrevisto.fechaInicio) }}) y se cerrará solo al desactivarla.
         </p>
 
         <AvisoMensaje v-if="errorGuardado" :mensaje="errorGuardado" tipo="error" />

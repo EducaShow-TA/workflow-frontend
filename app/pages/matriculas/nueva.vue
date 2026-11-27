@@ -4,6 +4,7 @@ import type {
   ErrorConfirmacionMatricula,
   EstudianteMatriculable,
   IncidenciaConfirmacionMatricula,
+  MatriculaApi,
 } from '~/types/matricula'
 import type { SolicitudCompromisoPago } from '~/types/compromisoPago'
 import type { PeriodoAcademico } from '~/types/periodoAcademico'
@@ -13,6 +14,7 @@ import { useMatriculas } from '~/composables/useMatriculas'
 import { usePeriodoMatricula } from '~/composables/usePeriodoMatricula'
 import { usePeriodosAcademicos } from '~/composables/usePeriodosAcademicos'
 import { ErrorSolicitudApi } from '~/types/api'
+import { useConstanciaMatricula } from '~/composables/useConstanciaMatricula'
 
 definePageMeta({ middleware: 'autenticacion' })
 
@@ -20,6 +22,7 @@ const { listar } = useEstudiantesMatriculables()
 const { listarPorAnhio } = usePeriodosAcademicos()
 const { obtenerPeriodoVigente } = usePeriodoMatricula()
 const { registrarMasivamente, retirar, confirmarMasivamente } = useMatriculas()
+const { descargar: descargarConstanciaPdf } = useConstanciaMatricula()
 
 const estudiantes = ref<EstudianteMatriculable[]>([])
 const periodos = ref<PeriodoAcademico[]>([])
@@ -33,6 +36,9 @@ const error = ref('')
 const aviso = ref('')
 const avisoSeleccion = ref('')
 const confirmacionExitosa = ref(false)
+const constanciasGeneradas = ref<MatriculaApi[]>([])
+const descargandoConstanciaId = ref<number | null>(null)
+const errorConstancia = ref('')
 const modalCompromisoAbierto = ref(false)
 const avisoPendientes = ref('')
 const errorCompromiso = ref('')
@@ -293,6 +299,7 @@ async function confirmarSeleccion(compromiso: SolicitudCompromisoPago): Promise<
   error.value = ''
   errorCompromiso.value = ''
   incidenciasCompromiso.value = []
+  errorConstancia.value = ''
   try {
     const resultados = await confirmarMasivamente(
       periodoSeleccionado.value.periodoId,
@@ -300,14 +307,15 @@ async function confirmarSeleccion(compromiso: SolicitudCompromisoPago): Promise<
       compromiso,
     )
     modalCompromisoAbierto.value = false
+    constanciasGeneradas.value = resultados
     seleccionPendientes.value = []
     incidenciasCompromiso.value = []
     avisoPendientes.value = ''
     await cargarDatos()
     aviso.value =
       resultados.length === 1
-        ? `Se confirmó 1 matrícula. Se creó su compromiso "${compromiso.concepto}" y la primera boleta.`
-        : `Se confirmaron ${resultados.length} matrículas. Se creó el compromiso "${compromiso.concepto}" y la primera boleta de cada estudiante.`
+        ? `Se confirmó 1 matrícula. Se generó su constancia, el cargo de matrícula y el cronograma de pensiones.`
+        : `Se confirmaron ${resultados.length} matrículas. Se generaron las constancias y cargos de matrícula, además de los cronogramas de pensiones.`
     confirmacionExitosa.value = true
   } catch (fallo: unknown) {
     if (fallo instanceof ErrorSolicitudApi && fallo.datos && typeof fallo.datos === 'object') {
@@ -322,6 +330,18 @@ async function confirmarSeleccion(compromiso: SolicitudCompromisoPago): Promise<
     )
   } finally {
     guardando.value = false
+  }
+}
+
+async function descargarConstancia(matriculaId: number): Promise<void> {
+  descargandoConstanciaId.value = matriculaId
+  errorConstancia.value = ''
+  try {
+    await descargarConstanciaPdf(matriculaId)
+  } catch (fallo: unknown) {
+    errorConstancia.value = obtenerMensajeError(fallo, 'No se pudo descargar la constancia de matrícula.')
+  } finally {
+    descargandoConstanciaId.value = null
   }
 }
 
@@ -344,7 +364,10 @@ onMounted(cargarDatos)
     <header class="encabezado-pagina">
       <div>
         <h1>Crear Matrícula</h1>
-        <p>Elige la sección, agrega estudiantes y confirma sus matrículas.</p>
+        <p>
+          Elige la sección y agrega estudiantes. El administrador confirma la primera matrícula y puede confirmar
+          renovaciones si el apoderado no puede hacerlo.
+        </p>
       </div>
       <span class="etiqueta-anhio">Año escolar {{ anhioMatricula ?? '—' }}</span>
     </header>
@@ -352,20 +375,16 @@ onMounted(cargarDatos)
     <section class="tarjeta" aria-labelledby="titulo-parametros">
       <div class="encabezado-tarjeta">
         <h2 id="titulo-parametros"><span class="numero-paso" aria-hidden="true">1</span>Destino de la matrícula</h2>
-        <p>Los estudiantes que agregues irán a esta sección.</p>
+        <p>Los cursos del grado y sección ya quedan disponibles mediante su horario anual.</p>
       </div>
 
       <div class="contenido-tarjeta">
         <div class="cuadricula-campos">
           <div class="campo">
             <label for="anhio-academico">Año Académico</label>
-            <input
-              id="anhio-academico"
-              :value="anhioMatricula ?? ''"
-              type="text"
-              readonly
-              aria-describedby="ayuda-anhio"
-            />
+            <output id="anhio-academico" class="valor-no-editable" aria-describedby="ayuda-anhio">
+              {{ anhioMatricula ?? '—' }}
+            </output>
             <small id="ayuda-anhio">Año de la ventana de matrícula vigente.</small>
           </div>
           <div class="campo">
@@ -506,6 +525,18 @@ onMounted(cargarDatos)
     <div v-if="aviso" class="aviso-exito">
       <AvisoMensaje :mensaje="aviso" tipo="exito" />
       <NuxtLink v-if="confirmacionExitosa" to="/finanzas" class="enlace-finanzas">Ver boletas en Finanzas →</NuxtLink>
+      <div v-if="confirmacionExitosa" class="lista-constancias">
+        <button
+          v-for="matricula in constanciasGeneradas"
+          :key="matricula.matriculaId"
+          type="button"
+          :disabled="descargandoConstanciaId !== null"
+          @click="descargarConstancia(matricula.matriculaId)"
+        >
+          {{ descargandoConstanciaId === matricula.matriculaId ? 'Descargando…' : `Descargar constancia #${matricula.matriculaId}` }}
+        </button>
+      </div>
+      <AvisoMensaje v-if="errorConstancia" :mensaje="errorConstancia" tipo="error" />
     </div>
     <AvisoMensaje
       v-if="avisoPendientes && pendientesDeConfirmacion.length"
@@ -522,7 +553,7 @@ onMounted(cargarDatos)
       <div class="contenido-tarjeta">
         <p class="ayuda-pendientes">
           Reservan su vacante, pero todavía no aparecen en tareas, asistencia ni notas. Al confirmar se definen los
-          términos del compromiso de pago y se emite la primera boleta.
+          tarifas escolares, se emite una boleta de matrícula separada y se generan las cuotas de pensión.
         </p>
         <button type="button" class="boton-agregar" :disabled="guardando" @click="alternarSeleccionPendientes">
           {{ todosPendientesSeleccionados ? 'Quitar selección' : 'Seleccionar todos' }}
@@ -577,6 +608,8 @@ onMounted(cargarDatos)
       :abierta="modalCompromisoAbierto"
       :cantidad="seleccionPendientes.length"
       :anhio-escolar="anhioMatricula"
+      :monto-matricula="ventanaVigente?.montoMatricula ?? 0"
+      :monto-pension="ventanaVigente?.montoPension ?? 0"
       :destino="destinoConfirmacion"
       :procesando="guardando"
       :error="errorCompromiso"
@@ -830,7 +863,8 @@ onMounted(cargarDatos)
   font-weight: 600;
 }
 .campo select,
-.campo input {
+.campo input,
+.campo output {
   width: 100%;
   min-height: 44px;
   padding: 10px 12px;
@@ -839,8 +873,10 @@ onMounted(cargarDatos)
   background: white;
   color: #191c1e;
   font-size: 14px;
+  cursor: default;
 }
-.campo input[readonly] {
+.campo input[readonly],
+.campo output {
   background: #f2f4f6;
 }
 .campo small {

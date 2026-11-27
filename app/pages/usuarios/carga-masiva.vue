@@ -2,12 +2,11 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import type { ResultadoCargaMasiva, RevisionCsv } from '~/types/cargaMasiva'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
+import { guardarArchivo } from '~/composables/useReporteAsistencia'
 import {
-  COLUMNAS_OBLIGATORIAS,
-  COLUMNAS_OPCIONALES,
   MAXIMO_FILAS,
   combinarFilas,
-  decodificarArchivo,
+  convertirArchivoMasivoACsv,
   descargarArchivo,
   describirConteoRoles,
   generarCsvCredenciales,
@@ -33,6 +32,85 @@ const PASOS: { clave: Paso; nombre: string }[] = [
 ]
 
 const { obtenerPlantilla, cargarArchivo } = useCargaMasiva()
+const ruta = useRoute()
+const rolesDisponibles = ['DOCENTE', 'ALUMNO', 'APODERADO'] as const
+type RolCargaMasiva = (typeof rolesDisponibles)[number]
+
+interface AyudaCarga {
+  descripcion: string
+  instrucciones: string[]
+  columnasObligatorias: string[]
+  columnasOpcionales: string[]
+}
+
+const AYUDA_POR_ROL: Record<RolCargaMasiva, AyudaCarga> = {
+  DOCENTE: {
+    descripcion: 'Registra docentes y genera sus credenciales temporales de acceso.',
+    instrucciones: [
+      'Completa una fila por docente y conserva DOCENTE en la columna rol.',
+      'Ingresa DNI, nombres, apellidos y correo; el teléfono es opcional.',
+      'No completes username: se genera automáticamente a partir del DNI.',
+      'Al terminar, descarga las credenciales temporales; las contraseñas solo se muestran en ese resultado.',
+    ],
+    columnasObligatorias: ['rol', 'dni', 'nombres', 'apellido_paterno', 'apellido_materno', 'correo'],
+    columnasOpcionales: ['telefono'],
+  },
+  ALUMNO: {
+    descripcion: 'Registra alumnos vinculándolos con un apoderado que ya exista en el sistema.',
+    instrucciones: [
+      'Completa una fila por alumno y conserva ALUMNO en la columna rol.',
+      'Ingresa DNI, nombres, apellidos y correo. Para fecha_nacimiento usa AAAA-MM-DD; fecha y teléfono son opcionales.',
+      'Completa dni_apoderado con el DNI de un apoderado ya registrado y especifica parentesco: PADRE, MADRE, TUTOR_LEGAL u OTRO.',
+      'No completes username: el sistema genera el usuario del alumno automáticamente.',
+      'Al terminar, descarga las credenciales temporales; las contraseñas solo se muestran en ese resultado.',
+    ],
+    columnasObligatorias: [
+      'rol',
+      'dni',
+      'nombres',
+      'apellido_paterno',
+      'apellido_materno',
+      'correo',
+      'dni_apoderado',
+      'parentesco',
+    ],
+    columnasOpcionales: ['fecha_nacimiento', 'telefono'],
+  },
+  APODERADO: {
+    descripcion: 'Registra apoderados y vincúlalos con alumnos que ya existan en el sistema.',
+    instrucciones: [
+      'Completa una fila por vínculo entre apoderado y alumno; conserva APODERADO en la columna rol.',
+      'Ingresa los datos del apoderado y el DNI de un alumno ya registrado. Si un apoderado tiene varios alumnos, repite sus datos en una fila por alumno.',
+      'Completa parentesco: PADRE, MADRE, TUTOR_LEGAL u OTRO. En es_principal indica SI o NO; marca SI para un solo apoderado principal por alumno.',
+      'username es opcional; si lo dejas vacío, el sistema lo genera a partir del DNI.',
+      'Al terminar, descarga las credenciales temporales; las contraseñas solo se muestran en ese resultado.',
+    ],
+    columnasObligatorias: [
+      'rol',
+      'dni',
+      'nombres',
+      'apellido_paterno',
+      'apellido_materno',
+      'correo',
+      'dni_alumno',
+      'parentesco',
+      'es_principal',
+    ],
+    columnasOpcionales: ['telefono', 'username'],
+  },
+}
+
+const rolEsperado = computed(() => {
+  const rol = typeof ruta.query.rol === 'string' ? ruta.query.rol.toUpperCase() : ''
+  return rolesDisponibles.find((disponible) => disponible === rol) ?? null
+})
+const nombreRol = computed(() => {
+  if (rolEsperado.value === 'ALUMNO') return 'alumnos'
+  if (rolEsperado.value === 'DOCENTE') return 'docentes'
+  if (rolEsperado.value === 'APODERADO') return 'apoderados'
+  return ''
+})
+const ayudaCarga = computed(() => (rolEsperado.value ? AYUDA_POR_ROL[rolEsperado.value] : null))
 
 const paso = ref<Paso>('elegir')
 const archivo = ref<File | null>(null)
@@ -88,9 +166,14 @@ async function elegirArchivo(seleccionado: File | undefined): Promise<void> {
 
   errorGeneral.value = ''
   archivo.value = seleccionado
-  const texto = decodificarArchivo(await seleccionado.arrayBuffer())
-  revision.value = revisarCsv(seleccionado.name, seleccionado.size, texto)
-  paso.value = 'revisar'
+  try {
+    const texto = await convertirArchivoMasivoACsv(seleccionado)
+    revision.value = revisarCsv(seleccionado.name, seleccionado.size, texto, rolEsperado.value)
+    paso.value = 'revisar'
+  } catch (error: unknown) {
+    archivo.value = null
+    errorGeneral.value = obtenerMensajeError(error, 'No se pudo leer el archivo seleccionado.')
+  }
 }
 
 function alSeleccionar(evento: Event): void {
@@ -104,12 +187,13 @@ function alSoltar(evento: DragEvent): void {
   void elegirArchivo(evento.dataTransfer?.files[0])
 }
 
-async function descargarPlantilla(): Promise<void> {
+async function descargarPlantilla(formato: 'csv' | 'xlsx'): Promise<void> {
   descargandoPlantilla.value = true
   errorGeneral.value = ''
 
   try {
-    descargarArchivo('plantilla-usuarios.csv', await obtenerPlantilla())
+    const archivo = await obtenerPlantilla(rolEsperado.value, formato)
+    guardarArchivo(archivo, `plantilla-${nombreRol.value}.${formato}`)
   } catch (error: unknown) {
     errorGeneral.value = obtenerMensajeError(error, 'No se pudo descargar la plantilla.')
   } finally {
@@ -124,7 +208,7 @@ async function procesar(): Promise<void> {
   errorGeneral.value = ''
 
   try {
-    resultado.value = await cargarArchivo(archivo.value)
+    resultado.value = await cargarArchivo(archivo.value, rolEsperado.value)
     credencialesDescargadas.value = false
     contrasenasVisibles.value = new Set()
     pestana.value =
@@ -200,16 +284,19 @@ function avisarAntesDeCerrar(evento: BeforeUnloadEvent): void {
 }
 
 onBeforeRouteLeave(() => confirmarDescarte())
-onMounted(() => window.addEventListener('beforeunload', avisarAntesDeCerrar))
+onMounted(() => {
+  if (!rolEsperado.value) {
+    void navigateTo('/usuarios', { replace: true })
+    return
+  }
+  window.addEventListener('beforeunload', avisarAntesDeCerrar)
+})
 onBeforeUnmount(() => window.removeEventListener('beforeunload', avisarAntesDeCerrar))
 </script>
 
 <template>
-  <main class="pagina-carga">
-    <EncabezadoPagina
-      titulo="Carga masiva de usuarios"
-      descripcion="Crea o actualiza cuentas de docentes, alumnos y apoderados desde un archivo CSV."
-    >
+  <main v-if="rolEsperado" class="pagina-carga">
+    <EncabezadoPagina :titulo="`Carga masiva de ${nombreRol}`" :descripcion="ayudaCarga?.descripcion">
       <template #acciones>
         <template v-if="paso === 'resultado'">
           <BotonAccion variante="secundario" @click="reiniciar">Cargar otro archivo</BotonAccion>
@@ -246,43 +333,38 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', avisarAntesDeCe
             <path d="M12 16V4M6 10l6-6 6 6M4 20h16" />
           </svg>
         </div>
-        <strong>Arrastra aquí tu archivo CSV</strong>
+        <strong>Arrastra aquí tu archivo CSV o Excel</strong>
         <span>o</span>
         <BotonAccion variante="secundario" @click="selectorArchivo?.click()">Seleccionar archivo</BotonAccion>
         <input
           ref="selectorArchivo"
           type="file"
-          accept=".csv,text/csv"
+          accept=".csv,.xls,.xlsx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           class="oculto"
-          aria-label="Seleccionar archivo CSV"
+          aria-label="Seleccionar archivo CSV o Excel"
           @change="alSeleccionar"
         />
         <small>Hasta {{ MAXIMO_FILAS }} filas y 10 MB · separado por comas o punto y coma</small>
       </div>
 
       <aside class="tarjeta guia" aria-labelledby="titulo-guia">
-        <h2 id="titulo-guia">¿Cómo armar el archivo?</h2>
+        <h2 id="titulo-guia">Instrucciones para {{ nombreRol }}</h2>
         <ol>
-          <li>Descarga la plantilla y ábrela en Excel.</li>
-          <li>
-            Una fila por persona. Rol: <strong>DOCENTE</strong>, <strong>ALUMNO</strong> o <strong>APODERADO</strong>.
-          </li>
-          <li>
-            Cada alumno necesita <code>dni_apoderado</code> y <code>parentesco</code> (PADRE, MADRE, TUTOR_LEGAL u
-            OTRO). Su apoderado puede ir en el mismo archivo.
-          </li>
-          <li>Guárdalo como <strong>CSV</strong>.</li>
+          <li>Descarga y completa la plantilla CSV o Excel específica para {{ nombreRol }}.</li>
+          <li v-for="instruccion in ayudaCarga?.instrucciones" :key="instruccion">{{ instruccion }}</li>
         </ol>
-        <BotonAccion variante="secundario" :deshabilitado="descargandoPlantilla" @click="descargarPlantilla">
-          {{ descargandoPlantilla ? 'Descargando...' : '⬇ Descargar plantilla' }}
-        </BotonAccion>
+        <div class="acciones-plantilla">
+          <BotonAccion variante="secundario" :deshabilitado="descargandoPlantilla" @click="descargarPlantilla('csv')">
+            {{ descargandoPlantilla ? 'Descargando...' : '⬇ Plantilla CSV' }}
+          </BotonAccion>
+          <BotonAccion variante="secundario" :deshabilitado="descargandoPlantilla" @click="descargarPlantilla('xlsx')">
+            {{ descargandoPlantilla ? 'Descargando...' : '⬇ Plantilla Excel' }}
+          </BotonAccion>
+        </div>
         <details>
           <summary>Ver columnas</summary>
-          <p><strong>Obligatorias:</strong> {{ COLUMNAS_OBLIGATORIAS.join(', ') }}</p>
-          <p>
-            <strong>Opcionales:</strong> {{ COLUMNAS_OPCIONALES.join(', ') }}. La fecha va como AAAA-MM-DD;
-            dni_apoderado y parentesco son obligatorias para ALUMNO.
-          </p>
+          <p><strong>Obligatorias:</strong> {{ ayudaCarga?.columnasObligatorias.join(', ') }}</p>
+          <p><strong>Opcionales:</strong> {{ ayudaCarga?.columnasOpcionales.join(', ') || 'Ninguna' }}</p>
         </details>
         <p class="nota">
           Las cuentas existentes conservan su contraseña y su rol: si un DNI ya registrado viene con otro rol, esa fila
@@ -348,7 +430,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', avisarAntesDeCe
                     .join(' ') || '—'
                 }}
               </td>
-              <td>{{ fila.valores.username || `usuario + ${fila.valores.dni ?? 'documento'}` }}</td>
+              <td>{{ fila.valores.username || 'Se generará automáticamente' }}</td>
               <td>
                 <InsigniaEstado v-if="!fila.valores.correo" texto="vacío" variante="advertencia" />
                 <template v-else>{{ fila.valores.correo }}</template>
@@ -357,7 +439,11 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', avisarAntesDeCe
                 {{
                   fila.valores.dni_apoderado
                     ? `${fila.valores.dni_apoderado}${fila.valores.parentesco ? ` · ${fila.valores.parentesco}` : ''}`
-                    : '—'
+                    : fila.valores.dni_alumno
+                      ? `${fila.valores.dni_alumno}${fila.valores.parentesco ? ` · ${fila.valores.parentesco}` : ''}${
+                          fila.valores.es_principal ? ` · principal: ${fila.valores.es_principal}` : ''
+                        }`
+                      : '—'
                 }}
               </td>
             </tr>
@@ -551,6 +637,9 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', avisarAntesDeCe
       </section>
     </template>
   </main>
+  <main v-else class="pagina-carga">
+    <p role="status">Selecciona el tipo de usuario desde la sección Usuarios para iniciar una carga masiva.</p>
+  </main>
 </template>
 
 <style scoped>
@@ -684,6 +773,12 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', avisarAntesDeCe
   color: #434655;
   font-size: 14px;
   line-height: 1.6;
+}
+
+.acciones-plantilla {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .guia details {

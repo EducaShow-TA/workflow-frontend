@@ -24,7 +24,6 @@ const mensajeEstado = ref('')
 const pasoApoderados = ref<InstanceType<typeof PasoApoderados> | null>(null)
 
 const pasos = ['Datos Personales', 'Contacto', 'Apoderados', 'Confirmación']
-const formatoUsuario = /^[A-Za-z0-9]+$/
 const { solicitar } = useApi()
 const enviando = ref(false)
 const credencialesCreadas = ref<CredencialApoderado[]>([])
@@ -36,7 +35,6 @@ interface CuentaApoderadoCreada {
 }
 
 const formulario = reactive<RegistroEstudiante>({
-  username: '',
   password: '',
   tipoDocumento: 'DNI',
   nombres: '',
@@ -70,7 +68,6 @@ const errores = reactive({
   apellidoMaterno: '',
   numeroDocumento: '',
   fechaNacimiento: '',
-  username: '',
   password: '',
   correoElectronico: '',
   celular: '',
@@ -158,16 +155,7 @@ function validarDatosPersonales(): boolean {
 }
 
 function validarContacto(): boolean {
-  errores.username = ''
   errores.password = ''
-
-  if (!formulario.username.trim()) {
-    errores.username = 'El usuario es obligatorio.'
-  } else if (formulario.username.length > 50) {
-    errores.username = 'El usuario no debe superar 50 caracteres.'
-  } else if (!formatoUsuario.test(formulario.username.trim())) {
-    errores.username = 'El usuario solo puede contener letras y números.'
-  }
 
   errores.password = validarPoliticaContrasena(formulario.password) ?? ''
 
@@ -188,7 +176,7 @@ function validarContacto(): boolean {
     errores.celular = 'El celular debe tener 9 dígitos y comenzar en 9.'
   }
 
-  return !(errores.username || errores.password || errores.correoElectronico || errores.celular)
+  return !(errores.password || errores.correoElectronico || errores.celular)
 }
 
 function siguientePaso(): void {
@@ -242,7 +230,6 @@ async function registrarEstudiante(): Promise<void> {
     const respuesta = await solicitar<{ cuentasApoderados?: CuentaApoderadoCreada[] }>('/api/v1/estudiantes', {
       metodo: 'POST',
       cuerpo: {
-        username: formulario.username.trim(),
         password: formulario.password,
         tipoDocumento: formulario.tipoDocumento,
         numeroDocumento: formulario.numeroDocumento,
@@ -452,24 +439,9 @@ async function registrarEstudiante(): Promise<void> {
         </div>
 
         <div v-else-if="pasoActual === 2" class="contenido-formulario">
-          <div class="campo">
-            <label for="username">Usuario <span class="obligatorio">*</span></label>
-            <input
-              id="username"
-              v-model="formulario.username"
-              type="text"
-              autocomplete="username"
-              pattern="[A-Za-z0-9]+"
-              maxlength="50"
-              required
-              placeholder="alumno01"
-              :aria-invalid="Boolean(errores.username)"
-              aria-describedby="ayuda-username"
-            />
-            <small v-if="errores.username" class="error">{{ errores.username }}</small>
-            <small id="ayuda-username" class="ayuda"
-              >Usa solo letras y números; el correo se registra en su campo aparte.</small
-            >
+          <div class="campo ancho-completo aviso-usuario">
+            <strong>Usuario generado automáticamente</strong>
+            <small>El sistema creará el usuario a partir del documento de identidad del estudiante.</small>
           </div>
           <div class="campo">
             <label for="password">Contraseña inicial <span class="obligatorio">*</span></label>
@@ -581,7 +553,7 @@ async function registrarEstudiante(): Promise<void> {
       bloqueada
       @cerrar="navigateTo('/estudiantes')"
     >
-      <CredencialesApoderado :credenciales="credencialesCreadas" />
+      <CredencialesTemporales :credenciales="credencialesCreadas" />
       <template #pie>
         <BotonAccion @click="navigateTo('/estudiantes')">Ir a la lista de estudiantes</BotonAccion>
       </template>

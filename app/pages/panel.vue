@@ -2,7 +2,6 @@
 import { computed, onMounted, ref } from 'vue'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
 import {
-  diasEntrePanel,
   fechaLocalPanel,
   fechaTituloPanel,
   formatearSolesPanel,
@@ -45,16 +44,14 @@ const saludo = computed(() => saludoPanel(ahora.value, autenticacion.usuario?.no
 const ventana = computed(() => {
   const datos = panel.value
   if (!datos?.ventanaMatricula) return null
-  const { estado, fechaInicio, fechaLimite, anhioEscolar } = datos.ventanaMatricula
+  const { estado, fechaInicio, anhioEscolar } = datos.ventanaMatricula
   if (estado === 'PENDIENTE') {
     const fecha = new Intl.DateTimeFormat('es-PE', { day: 'numeric', month: 'long' }).format(
       fechaLocalPanel(fechaInicio),
     )
     return { texto: `Matrícula ${anhioEscolar} abre el ${fecha}`, abierta: false }
   }
-  const dias = diasEntrePanel(datos.fecha, fechaLimite)
-  const cierre = dias === 0 ? 'cierra hoy' : dias === 1 ? 'cierra mañana' : `cierra en ${dias} días`
-  return { texto: `Matrícula ${anhioEscolar} abierta · ${cierre}`, abierta: true }
+  return { texto: `Matrícula ${anhioEscolar} abierta · hasta que la desactives`, abierta: true }
 })
 
 const pendientes = computed(() => (panel.value ? listarPendientesPanel(panel.value) : []))

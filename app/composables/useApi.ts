@@ -72,7 +72,30 @@ export function useApi() {
     }
   }
 
+  async function solicitarArchivo(ruta: string): Promise<Blob> {
+    const urlBase = String(configuracion.public.apiBase || '').replace(/\/+$/, '')
+    if (!ruta.startsWith('/api/v1/')) {
+      throw new ErrorSolicitudApi('La ruta debe utilizar el prefijo /api/v1/.', 0, ruta)
+    }
+    const respuesta = await fetch(`${urlBase}${ruta}`, {
+      headers: autenticacion.token ? { Authorization: `Bearer ${autenticacion.token}` } : {},
+      cache: 'no-store',
+    })
+    if (!respuesta.ok) {
+      const datos: unknown = await respuesta.json().catch(() => undefined)
+      const mensaje =
+        datos && typeof datos === 'object' && 'message' in datos && typeof datos.message === 'string'
+          ? datos.message
+          : 'No se pudo descargar el archivo solicitado.'
+      const error = new ErrorSolicitudApi(mensaje, respuesta.status, ruta, datos)
+      if (error.estado === 401 && autenticacion.token) autenticacion.cerrarSesion()
+      throw error
+    }
+    return respuesta.blob()
+  }
+
   return {
     solicitar,
+    solicitarArchivo,
   }
 }

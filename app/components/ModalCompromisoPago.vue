@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import type { ErroresCompromisoPago, FormularioCompromisoPago, SolicitudCompromisoPago } from '~/types/compromisoPago'
 import type { IncidenciaConfirmacionMatricula } from '~/types/matricula'
 import {
@@ -13,14 +13,14 @@ import {
   validarCompromiso,
 } from '~/composables/useCompromisoPago'
 import { formatearFecha, obtenerFechaHoyIso } from '~/composables/useFechas'
-import { useApi } from '~/composables/useApi'
-import { obtenerMensajeError } from '~/composables/useMensajesError'
 
 const propiedades = withDefaults(
   defineProps<{
     abierta: boolean
     cantidad: number
     anhioEscolar: number
+    montoMatricula: number
+    montoPension: number
     destino?: string
     procesando?: boolean
     error?: string
@@ -44,10 +44,7 @@ const formulario = reactive<FormularioCompromisoPago>(
 )
 const fechaMinima = obtenerFechaHoyIso()
 const errores = ref<ErroresCompromisoPago>({})
-const { solicitar } = useApi()
-const montoPredeterminado = ref<number | null>(null)
-const montoCuota = ref<number | null>(null)
-const errorConfiguracion = ref('')
+const montoCuota = ref<number | null>(propiedades.montoPension)
 
 const cronograma = computed(() => calcularCronograma(formulario))
 const primeraCuota = computed(() => cronograma.value[0])
@@ -75,23 +72,20 @@ watch(
   (abierta) => {
     if (abierta) {
       Object.assign(formulario, crearFormularioCompromiso(propiedades.anhioEscolar, obtenerFechaHoyIso()))
-      montoCuota.value = montoPredeterminado.value
+      montoCuota.value = propiedades.montoPension
       actualizarMontoTotal()
       errores.value = {}
     }
   },
 )
 
-onMounted(async () => {
-  try {
-    const configuracion = await solicitar<{ montoPensionPredeterminado: number }>('/api/v1/configuracion/finanzas')
-    const monto = Number(configuracion.montoPensionPredeterminado)
-    montoPredeterminado.value = Number.isFinite(monto) && monto > 0 ? monto : null
-    if (montoPredeterminado.value !== null && montoCuota.value === null) montoCuota.value = montoPredeterminado.value
-  } catch (fallo: unknown) {
-    errorConfiguracion.value = obtenerMensajeError(fallo, 'No se pudo cargar el monto sugerido.')
-  }
-})
+watch(
+  () => propiedades.montoPension,
+  (monto) => {
+    montoCuota.value = monto
+    actualizarMontoTotal()
+  },
+)
 
 function limpiarError(campo: keyof FormularioCompromisoPago): void {
   errores.value = { ...errores.value, [campo]: undefined }
@@ -129,8 +123,9 @@ function confirmar(): void {
     <div class="distribucion">
       <form id="formulario-compromiso" class="formulario" novalidate @submit.prevent="confirmar">
         <p class="dato-informativo">
-          Al confirmar se crea este compromiso para cada estudiante y se emite su primera boleta. Los términos se
-          aplican por igual a {{ cantidad === 1 ? 'este estudiante' : `los ${cantidad} estudiantes` }}.
+          Se emitirá una boleta única de matrícula por S/ {{ montoMatricula.toFixed(2) }} y el cronograma de pensiones
+          por S/ {{ (montoCuota ?? 0).toFixed(2) }} mensuales. Las tarifas se aplican por igual a
+          {{ cantidad === 1 ? 'este estudiante' : `los ${cantidad} estudiantes` }}.
         </p>
 
         <div class="campo">
@@ -149,26 +144,8 @@ function confirmar(): void {
 
         <div class="cuadricula-campos">
           <div class="campo">
-            <label for="monto-compromiso">Pensión mensual por estudiante (S/) <span class="obligatorio">*</span></label>
-            <small v-if="montoPredeterminado !== null" class="ayuda">
-              Valor predeterminado: S/ {{ montoPredeterminado.toFixed(2) }} por cuota. Puedes editarlo para aplicar
-              becas.
-            </small>
-            <small v-else-if="errorConfiguracion" class="ayuda"
-              >{{ errorConfiguracion }} Ingresa el monto acordado.</small
-            >
-            <input
-              id="monto-compromiso"
-              v-model.number="montoCuota"
-              type="number"
-              inputmode="decimal"
-              min="0.01"
-              step="0.01"
-              placeholder="Ej. 500.00"
-              :aria-invalid="Boolean(errores.montoTotal)"
-              :aria-describedby="errores.montoTotal ? 'error-monto' : undefined"
-              @input="limpiarError('montoTotal')"
-            />
+            <label for="monto-compromiso">Pensión mensual por estudiante (S/)</label>
+            <output id="monto-compromiso" class="monto-tarifa">S/ {{ (montoCuota ?? 0).toFixed(2) }}</output>
             <small v-if="errores.montoTotal" id="error-monto" class="error">{{ errores.montoTotal }}</small>
           </div>
 
@@ -309,7 +286,8 @@ function confirmar(): void {
   font-weight: 600;
 }
 
-.campo input {
+.campo input,
+.monto-tarifa {
   width: 100%;
   min-width: 0;
   min-height: 44px;
@@ -319,6 +297,10 @@ function confirmar(): void {
   background: white;
   color: #191c1e;
   font-size: 14px;
+}
+
+.monto-tarifa {
+  font-weight: 700;
 }
 
 .campo input:focus-visible {

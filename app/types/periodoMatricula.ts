@@ -9,16 +9,20 @@ export interface PeriodoMatricula {
   fechaLimite: string
   /** Calculado por el backend con la fecha del servidor. */
   estado: EstadoPeriodo
-  /** Hay matrículas registradas entre sus fechas; un periodo vencido con matrículas no se puede editar. */
+  /** Hay matrículas registradas para este año; las tarifas ya no se pueden modificar. */
   tieneMatriculas: boolean
-  /** Año escolar que se matricula: si las clases del año ya empezaron, el siguiente (calculado por el backend). */
   anhioEscolar: number
+  montoMatricula: number
+  montoPension: number
 }
 
 /** Cuerpo de POST y PUT /api/v1/periodos-matricula. */
 export interface SolicitudPeriodoMatricula {
-  fechaInicio: string
-  fechaLimite: string
+  fechaInicio?: string
+  fechaLimite?: string
+  anhioEscolar?: number
+  montoMatricula?: number
+  montoPension?: number
 }
 
 export type ErroresPeriodoMatricula = Partial<Record<keyof SolicitudPeriodoMatricula, string>>

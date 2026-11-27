@@ -6,42 +6,76 @@ interface EnlaceMenu {
   prefijoActivo?: string
 }
 
-const ruta = useRoute()
+interface GrupoMenu {
+  titulo: string
+  enlaces: EnlaceMenu[]
+}
 
-const enlaces: EnlaceMenu[] = [
-  { nombre: 'Panel', icono: '/icons/menu-panel.svg', destino: '/panel' },
-  { nombre: 'Estudiantes', icono: '/icons/menu-estudiantes.svg', destino: '/estudiantes' },
+const ruta = useRoute()
+const grupos: GrupoMenu[] = [
   {
-    nombre: 'Matrícula',
-    icono: '/icons/menu-matricula.svg',
-    destino: '/matriculas',
-    prefijoActivo: '/matriculas',
-  },
-  { nombre: 'Grados/Secciones', icono: '/icons/menu-secciones.svg', destino: '/secciones' },
-  { nombre: 'Áreas y competencias', icono: '/icons/menu-competencias.svg', destino: '/competencias' },
-  { nombre: 'Tareas', icono: '/icons/menu-tareas.svg', destino: '/tareas' },
-  { nombre: 'Calificaciones', icono: '/icons/menu-calificaciones.svg', destino: '/calificaciones' },
-  { nombre: 'Horarios', icono: '/icons/menu-horarios.svg', destino: '/horarios' },
-  { nombre: 'Sesiones de clase', icono: '/icons/menu-matricula.svg', destino: '/sesiones-clase' },
-  { nombre: 'Asistencia docente', icono: '/icons/menu-docentes.svg', destino: '/asistencia-docentes' },
-  { nombre: 'Horario por sección', icono: '/icons/menu-clases.svg', destino: '/horario-secciones' },
-  { nombre: 'Finanzas', icono: '/icons/menu-finanzas.svg', destino: '/finanzas' },
-  {
-    nombre: 'Reportes',
-    icono: '/icons/menu-reportes.svg',
-    destino: '/reportes/boletas',
-    prefijoActivo: '/reportes/boletas',
+    titulo: 'Inicio',
+    enlaces: [{ nombre: 'Panel', icono: '/icons/menu-panel.svg', destino: '/panel' }],
   },
   {
-    nombre: 'Cuadro de mérito',
-    icono: '/icons/menu-reportes.svg',
-    destino: '/reportes/cuadro-merito',
-    prefijoActivo: '/reportes/cuadro-merito',
+    titulo: 'Estudiantes y matrícula',
+    enlaces: [
+      { nombre: 'Estudiantes', icono: '/icons/menu-estudiantes.svg', destino: '/estudiantes' },
+      {
+        nombre: 'Matrícula',
+        icono: '/icons/menu-matricula.svg',
+        destino: '/matriculas',
+        prefijoActivo: '/matriculas',
+      },
+      { nombre: 'Grados y secciones', icono: '/icons/menu-secciones.svg', destino: '/secciones' },
+    ],
   },
-  { nombre: 'Usuarios', icono: '/icons/menu-usuarios.svg', destino: '/usuarios' },
-  { nombre: 'Roles/Permisos', icono: '/icons/menu-roles.svg', destino: '/roles-permisos' },
-  { nombre: 'Logs del sistema', icono: '/icons/menu-logs.svg', destino: '/logs-sistema' },
-  { nombre: 'Parámetros del sistema', icono: '/icons/menu-config.svg', destino: '/parametros-sistema' },
+  {
+    titulo: 'Gestión académica',
+    enlaces: [
+      { nombre: 'Calificaciones', icono: '/icons/menu-calificaciones.svg', destino: '/calificaciones' },
+      { nombre: 'Áreas y competencias', icono: '/icons/menu-competencias.svg', destino: '/competencias' },
+      { nombre: 'Tareas', icono: '/icons/menu-tareas.svg', destino: '/tareas' },
+      { nombre: 'Horarios', icono: '/icons/menu-horarios.svg', destino: '/horarios' },
+      { nombre: 'Horario por sección', icono: '/icons/menu-clases.svg', destino: '/horario-secciones' },
+      { nombre: 'Docentes', icono: '/icons/menu-docentes.svg', destino: '/docentes' },
+      { nombre: 'Sesiones de clase', icono: '/icons/menu-matricula.svg', destino: '/sesiones-clase' },
+      { nombre: 'Asistencia docente', icono: '/icons/menu-docentes.svg', destino: '/asistencia-docentes' },
+    ],
+  },
+  {
+    titulo: 'Finanzas y reportes',
+    enlaces: [
+      { nombre: 'Finanzas', icono: '/icons/menu-finanzas.svg', destino: '/finanzas' },
+      {
+        nombre: 'Boletas',
+        icono: '/icons/menu-reportes.svg',
+        destino: '/reportes/boletas',
+        prefijoActivo: '/reportes/boletas',
+      },
+      {
+        nombre: 'Reporte de asistencia',
+        icono: '/icons/menu-reportes.svg',
+        destino: '/reportes/asistencia',
+        prefijoActivo: '/reportes/asistencia',
+      },
+      {
+        nombre: 'Cuadro de mérito',
+        icono: '/icons/menu-reportes.svg',
+        destino: '/reportes/cuadro-merito',
+        prefijoActivo: '/reportes/cuadro-merito',
+      },
+    ],
+  },
+  {
+    titulo: 'Administración',
+    enlaces: [
+      { nombre: 'Usuarios', icono: '/icons/menu-usuarios.svg', destino: '/usuarios' },
+      { nombre: 'Roles y permisos', icono: '/icons/menu-roles.svg', destino: '/roles-permisos' },
+      { nombre: 'Logs del sistema', icono: '/icons/menu-logs.svg', destino: '/logs-sistema' },
+      { nombre: 'Parámetros', icono: '/icons/menu-config.svg', destino: '/parametros-sistema' },
+    ],
+  },
 ]
 
 function estaActivo(enlace: EnlaceMenu): boolean {
@@ -64,20 +98,20 @@ function estaActivo(enlace: EnlaceMenu): boolean {
     </NuxtLink>
 
     <nav class="navegacion" aria-label="Navegación principal">
-      <template v-for="enlace in enlaces" :key="enlace.nombre">
+      <section v-for="grupo in grupos" :key="grupo.titulo" class="grupo-menu">
+        <h2 class="titulo-grupo">{{ grupo.titulo }}</h2>
         <NuxtLink
-          v-if="enlace.destino"
+          v-for="enlace in grupo.enlaces"
+          :key="enlace.destino"
           :to="enlace.destino"
           class="enlace-menu"
           :class="{ activo: estaActivo(enlace) }"
           :aria-current="estaActivo(enlace) ? 'page' : undefined"
         >
-          <span class="contenedor-icono">
-            <img :src="enlace.icono" alt="" />
-          </span>
+          <span class="contenedor-icono"><img :src="enlace.icono" alt="" /></span>
           <span>{{ enlace.nombre }}</span>
         </NuxtLink>
-      </template>
+      </section>
     </nav>
   </aside>
 </template>
@@ -135,8 +169,24 @@ function estaActivo(enlace: EnlaceMenu): boolean {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 4px;
+  gap: 12px;
   overflow-y: auto;
+}
+
+.grupo-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.titulo-grupo {
+  padding: 4px 8px;
+  margin: 0;
+  color: rgb(255 255 255 / 70%);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .enlace-menu {
@@ -195,6 +245,10 @@ function estaActivo(enlace: EnlaceMenu): boolean {
   .navegacion {
     flex-direction: row;
     overflow-x: auto;
+  }
+
+  .grupo-menu {
+    flex: 0 0 auto;
   }
 
   .enlace-menu {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { obtenerFechaHoyIso } from '~/composables/useFechas'
 import { obtenerRecordatoriosPago } from '~/composables/useRecordatoriosPago'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
@@ -94,6 +94,7 @@ const MESES = [
 ]
 
 const autenticacion = useAutenticacionStore()
+const ruta = useRoute()
 const { listarHijos, consultarAsistencia, consultarRiesgos, consultarHorario } = usePortalFamilia()
 const { consultar: consultarLibreta } = useLibretas()
 const { listar: listarBimestres } = useBimestres()
@@ -106,6 +107,7 @@ let temporizador: ReturnType<typeof setInterval> | undefined
 
 const fechaHoy = obtenerFechaHoyIso()
 const tarjetas = ref<TarjetaHijo[]>([])
+const hijoSeleccionado = ref<number | 'todos'>('todos')
 const cargando = ref(true)
 const error = ref('')
 const pagos = ref<PagosHijo[]>([])
@@ -114,16 +116,31 @@ const riesgos = ref<AlertaRiesgoFamilia[]>([])
 const errorRiesgos = ref('')
 let actualizacionRiesgos = 0
 
-const deudas = computed(() => deudaFamiliar(pagos.value))
+const tarjetasVisibles = computed(() =>
+  hijoSeleccionado.value === 'todos'
+    ? tarjetas.value
+    : tarjetas.value.filter((tarjeta) => tarjeta.hijo.estudianteId === hijoSeleccionado.value),
+)
+const pagosVisibles = computed(() =>
+  hijoSeleccionado.value === 'todos'
+    ? pagos.value
+    : pagos.value.filter((hijo) => hijo.estudianteId === hijoSeleccionado.value),
+)
+const tituloResumen = computed(() => {
+  if (hijoSeleccionado.value === 'todos') return `Resumen de tus hijos en el año escolar ${fechaHoy.slice(0, 4)}.`
+  const tarjeta = tarjetasVisibles.value[0]
+  return `Resumen de ${tarjeta?.hijo.nombreCompleto ?? 'tu hijo'} en el año escolar ${fechaHoy.slice(0, 4)}.`
+})
+const deudas = computed(() => deudaFamiliar(pagosVisibles.value))
 const totalDeuda = computed(() => sumarDeuda(deudas.value))
 const recordatorios = computed(() =>
   obtenerRecordatoriosPago(deudas.value, fechaRecordatorio.value, Number(configuracion.public.recordatorioPagoDias)),
 )
 const deudasEnMora = computed(() => deudas.value.filter((deuda) => deuda.boleta.estadoPago === 'EN_MORA').length)
-const hayCompromisos = computed(() => pagos.value.some((hijo) => hijo.compromisos.length > 0))
+const hayCompromisos = computed(() => pagosVisibles.value.some((hijo) => hijo.compromisos.length > 0))
 const proximaEmision = computed(
   () =>
-    pagos.value
+    pagosVisibles.value
       .flatMap((hijo) => hijo.compromisos.map((compromiso) => compromiso.proximaEmision))
       .filter((fecha): fecha is string => Boolean(fecha))
       .sort()[0] ?? null,
@@ -131,7 +148,7 @@ const proximaEmision = computed(
 
 const ausenciasVistas = ref<string[]>(leerAusenciasVistas())
 const avisosAusencia = computed<AvisoAusencia[]>(() =>
-  tarjetas.value.flatMap((tarjeta) => {
+  tarjetasVisibles.value.flatMap((tarjeta) => {
     const ausentes = tarjeta.registrosHoy.filter((registro) => registro.estado === 'AUSENTE')
     const clave = ausentes.map((registro) => registro.asistenciaId).join('-')
     const primera = ausentes[0]
@@ -148,6 +165,25 @@ const avisosAusencia = computed<AvisoAusencia[]>(() =>
     ]
   }),
 )
+
+function sincronizarHijoDesdeRuta(): void {
+  const idSolicitado = typeof ruta.query.estudianteId === 'string' ? Number(ruta.query.estudianteId) : NaN
+  hijoSeleccionado.value = tarjetas.value.some((tarjeta) => tarjeta.hijo.estudianteId === idSolicitado)
+    ? idSolicitado
+    : 'todos'
+}
+
+async function actualizarHijoEnRuta(): Promise<void> {
+  const query = { ...ruta.query }
+  if (hijoSeleccionado.value === 'todos') {
+    delete query.estudianteId
+  } else {
+    query.estudianteId = String(hijoSeleccionado.value)
+  }
+  await navigateTo({ path: ruta.path, query, replace: true })
+}
+
+watch(() => ruta.query.estudianteId, sincronizarHijoDesdeRuta)
 
 const nombre = computed(() => autenticacion.usuario?.nombreCompleto?.trim().split(/\s+/)[0] ?? '')
 const mes = MESES[Number(fechaHoy.slice(5, 7)) - 1]
@@ -281,6 +317,7 @@ async function cargar(): Promise<void> {
   try {
     const [hijos] = await Promise.all([listarHijos(), cargarPagos(), cargarRiesgos()])
     tarjetas.value = await Promise.all(hijos.map(armarTarjeta))
+    sincronizarHijoDesdeRuta()
   } catch (fallo: unknown) {
     error.value = obtenerMensajeError(fallo, 'No se pudo cargar el resumen de tus hijos.')
   } finally {
@@ -344,8 +381,17 @@ onUnmounted(() => {
     <div class="docente-titulo">
       <div>
         <h1>Hola{{ nombre ? `, ${nombre}` : '' }}</h1>
-        <p>Resumen de tus hijos en el año escolar {{ fechaHoy.slice(0, 4) }}.</p>
+        <p>{{ tituloResumen }}</p>
       </div>
+      <label v-if="tarjetas.length > 1" class="selector-hijo-panel">
+        <span>Ver información de</span>
+        <select v-model="hijoSeleccionado" aria-label="Cambiar hijo del panel" @change="actualizarHijoEnRuta">
+          <option :value="'todos'">Todos mis hijos</option>
+          <option v-for="tarjeta in tarjetas" :key="tarjeta.hijo.estudianteId" :value="tarjeta.hijo.estudianteId">
+            {{ tarjeta.hijo.nombreCompleto }}
+          </option>
+        </select>
+      </label>
     </div>
 
     <PanelEstadoCarga v-if="cargando || error" :cargando="cargando" :error="error" @reintentar="cargar" />
@@ -385,7 +431,9 @@ onUnmounted(() => {
         <h2 id="titulo-recordatorios">Pagos próximos a vencer</h2>
         <ul>
           <li v-for="recordatorio in recordatorios" :key="recordatorio.boleta.boletaId">
-            <strong>{{ recordatorio.nombreHijo }}</strong> · {{ nombrarMesBoleta(recordatorio.boleta.mesCobro) }} ·
+            <strong>{{ recordatorio.nombreHijo }}</strong> ·
+            {{ recordatorio.boleta.tipoCargo === 'MATRICULA' ? 'Matrícula' : 'Pensión' }} ·
+            {{ nombrarMesBoleta(recordatorio.boleta.mesCobro) }} ·
             <strong>{{ formatearSolesFamilia(recordatorio.boleta.montoTotal) }}</strong>
             <span>
               {{
@@ -416,6 +464,7 @@ onUnmounted(() => {
           <div v-for="deuda in deudas.slice(0, DEUDAS_VISIBLES)" :key="deuda.boleta.boletaId" class="fila-deuda">
             <span class="texto">
               <strong>{{ primerNombre(deuda.nombreHijo) }}</strong> ·
+              {{ deuda.boleta.tipoCargo === 'MATRICULA' ? 'Matrícula' : 'Pensión' }} ·
               {{ nombrarMesBoleta(deuda.boleta.mesCobro, true) }}
               <small
                 >{{ deuda.boleta.estadoPago === 'EN_MORA' ? 'Venció' : 'Vence' }}
@@ -452,7 +501,7 @@ onUnmounted(() => {
       </div>
 
       <section class="hijos" aria-label="Resumen por hijo">
-        <article v-for="tarjeta in tarjetas" :key="tarjeta.hijo.estudianteId" class="docente-tarjeta hijo">
+        <article v-for="tarjeta in tarjetasVisibles" :key="tarjeta.hijo.estudianteId" class="docente-tarjeta hijo">
           <header>
             <h2>{{ tarjeta.hijo.nombreCompleto }}</h2>
             <p>{{ describirSeccionHijo(periodoVigente(tarjeta.hijo, fechaHoy)) }}</p>
@@ -774,6 +823,26 @@ onUnmounted(() => {
 .docente-titulo p {
   margin: 0;
   color: #64748b;
+}
+
+.selector-hijo-panel {
+  display: grid;
+  min-width: min(250px, 100%);
+  gap: 5px;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.selector-hijo-panel select {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 34px 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #0f172a;
+  font: inherit;
 }
 
 .hijos {

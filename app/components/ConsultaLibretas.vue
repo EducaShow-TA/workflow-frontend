@@ -6,6 +6,7 @@ import { useEstudiantesMatriculables } from '~/composables/useEstudiantesMatricu
 import { usePeriodosAcademicos } from '~/composables/usePeriodosAcademicos'
 import { useMisClases } from '~/composables/useMisClases'
 import { useApi } from '~/composables/useApi'
+import { useBimestres } from '~/composables/useBimestres'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
 import type { LibretaNotas } from '~/types/libreta'
 
@@ -17,6 +18,7 @@ interface OpcionEstudiante {
 interface OpcionPeriodo {
   id: number
   nombre: string
+  anhio: number
 }
 interface EstudianteVinculado {
   estudianteId: number
@@ -29,6 +31,7 @@ const { consultar: solicitarLibreta, descargar } = useLibretas()
 const { listar: listarEstudiantes } = useEstudiantesMatriculables()
 const { listar: listarPeriodos } = usePeriodosAcademicos()
 const { listar: listarClases, listarAlumnos } = useMisClases()
+const { listar: listarBimestres } = useBimestres()
 const esAdministrador = computed(() => autenticacion.usuario?.rol === 'ADMINISTRADOR')
 const esDocente = computed(() => autenticacion.usuario?.rol === 'DOCENTE')
 const esApoderado = computed(() => autenticacion.usuario?.rol === 'APODERADO')
@@ -36,14 +39,15 @@ const estudiantes = ref<OpcionEstudiante[]>([])
 const periodos = ref<OpcionPeriodo[]>([])
 const estudianteId = ref<number | ''>('')
 const periodoId = ref<number | ''>('')
-const bimestre = ref<number | ''>('')
+const bimestreHasta = ref<number | ''>('')
+const ultimoBimestreDisponible = ref(0)
 const cargando = ref(true)
 const consultando = ref(false)
-const descargando = ref(false)
+const descargandoBimestre = ref<number | null>(null)
 const errorCatalogos = ref('')
 const error = ref('')
 const aviso = ref('')
-const libreta = ref<LibretaNotas | null>(null)
+const libretas = ref<LibretaNotas[]>([])
 const comentarioPeriodo = ref('')
 const autorComentario = ref('')
 const guardandoComentario = ref(false)
@@ -52,7 +56,7 @@ const comentarioAviso = ref('')
 const comentariosPorPeriodo = computed(
   () =>
     new Map(
-      libreta.value?.periodos.map((periodo) => [
+      libretas.value[0]?.periodos.map((periodo) => [
         periodo.periodoId,
         periodo.areas.flatMap((area) =>
           area.competencias.flatMap((competencia) => {
@@ -97,6 +101,7 @@ async function cargarCatalogos(): Promise<void> {
           formatearSeccionCompleta(item.numeroGrado, item.seccion, item.nivelEducativo),
           item.fechaInicio.slice(0, 4),
         ),
+        anhio: Number(item.fechaInicio.slice(0, 4)),
       }))
     } else if (esDocente.value) {
       const clases = await listarClases()
@@ -107,6 +112,7 @@ async function cargarCatalogos(): Promise<void> {
             {
               id: item.periodoId,
               nombre: conAnhio(formatearSeccionCompleta(item.gradoNumero, item.seccionCodigo), item.anhio),
+              anhio: item.anhio,
             },
           ]),
         ).values(),
@@ -127,6 +133,7 @@ async function cargarCatalogos(): Promise<void> {
               formatearSeccionCompleta(periodo.gradoNumero, periodo.seccion),
               periodo.fechaInicio.slice(0, 4),
             ),
+            anhio: Number(periodo.fechaInicio.slice(0, 4)),
           })
         }),
       )
@@ -142,18 +149,37 @@ async function cargarCatalogos(): Promise<void> {
 watch(periodoId, async (id) => {
   const turno = ++catalogoActual
   estudianteId.value = ''
-  if (!esDocente.value) return
-  estudiantes.value = []
+  bimestreHasta.value = ''
+  ultimoBimestreDisponible.value = 0
+  libretas.value = []
   if (id === '') return
+  const periodoSeleccionado = periodos.value.find((item) => item.id === Number(id))
+  if (!periodoSeleccionado) return
   cargando.value = true
   errorCatalogos.value = ''
   try {
-    const alumnos = await listarAlumnos(id)
+    const bimestres = await listarBimestres(periodoSeleccionado.anhio)
+    if (turno !== catalogoActual) return
+    ultimoBimestreDisponible.value = bimestres
+      .filter((item) => item.estado !== 'PROXIMO')
+      .reduce((ultimo, item) => Math.max(ultimo, item.numero), 0)
+    bimestreHasta.value = ultimoBimestreDisponible.value || ''
+  } catch (fallo: unknown) {
+    if (turno === catalogoActual)
+      errorCatalogos.value = obtenerMensajeError(fallo, 'No se pudo cargar el calendario escolar.')
+  } finally {
+    if (turno === catalogoActual && !esDocente.value) cargando.value = false
+  }
+  if (!esDocente.value || turno !== catalogoActual) return
+  cargando.value = true
+  estudiantes.value = []
+  try {
+    const alumnos = await listarAlumnos(Number(id))
     if (turno === catalogoActual)
       estudiantes.value = alumnos.map((item) => ({
         id: item.estudianteId,
         nombre: item.nombreCompleto,
-        periodos: [id],
+        periodos: [Number(id)],
       }))
   } catch (fallo: unknown) {
     if (turno === catalogoActual)
@@ -164,11 +190,11 @@ watch(periodoId, async (id) => {
 })
 
 watch(
-  [estudianteId, periodoId, bimestre],
+  [estudianteId, periodoId, bimestreHasta],
   () => {
     consultaActual++
     consultando.value = false
-    libreta.value = null
+    libretas.value = []
     comentarioPeriodo.value = ''
     autorComentario.value = ''
     comentarioError.value = ''
@@ -180,22 +206,26 @@ watch(
 )
 
 async function consultar(): Promise<void> {
+  const maximo = Number(bimestreHasta.value)
+  if (!estudianteId.value || !periodoId.value || maximo < 1 || maximo > ultimoBimestreDisponible.value) return
   const turno = ++consultaActual
-  libreta.value = null
+  libretas.value = []
   error.value = ''
   aviso.value = ''
   consultando.value = true
   try {
-    const resultado = await solicitarLibreta(
-      Number(estudianteId.value),
-      Number(periodoId.value),
-      Number(bimestre.value),
+    const resultado = await Promise.all(
+      Array.from({ length: maximo }, (_, indice) =>
+        solicitarLibreta(Number(estudianteId.value), Number(periodoId.value), indice + 1),
+      ),
     )
     if (turno === consultaActual) {
-      libreta.value = resultado
+      libretas.value = resultado
+      const base = resultado[0]
+      if (!base) return
       try {
         const comentario = await solicitar<{ comentario: string | null; autorNombre: string | null }>(
-          `/api/v1/estudiantes/${resultado.estudianteId}/libreta/comentario-periodo?periodoId=${resultado.periodoSolicitadoId}`,
+          `/api/v1/estudiantes/${base.estudianteId}/libreta/comentario-periodo?periodoId=${base.periodoSolicitadoId}`,
         )
         if (turno === consultaActual) {
           comentarioPeriodo.value = comentario.comentario ?? ''
@@ -213,11 +243,10 @@ async function consultar(): Promise<void> {
   }
 }
 
-async function descargarPdf(): Promise<void> {
-  const actual = libreta.value
-  if (!actual || descargando.value) return
+async function descargarPdf(actual: LibretaNotas): Promise<void> {
+  if (descargandoBimestre.value !== null) return
   const turno = consultaActual
-  descargando.value = true
+  descargandoBimestre.value = actual.bimestre
   error.value = ''
   aviso.value = ''
   try {
@@ -234,12 +263,12 @@ async function descargarPdf(): Promise<void> {
   } catch (fallo: unknown) {
     if (turno === consultaActual) error.value = obtenerMensajeError(fallo, 'No se pudo descargar el PDF.')
   } finally {
-    descargando.value = false
+    descargandoBimestre.value = null
   }
 }
 
 async function guardarComentario(): Promise<void> {
-  const actual = libreta.value
+  const actual = libretas.value[0]
   if (!actual || !comentarioPeriodo.value.trim() || guardandoComentario.value) return
   guardandoComentario.value = true
   comentarioError.value = ''
@@ -277,7 +306,7 @@ onMounted(cargarCatalogos)
     </header>
     <NavegacionCalificaciones v-if="esDocente" :docente="true" />
     <section class="tarjeta" aria-labelledby="titulo-consulta">
-      <h2 id="titulo-consulta">Consultar libreta</h2>
+      <h2 id="titulo-consulta">Consultar libretas</h2>
       <p v-if="esDocente" class="ayuda">
         Solo puedes consultar los alumnos y las competencias de las clases que tienes asignadas.
       </p>
@@ -291,33 +320,54 @@ onMounted(cargarCatalogos)
       <form @submit.prevent="consultar">
         <div class="campos">
           <label v-if="esAdministrador || esDocente || esApoderado"
-            >Grado y sección
-            <select v-model="periodoId" required :disabled="cargando || descargando">
-              <option value="">Selecciona un periodo</option>
+            >Período
+            <select v-model="periodoId" required :disabled="cargando || descargandoBimestre !== null">
+              <option value="">Elige un período</option>
               <option v-for="item in periodos" :key="item.id" :value="item.id">{{ item.nombre }}</option>
             </select>
           </label>
           <label v-else
             >Identificador del periodo
-            <input v-model.number="periodoId" type="number" min="1" step="1" required :disabled="descargando" />
+            <input
+              v-model.number="periodoId"
+              type="number"
+              min="1"
+              step="1"
+              required
+              :disabled="descargandoBimestre !== null"
+            />
           </label>
           <label>
-            Bimestre
-            <select v-model.number="bimestre" required :disabled="cargando || descargando">
-              <option value="">Selecciona un bimestre</option>
-              <option v-for="numero in 4" :key="numero" :value="numero">Bimestre {{ numero }}</option>
+            Mostrar hasta
+            <select v-model.number="bimestreHasta" required :disabled="cargando || descargandoBimestre !== null">
+              <option value="">Elige un bimestre</option>
+              <option v-for="numero in ultimoBimestreDisponible" :key="numero" :value="numero">
+                Bimestres 1 al {{ numero }}
+              </option>
             </select>
+            <small>Se mostrarán juntos desde el primer bimestre hasta el elegido.</small>
           </label>
           <label v-if="esAdministrador || esDocente || esApoderado"
             >Estudiante con matrícula confirmada
-            <select v-model="estudianteId" required :disabled="!periodoId || cargando || descargando">
-              <option value="">Selecciona un estudiante</option>
+            <select
+              v-model="estudianteId"
+              required
+              :disabled="!periodoId || cargando || descargandoBimestre !== null"
+            >
+              <option value="">Elige un estudiante</option>
               <option v-for="item in estudiantesDisponibles" :key="item.id" :value="item.id">{{ item.nombre }}</option>
             </select>
           </label>
           <label v-else
             >Identificador del estudiante
-            <input v-model.number="estudianteId" type="number" min="1" step="1" required :disabled="descargando" />
+            <input
+              v-model.number="estudianteId"
+              type="number"
+              min="1"
+              step="1"
+              required
+              :disabled="descargandoBimestre !== null"
+            />
           </label>
         </div>
         <p v-if="cargando" role="status">Cargando opciones…</p>
@@ -338,147 +388,155 @@ onMounted(cargarCatalogos)
         >
           No hay estudiantes con matrícula confirmada para este periodo.
         </p>
+        <p v-else-if="periodoId && !ultimoBimestreDisponible && !cargando && !errorCatalogos" class="ayuda">
+          Aún no hay bimestres iniciados para este período.
+        </p>
         <AvisoMensaje v-if="errorCatalogos" :mensaje="errorCatalogos" tipo="error" />
-        <button v-if="errorCatalogos" type="button" @click="cargarCatalogos">Reintentar carga</button>
+        <button v-if="errorCatalogos" type="button" @click="cargarCatalogos">Reintentar</button>
         <button
           class="primario"
           type="submit"
           :disabled="
-            cargando || consultando || descargando || !estudianteId || !periodoId || !bimestre || !!errorCatalogos
+            cargando ||
+            consultando ||
+            descargandoBimestre !== null ||
+            !estudianteId ||
+            !periodoId ||
+            !bimestreHasta ||
+            !!errorCatalogos
           "
         >
-          {{ consultando ? 'Consultando…' : 'Consultar libreta' }}
+          {{ consultando ? 'Consultando…' : 'Ver libretas' }}
         </button>
       </form>
     </section>
     <AvisoMensaje v-if="error" :mensaje="error" tipo="error" />
     <p v-if="aviso" role="status" class="exito">{{ aviso }}</p>
     <p v-if="consultando" role="status">Consultando las calificaciones…</p>
-    <section v-if="libreta" aria-label="Resultado de la consulta" :aria-busy="descargando">
-      <div class="tarjeta resumen">
-        <div>
-          <h2>{{ libreta.estudiante }}</h2>
-          <p>
-            Año escolar {{ libreta.anhioEscolar }} · Bimestre {{ libreta.bimestre }} · Estudiante #{{
-              libreta.estudianteId
-            }}
-          </p>
-        </div>
-        <button class="primario" type="button" :disabled="descargando" @click="descargarPdf">
-          {{ descargando ? 'Descargando…' : 'Descargar PDF' }}
-        </button>
-      </div>
-      <AvisoMensaje
-        v-if="libreta.evaluacionesSinBimestre > 0"
-        :mensaje="`${libreta.evaluacionesSinBimestre} evaluación(es) aún no tienen bimestre asignado y no se incluyen en este informe.`"
-        tipo="advertencia"
-      />
-      <p class="ayuda">
-        El logro de cada competencia se calcula solo con las evaluaciones del bimestre seleccionado. Se muestran también
-        las evaluaciones que lo componen.
-      </p>
-      <p v-if="!libreta.periodos.length" class="tarjeta">No hay información académica para mostrar.</p>
-      <article v-for="periodo in libreta.periodos" :key="periodo.periodoId" class="tarjeta periodo">
+    <section v-if="libretas.length" aria-label="Resultados de la consulta">
+      <article
+        v-for="libreta in libretas"
+        :key="libreta.bimestre"
+        class="tarjeta resultado-bimestre"
+        :aria-busy="descargandoBimestre === libreta.bimestre"
+      >
         <div class="resumen">
-          <h2>
-            {{
-              conAnhio(formatearSeccionCompleta(periodo.gradoNumero, periodo.seccion), periodo.fechaInicio.slice(0, 4))
-            }}
-          </h2>
-          <span class="estado" :class="periodo.actasCerradas ? 'oficial' : 'borrador'">
-            {{ periodo.actasCerradas ? 'Actas cerradas · Libreta oficial' : 'Actas abiertas · Informe preliminar' }}
-          </span>
-        </div>
-        <p class="ayuda">
-          {{ periodo.fechaInicio }} a {{ periodo.fechaFin
-          }}<strong v-if="periodo.periodoId === libreta.periodoSolicitadoId"> · Periodo seleccionado</strong>
-        </p>
-        <section
-          v-if="periodo.periodoId === libreta.periodoSolicitadoId"
-          class="comentarios"
-          aria-labelledby="comentario-periodo"
-        >
-          <h3 id="comentario-periodo">Comentario cualitativo del período</h3>
-          <template v-if="esDocente || esAdministrador">
-            <label for="comentario-docente">Comentario del docente (máximo 2000 caracteres)</label>
-            <textarea
-              id="comentario-docente"
-              v-model="comentarioPeriodo"
-              maxlength="2000"
-              rows="5"
-              :disabled="guardandoComentario"
-            />
-            <p class="ayuda">
-              {{ comentarioPeriodo.length }}/2000 caracteres<span v-if="autorComentario">
-                · Última edición: {{ autorComentario }}</span
-              >
-            </p>
-            <button
-              class="primario"
-              type="button"
-              :disabled="guardandoComentario || !comentarioPeriodo.trim()"
-              @click="guardarComentario"
-            >
-              {{ guardandoComentario ? 'Guardando…' : 'Guardar comentario' }}
-            </button>
-          </template>
-          <p v-else-if="comentarioPeriodo" class="comentario-periodo">{{ comentarioPeriodo }}</p>
-          <p v-else class="ayuda">No hay un comentario registrado para este período.</p>
-          <AvisoMensaje v-if="comentarioError" :mensaje="comentarioError" tipo="error" />
-          <p v-if="comentarioAviso" role="status" class="exito">{{ comentarioAviso }}</p>
-        </section>
-        <p v-if="!periodo.areas.length">No hay áreas o competencias disponibles para esta consulta.</p>
-        <div v-for="area in periodo.areas" :key="area.codigo" class="area">
-          <h3>{{ area.nombre }}</h3>
-          <div class="tabla-contenedor" tabindex="0" :aria-label="`Notas de ${area.nombre}`">
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">Competencia</th>
-                  <th scope="col">Logro</th>
-                  <th scope="col">Evaluaciones del bimestre</th>
-                  <th scope="col">Observación</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="competencia in area.competencias" :key="competencia.codigo">
-                  <td>{{ competencia.nombre }}</td>
-                  <td>
-                    <span class="nota">{{ competencia.nota ?? 'Sin calificación' }}</span>
-                    <small v-if="competencia.puntajeConsolidado !== null" class="puntaje">
-                      Puntaje: {{ competencia.puntajeConsolidado }}
-                    </small>
-                  </td>
-                  <td>
-                    <ul v-if="competencia.evaluaciones.length" class="evaluaciones">
-                      <li v-for="evaluacion in competencia.evaluaciones" :key="evaluacion.evaluacionId">
-                        <strong>{{ evaluacion.titulo }}</strong> ·
-                        {{ evaluacion.justificada ? 'Justificada' : (evaluacion.nota ?? 'Sin calificación') }}
-                        · {{ evaluacion.ponderacion }}%
-                      </li>
-                    </ul>
-                    <span v-else>Sin evaluaciones en este bimestre</span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+          <div>
+            <h2>{{ libreta.estudiante }} · Bimestre {{ libreta.bimestre }}</h2>
+            <p>Año escolar {{ libreta.anhioEscolar }} · Estudiante #{{ libreta.estudianteId }}</p>
           </div>
+          <button
+            class="primario"
+            type="button"
+            :disabled="descargandoBimestre !== null"
+            @click="descargarPdf(libreta)"
+          >
+            {{ descargandoBimestre === libreta.bimestre ? 'Descargando…' : `PDF bimestre ${libreta.bimestre}` }}
+          </button>
         </div>
-        <section class="comentarios" :aria-labelledby="`comentarios-${periodo.periodoId}`">
-          <h3 :id="`comentarios-${periodo.periodoId}`">Comentarios cualitativos</h3>
+        <AvisoMensaje
+          v-if="libreta.bimestre === 1 && libreta.evaluacionesSinBimestre > 0"
+          :mensaje="`${libreta.evaluacionesSinBimestre} evaluación(es) sin bimestre no aparecen en estas libretas.`"
+          tipo="advertencia"
+        />
+        <p class="ayuda">El logro y las evaluaciones corresponden a este bimestre.</p>
+        <p v-if="!libreta.periodos.length" class="tarjeta">No hay información académica para mostrar.</p>
+        <article v-for="periodo in libreta.periodos" :key="periodo.periodoId" class="periodo">
+          <div class="resumen">
+            <h3>
+              {{
+                conAnhio(formatearSeccionCompleta(periodo.gradoNumero, periodo.seccion), periodo.fechaInicio.slice(0, 4))
+              }}
+            </h3>
+            <span class="estado" :class="periodo.actasCerradas ? 'oficial' : 'borrador'">
+              {{ periodo.actasCerradas ? 'Actas cerradas · Oficial' : 'Actas abiertas · Preliminar' }}
+            </span>
+          </div>
+          <p class="ayuda">{{ periodo.fechaInicio }} a {{ periodo.fechaFin }}</p>
+          <p v-if="!periodo.areas.length">No hay áreas o competencias para este bimestre.</p>
+          <div v-for="area in periodo.areas" :key="area.codigo" class="area">
+            <h4>{{ area.nombre }}</h4>
+            <div class="tabla-contenedor" tabindex="0" :aria-label="`Notas de ${area.nombre}`">
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">Competencia</th>
+                    <th scope="col">Logro</th>
+                    <th scope="col">Evaluaciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="competencia in area.competencias" :key="competencia.codigo">
+                    <td>{{ competencia.nombre }}</td>
+                    <td>
+                      <span class="nota">{{ competencia.nota ?? 'Sin calificación' }}</span>
+                      <small v-if="competencia.puntajeConsolidado !== null" class="puntaje">
+                        Puntaje: {{ competencia.puntajeConsolidado }}
+                      </small>
+                    </td>
+                    <td>
+                      <ul v-if="competencia.evaluaciones.length" class="evaluaciones">
+                        <li v-for="evaluacion in competencia.evaluaciones" :key="evaluacion.evaluacionId">
+                          <strong>{{ evaluacion.titulo }}</strong> ·
+                          {{ evaluacion.justificada ? 'Justificada' : (evaluacion.nota ?? 'Sin calificación') }}
+                          · {{ evaluacion.ponderacion }}%
+                        </li>
+                      </ul>
+                      <span v-else>Sin evaluaciones</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </article>
+      </article>
+      <section v-if="libretas[0]?.periodos[0]" class="tarjeta comentarios" aria-labelledby="comentario-periodo">
+        <h3 id="comentario-periodo">Comentario cualitativo del período</h3>
+        <template v-if="esDocente || esAdministrador">
+          <label for="comentario-docente">Comentario del docente (máximo 2000 caracteres)</label>
+          <textarea
+            id="comentario-docente"
+            v-model="comentarioPeriodo"
+            maxlength="2000"
+            rows="5"
+            :disabled="guardandoComentario"
+          />
+          <p class="ayuda">
+            {{ comentarioPeriodo.length }}/2000 caracteres<span v-if="autorComentario">
+              · Última edición: {{ autorComentario }}</span
+            >
+          </p>
+          <button
+            class="primario"
+            type="button"
+            :disabled="guardandoComentario || !comentarioPeriodo.trim()"
+            @click="guardarComentario"
+          >
+            {{ guardandoComentario ? 'Guardando…' : 'Guardar comentario' }}
+          </button>
+        </template>
+        <p v-else-if="comentarioPeriodo" class="comentario-periodo">{{ comentarioPeriodo }}</p>
+        <p v-else class="ayuda">No hay un comentario registrado para este período.</p>
+        <AvisoMensaje v-if="comentarioError" :mensaje="comentarioError" tipo="error" />
+        <p v-if="comentarioAviso" role="status" class="exito">{{ comentarioAviso }}</p>
+      </section>
+      <section v-if="libretas[0]" class="tarjeta comentarios" aria-label="Comentarios cualitativos">
+        <h3>Comentarios de competencias</h3>
+        <template v-for="periodo in libretas[0].periodos" :key="periodo.periodoId">
           <ul v-if="comentariosPorPeriodo.get(periodo.periodoId)?.length" class="lista-comentarios">
             <li v-for="item in comentariosPorPeriodo.get(periodo.periodoId)" :key="item.clave">
               <h4>{{ item.area }} · {{ item.competencia }}</h4>
               <p>{{ item.comentario }}</p>
             </li>
           </ul>
-          <p v-else class="ayuda">No hay comentarios registrados para este periodo.</p>
-        </section>
-      </article>
+        </template>
+        <p v-if="!comentariosPorPeriodo.size" class="ayuda">No hay comentarios registrados.</p>
+      </section>
       <p class="ayuda">Escala de logro: AD — destacado · A — esperado · B — en proceso · C — en inicio.</p>
     </section>
     <p v-else-if="!consultando && !error" class="ayuda">
-      Selecciona los datos y pulsa «Consultar libreta» para visualizar el informe.
+      Elige el período, el estudiante y el bimestre hasta el que quieres comparar.
     </p>
   </main>
 </template>

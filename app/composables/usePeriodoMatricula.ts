@@ -27,7 +27,7 @@ export function calcularEstadoPeriodo(fechaInicio: string, fechaLimite: string, 
 
 export function obtenerEtiquetaEstadoPeriodo(estado: EstadoPeriodo): string {
   const etiquetas: Record<EstadoPeriodo, string> = {
-    PENDIENTE: 'Pendiente',
+    PENDIENTE: 'Pendiente de inicio',
     VIGENTE: 'Vigente',
     VENCIDO: 'Vencido',
   }
@@ -79,6 +79,7 @@ export function buscarCruce(
   return periodosExistentes.find(
     (periodo) =>
       periodo.id !== idEnEdicion &&
+      (solicitud.anhioEscolar === undefined || periodo.anhioEscolar === solicitud.anhioEscolar) &&
       periodo.fechaInicio <= solicitud.fechaLimite &&
       periodo.fechaLimite >= solicitud.fechaInicio,
   )

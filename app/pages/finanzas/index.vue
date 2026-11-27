@@ -214,6 +214,7 @@ onMounted(async () => {
                 <th scope="col">Estudiante / Apoderado</th>
                 <th scope="col">Grado / Sección</th>
                 <th scope="col">Mes</th>
+                <th scope="col">Tipo de cargo</th>
                 <th scope="col">Vencimiento</th>
                 <th scope="col">Estado</th>
                 <th scope="col" class="importe">Total</th>
@@ -230,6 +231,7 @@ onMounted(async () => {
                 </td>
                 <td>{{ formatearSeccion(boleta.grado, boleta.seccion) }}</td>
                 <td>{{ boleta.mesCobro }}</td>
+                <td>{{ boleta.tipoCargo === 'MATRICULA' ? 'Matrícula anual' : 'Pensión' }}</td>
                 <td>{{ formatearFecha(boleta.fechaVencimiento) }}</td>
                 <td>
                   <span class="estado" :class="boleta.estadoPago.toLowerCase()">{{

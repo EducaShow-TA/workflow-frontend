@@ -24,6 +24,20 @@ export interface SolicitudCrearCuenta {
   rol: RolUsuario
 }
 
+export interface SolicitudCrearDocente {
+  dni: string
+  nombre: string
+  apellidoPaterno: string
+  apellidoMaterno: string
+  correo: string
+}
+
+export interface CredencialesTemporalesCuenta {
+  dni: string
+  username: string
+  contrasenhaTemporal: string
+}
+
 export interface SolicitudActualizarCuenta {
   nombre: string
   apellidoPaterno: string

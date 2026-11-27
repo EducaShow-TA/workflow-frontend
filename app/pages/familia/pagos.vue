@@ -155,7 +155,7 @@ onMounted(() => {
     <div class="docente-titulo">
       <div>
         <h1>Pagos</h1>
-        <p>Paga las pensiones de tus hijos y descarga tus comprobantes.</p>
+        <p>Paga las matrículas y pensiones de tus hijos y descarga tus comprobantes.</p>
       </div>
     </div>
 
@@ -278,7 +278,7 @@ onMounted(() => {
                         @change="alternarTodas"
                       />
                     </th>
-                    <th scope="col">Mes</th>
+                    <th scope="col">Concepto / mes</th>
                     <th scope="col">Vencimiento</th>
                     <th scope="col">Estado</th>
                     <th scope="col" class="monto">Monto</th>
@@ -295,11 +295,14 @@ onMounted(() => {
                         v-model="seleccion"
                         type="checkbox"
                         :value="boleta.boletaId"
-                        :aria-label="`Seleccionar ${nombrarMesBoleta(boleta.mesCobro)}`"
+                        :aria-label="`Seleccionar ${boleta.tipoCargo === 'MATRICULA' ? 'matrícula' : 'pensión'} ${nombrarMesBoleta(boleta.mesCobro)}`"
                       />
                     </td>
                     <td>
-                      <strong>{{ nombrarMesBoleta(boleta.mesCobro) }}</strong>
+                      <strong>
+                        {{ boleta.tipoCargo === 'MATRICULA' ? 'Matrícula' : 'Pensión' }} ·
+                        {{ nombrarMesBoleta(boleta.mesCobro) }}
+                      </strong>
                     </td>
                     <td>
                       {{ boleta.estadoPago === 'EN_MORA' ? 'Venció' : 'Vence' }}
@@ -354,7 +357,7 @@ onMounted(() => {
             <table class="tabla-historial">
               <thead>
                 <tr>
-                  <th scope="col">Mes</th>
+                  <th scope="col">Concepto / mes</th>
                   <th scope="col">Pagado el</th>
                   <th scope="col">Medio</th>
                   <th scope="col" class="monto">Monto</th>
@@ -364,7 +367,10 @@ onMounted(() => {
               <tbody>
                 <tr v-for="boleta in historialVisible" :key="boleta.boletaId">
                   <td>
-                    <strong>{{ nombrarMesBoleta(boleta.mesCobro) }}</strong>
+                    <strong>
+                      {{ boleta.tipoCargo === 'MATRICULA' ? 'Matrícula' : 'Pensión' }} ·
+                      {{ nombrarMesBoleta(boleta.mesCobro) }}
+                    </strong>
                   </td>
                   <td>{{ boleta.comprobante ? fechaPago(boleta.comprobante.fechaEmision) : '—' }}</td>
                   <td>{{ boleta.comprobante?.medioPago === 'VIRTUAL' ? 'Virtual' : 'Presencial' }}</td>

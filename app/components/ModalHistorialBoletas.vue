@@ -178,6 +178,7 @@ async function generar(): Promise<void> {
                   <tr>
                     <th scope="col">Boleta</th>
                     <th scope="col">Mes</th>
+                    <th scope="col">Tipo de cargo</th>
                     <th scope="col">Vencimiento</th>
                     <th scope="col">Estado</th>
                     <th scope="col">Comprobante</th>
@@ -188,6 +189,7 @@ async function generar(): Promise<void> {
                   <tr v-for="boleta in matricula.boletas" :key="boleta.id">
                     <td>#{{ boleta.id }}</td>
                     <td>{{ nombreMes(boleta.mesCobro) }}</td>
+                    <td>{{ boleta.tipoCargo === 'MATRICULA' ? 'Matrícula anual' : 'Pensión' }}</td>
                     <td>{{ formatearFecha(boleta.fechaVencimiento) }}</td>
                     <td>
                       <span class="estado" :class="boleta.estadoPago.toLowerCase()">

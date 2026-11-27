@@ -1,4 +1,5 @@
 import type { PaginaRespuesta } from '~/types/paginacion'
+import type { TipoCargoBoleta } from '~/types/boletaPension'
 
 export type EstadoBoletaCobranza = 'PENDIENTE' | 'EN_MORA'
 
@@ -20,6 +21,7 @@ export interface BoletaReporte {
   grado: number
   seccion: string
   mesCobro: string
+  tipoCargo: TipoCargoBoleta
   monto: number
   mora: number
   montoTotal: number

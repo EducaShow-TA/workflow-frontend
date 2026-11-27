@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import type { CredencialApoderado } from '~/types/apoderado'
+import type { CredencialTemporal } from '~/types/credencial'
 
 defineProps<{
-  credenciales: CredencialApoderado[]
+  credenciales: CredencialTemporal[]
 }>()
 
 const visibles = ref(new Set<string>())
@@ -16,7 +16,7 @@ function alternar(username: string): void {
   visibles.value = siguiente
 }
 
-async function copiar(credencial: CredencialApoderado): Promise<void> {
+async function copiar(credencial: CredencialTemporal): Promise<void> {
   try {
     await navigator.clipboard.writeText(credencial.contrasenhaTemporal)
     copiado.value = credencial.username

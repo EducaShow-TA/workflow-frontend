@@ -10,6 +10,7 @@ import type {
   SolicitudSesionHorario,
   TipoConflicto,
   ValidacionSesion,
+  DisponibilidadDocenteHorario,
 } from '~/types/horarioSeccion'
 
 const RUTA = '/api/v1/horarios/secciones'
@@ -45,6 +46,10 @@ export function useHorarioSeccion() {
     listarSecciones: () => solicitar<Seccion[]>('/api/v1/secciones'),
     listarPlantillas: () => solicitar<PlantillaHorario[]>('/api/v1/horarios/plantillas'),
     listarAulas: () => solicitar<Aula[]>('/api/v1/aulas'),
+    listarDisponibilidadDocente: (docenteId: number, anio: number) =>
+      solicitar<DisponibilidadDocenteHorario[]>(
+        `/api/v1/docentes/${docenteId}/disponibilidad?anio=${anio}`,
+      ),
     crearAula: (solicitud: SolicitudAula) =>
       solicitar<Aula>('/api/v1/aulas', {
         metodo: 'POST',

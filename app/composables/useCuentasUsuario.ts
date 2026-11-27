@@ -1,6 +1,7 @@
 import type { RolUsuario } from '~/types/autenticacion'
 import type {
   ConteoEstadoCuentas,
+  CredencialesTemporalesCuenta,
   CuentaUsuario,
   ErroresCuenta,
   ErroresEdicion,
@@ -9,6 +10,7 @@ import type {
   FormularioCuenta,
   SolicitudActualizarCuenta,
   SolicitudCrearCuenta,
+  SolicitudCrearDocente,
 } from '~/types/cuentaUsuario'
 import { ErrorSolicitudApi } from '~/types/api'
 import { useApi } from '~/composables/useApi'
@@ -121,12 +123,13 @@ function validarDatosPersonales(
   formulario: SolicitudActualizarCuenta,
   cuentas: CuentaUsuario[],
   idExcluido?: number,
+  usuarioAutomatico = false,
 ): ErroresEdicion {
   return {
     nombre: validarNombre(formulario.nombre, 'El nombre'),
     apellidoPaterno: validarNombre(formulario.apellidoPaterno, 'El apellido paterno'),
     apellidoMaterno: validarNombre(formulario.apellidoMaterno, 'El apellido materno'),
-    username: validarUsuario(formulario.username, cuentas, idExcluido),
+    username: usuarioAutomatico ? undefined : validarUsuario(formulario.username, cuentas, idExcluido),
     correo: validarCorreo(formulario.correo, cuentas, idExcluido),
   }
 }
@@ -143,16 +146,19 @@ export function validarCuenta(formulario: FormularioCuenta, cuentas: CuentaUsuar
     errores.dni = 'Ya existe una cuenta con ese DNI.'
   }
 
-  Object.assign(errores, validarDatosPersonales(formulario, cuentas))
+  const docente = formulario.rol === 'DOCENTE'
+  Object.assign(errores, validarDatosPersonales(formulario, cuentas, undefined, docente))
 
-  if (!formulario.password) {
-    errores.password = 'La contraseña es obligatoria.'
-  } else {
-    errores.password = validarPoliticaContrasena(formulario.password)
-  }
+  if (!docente) {
+    if (!formulario.password) {
+      errores.password = 'La contraseña es obligatoria.'
+    } else {
+      errores.password = validarPoliticaContrasena(formulario.password)
+    }
 
-  if (formulario.password && formulario.confirmacionPassword !== formulario.password) {
-    errores.confirmacionPassword = 'Las contraseñas no coinciden.'
+    if (formulario.password && formulario.confirmacionPassword !== formulario.password) {
+      errores.confirmacionPassword = 'Las contraseñas no coinciden.'
+    }
   }
 
   if (!formulario.rol) {
@@ -306,6 +312,13 @@ export function useCuentasUsuario() {
     return solicitar<CuentaUsuario>(RUTA_CUENTAS, { metodo: 'POST', cuerpo: solicitud })
   }
 
+  async function crearDocente(solicitud: SolicitudCrearDocente): Promise<CredencialesTemporalesCuenta> {
+    return solicitar<CredencialesTemporalesCuenta>(`${RUTA_CUENTAS}/docentes`, {
+      metodo: 'POST',
+      cuerpo: solicitud,
+    })
+  }
+
   async function actualizarCuenta(id: number, solicitud: SolicitudActualizarCuenta): Promise<CuentaUsuario> {
     return solicitar<CuentaUsuario>(`${RUTA_CUENTAS}/${id}`, { metodo: 'PUT', cuerpo: solicitud })
   }
@@ -318,6 +331,7 @@ export function useCuentasUsuario() {
     listarCuentas,
     obtenerCuenta,
     crearCuenta,
+    crearDocente,
     actualizarCuenta,
     cambiarEstadoCuenta,
   }

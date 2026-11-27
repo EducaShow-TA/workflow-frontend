@@ -3,7 +3,6 @@ import { ref } from 'vue'
 import { obtenerFechaHoyIso } from '~/composables/useFechas'
 import { useMiAsistenciaDocente } from '~/composables/useMiAsistenciaDocente'
 import { claveClase, nombreClase, useMisClases } from '~/composables/useMisClases'
-import { normalizarParaComparar } from '~/composables/useCompetencias'
 import {
   formatearHora,
   horaDeMomento,
@@ -66,74 +65,8 @@ export interface PendienteDocente {
   destino: string
 }
 
-export interface PantallaDocente {
-  titulo: string
-  detalle: string
-  destino: string
-  icono: string
-  claves?: string
-}
-
-export const PANTALLAS_DOCENTE: PantallaDocente[] = [
-  { titulo: 'Mi panel', detalle: 'Resumen del día', destino: '/docente', icono: '🏠', claves: 'inicio' },
-  {
-    titulo: 'Tareas',
-    detalle: 'Crear tareas y ver entregas',
-    destino: '/docente/tareas',
-    icono: '📋',
-    claves: 'entregas',
-  },
-  {
-    titulo: 'Calificaciones',
-    detalle: 'Notas y evidencias',
-    destino: '/docente/calificaciones',
-    icono: '🏅',
-    claves: 'notas rectificar',
-  },
-  {
-    titulo: 'Asistencia de alumnos',
-    detalle: 'Tomar asistencia por clase',
-    destino: '/docente/asistencia',
-    icono: '✅',
-  },
-  {
-    titulo: 'Reporte de asistencia',
-    detalle: 'Faltas y tardanzas',
-    destino: '/docente/reporte-asistencia',
-    icono: '📊',
-    claves: 'inasistencias tardanzas',
-  },
-  {
-    titulo: 'Libretas e informes',
-    detalle: 'Progreso por competencia',
-    destino: '/docente/libretas',
-    icono: '📘',
-    claves: 'libreta informe',
-  },
-  {
-    titulo: 'Mi marcaje',
-    detalle: 'Entrada y salida',
-    destino: '/docente/marcaje',
-    icono: '🕘',
-    claves: 'entrada salida',
-  },
-  {
-    titulo: 'Mi horario',
-    detalle: 'Agenda semanal',
-    destino: '/docente/horario',
-    icono: '🗓️',
-    claves: 'clases semana',
-  },
-]
-
-const MINIMO_BUSQUEDA_DOCENTE = 2
-
 const datos = ref<DatosPanelDocente | null>(null)
 let pendiente: Promise<DatosPanelDocente> | null = null
-
-function incluye(texto: string, criterio: string): boolean {
-  return normalizarParaComparar(texto).includes(criterio)
-}
 
 export function usePanelDocente() {
   const misClases = useMisClases()
@@ -287,74 +220,6 @@ export function listarPendientesDocente(panel: DatosPanelDocente, ahora = Date.n
     })
   }
   return lista
-}
-
-export type ResultadoBusquedaDocente =
-  | { tipo: 'alumno'; clave: string; titulo: string; detalle: string; etiqueta: string; destino: string }
-  | { tipo: 'clase'; clave: string; titulo: string; detalle: string; etiqueta: string; destino: string }
-  | { tipo: 'tarea'; clave: string; titulo: string; detalle: string; etiqueta: string; destino: string }
-  | { tipo: 'pantalla'; clave: string; titulo: string; detalle: string; etiqueta: string; destino: string }
-
-export function buscarEnPanelDocente(panel: DatosPanelDocente | null, consulta: string): ResultadoBusquedaDocente[] {
-  const criterio = normalizarParaComparar(consulta)
-  if (criterio.length < MINIMO_BUSQUEDA_DOCENTE) return []
-  const soloNumeros = /^\d+$/.test(criterio)
-  const alumnos = (panel?.alumnos ?? [])
-    .filter(({ alumno }) => (soloNumeros ? alumno.dni.includes(criterio) : incluye(alumno.nombreCompleto, criterio)))
-    .slice(0, 5)
-    .map(({ alumno, clave, nombreClase: clase }) => ({
-      tipo: 'alumno' as const,
-      clave: `a-${clave}-${alumno.matriculaId}`,
-      titulo: alumno.nombreCompleto,
-      detalle: `DNI ${alumno.dni}`,
-      etiqueta: clase,
-      destino: `/docente/calificaciones?clase=${encodeURIComponent(clave)}&alumno=${encodeURIComponent(alumno.dni)}`,
-    }))
-  if (soloNumeros) return alumnos
-  const clases = (panel?.clases ?? [])
-    .filter((item) =>
-      incluye(`${item.nombre} ${formatearSeccion(item.clase.gradoNumero, item.clase.seccionCodigo)}`, criterio),
-    )
-    .slice(0, 3)
-    .map((item) => ({
-      tipo: 'clase' as const,
-      clave: `c-${item.clave}`,
-      titulo: item.nombre,
-      detalle: `${item.clase.totalAlumnos} alumnos`,
-      etiqueta: 'Clase',
-      destino: `/docente/tareas?clase=${encodeURIComponent(item.clave)}`,
-    }))
-  const tareas = (panel?.tareas ?? [])
-    .filter((item) => incluye(item.tarea.titulo, criterio))
-    .slice(0, 3)
-    .map((item) => ({
-      tipo: 'tarea' as const,
-      clave: `t-${item.tarea.id}`,
-      titulo: item.tarea.titulo,
-      detalle: item.nombreClase,
-      etiqueta: item.vigente ? 'Vigente' : 'Vencida',
-      destino: `/docente/tareas?clase=${encodeURIComponent(item.clave)}&tarea=${item.tarea.id}`,
-    }))
-  const pantallas = PANTALLAS_DOCENTE.filter((pantalla) =>
-    incluye(`${pantalla.titulo} ${pantalla.claves ?? ''}`, criterio),
-  )
-    .slice(0, 3)
-    .map((pantalla) => ({
-      tipo: 'pantalla' as const,
-      clave: `p-${pantalla.destino}`,
-      titulo: pantalla.titulo,
-      detalle: pantalla.detalle,
-      etiqueta: pantalla.icono,
-      destino: pantalla.destino,
-    }))
-  return [...alumnos, ...clases, ...tareas, ...pantallas]
-}
-
-export const GRUPOS_BUSQUEDA_DOCENTE: Record<ResultadoBusquedaDocente['tipo'], string> = {
-  alumno: 'Mis alumnos',
-  clase: 'Mis clases',
-  tarea: 'Mis tareas',
-  pantalla: 'Ir a',
 }
 
 export function limpiarPanelDocente(): void {

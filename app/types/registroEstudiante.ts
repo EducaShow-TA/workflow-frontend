@@ -13,7 +13,6 @@ export interface ApoderadoRegistro {
 }
 
 export interface RegistroEstudiante {
-  username: string
   password: string
   tipoDocumento: TipoDocumento
   nombres: string
