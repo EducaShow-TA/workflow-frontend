@@ -83,6 +83,15 @@ const evaluacionElegida = computed(
   () => evaluacionesLibres.value.find((item) => String(item.id) === formulario.evaluacionId) ?? null,
 )
 
+function etiquetaCompetencia(competencia: { codigo: string; nombre: string }): string {
+  const uuidDelCodigo = competencia.codigo.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)?.[0]
+  if (!uuidDelCodigo || !competencia.nombre.toLowerCase().endsWith(uuidDelCodigo.toLowerCase())) {
+    return competencia.nombre
+  }
+
+  return competencia.nombre.slice(0, -uuidDelCodigo.length).trimEnd()
+}
+
 function limpiarAvisos(): void {
   error.value = ''
   aviso.value = ''
@@ -394,7 +403,12 @@ onBeforeUnmount(() => clearInterval(reloj))
         >
           Actualizar
         </button>
-        <button type="button" class="docente-boton" :disabled="!claseActual" @click="abrirNuevaTarea">
+        <button
+          type="button"
+          class="docente-boton"
+          :disabled="!claseActual || claseActual.actasCerradas"
+          @click="abrirNuevaTarea"
+        >
           + Nueva tarea
         </button>
       </div>
@@ -402,6 +416,11 @@ onBeforeUnmount(() => clearInterval(reloj))
 
     <AvisoMensaje v-if="error && !modalAbierto" :mensaje="error" tipo="error" />
     <AvisoMensaje v-if="aviso" :mensaje="aviso" tipo="exito" />
+    <AvisoMensaje
+      v-if="claseActual?.actasCerradas"
+      mensaje="No se pueden crear tareas para esta sección porque sus actas están cerradas."
+      tipo="advertencia"
+    />
 
     <p v-if="cargando" role="status">Consultando tus clases…</p>
     <template v-else>
@@ -641,7 +660,7 @@ onBeforeUnmount(() => clearInterval(reloj))
           <label for="tarea-competencia">Competencia *</label>
           <select id="tarea-competencia" v-model="competenciaCodigo" required :disabled="!competencias.length">
             <option v-for="competencia in competencias" :key="competencia.codigo" :value="competencia.codigo">
-              {{ competencia.nombre }}
+              {{ etiquetaCompetencia(competencia) }}
             </option>
           </select>
         </div>

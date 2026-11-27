@@ -37,6 +37,7 @@ const esDocente = computed(() => autenticacion.usuario?.rol === 'DOCENTE')
 const esApoderado = computed(() => autenticacion.usuario?.rol === 'APODERADO')
 const estudiantes = ref<OpcionEstudiante[]>([])
 const periodos = ref<OpcionPeriodo[]>([])
+const anhioSeleccionado = ref(new Date().getFullYear())
 const estudianteId = ref<number | ''>('')
 const periodoId = ref<number | ''>('')
 const bimestreHasta = ref<number | ''>('')
@@ -83,6 +84,16 @@ const estudiantesDisponibles = computed(() =>
     ? estudiantes.value
     : estudiantes.value.filter((item) => periodoId.value !== '' && item.periodos.includes(periodoId.value)),
 )
+const anhosDisponibles = computed(() => {
+  const anhos = new Set(periodos.value.map((periodo) => periodo.anhio))
+  anhos.add(new Date().getFullYear())
+  return [...anhos].sort((a, b) => b - a)
+})
+const periodosDisponibles = computed(() =>
+  esAdministrador.value
+    ? periodos.value.filter((periodo) => periodo.anhio === anhioSeleccionado.value)
+    : periodos.value,
+)
 
 async function cargarCatalogos(): Promise<void> {
   cargando.value = true
@@ -97,12 +108,11 @@ async function cargarCatalogos(): Promise<void> {
       }))
       periodos.value = listaPeriodos.map((item) => ({
         id: item.periodoId,
-        nombre: conAnhio(
-          formatearSeccionCompleta(item.numeroGrado, item.seccion, item.nivelEducativo),
-          item.fechaInicio.slice(0, 4),
-        ),
+        nombre: formatearSeccionCompleta(item.numeroGrado, item.seccion, item.nivelEducativo),
         anhio: Number(item.fechaInicio.slice(0, 4)),
       }))
+      anhioSeleccionado.value = new Date().getFullYear()
+      periodoId.value = periodos.value.find((periodo) => periodo.anhio === anhioSeleccionado.value)?.id ?? ''
     } else if (esDocente.value) {
       const clases = await listarClases()
       periodos.value = [
@@ -186,6 +196,12 @@ watch(periodoId, async (id) => {
       errorCatalogos.value = obtenerMensajeError(fallo, 'No se pudieron cargar los alumnos.')
   } finally {
     if (turno === catalogoActual) cargando.value = false
+  }
+})
+
+watch(anhioSeleccionado, () => {
+  if (esAdministrador.value) {
+    periodoId.value = periodosDisponibles.value[0]?.id ?? ''
   }
 })
 
@@ -319,11 +335,19 @@ onMounted(cargarCatalogos)
       </p>
       <form @submit.prevent="consultar">
         <div class="campos">
+          <label v-if="esAdministrador">
+            Año escolar
+            <select v-model.number="anhioSeleccionado" required :disabled="cargando || descargandoBimestre !== null">
+              <option v-for="anhio in anhosDisponibles" :key="anhio" :value="anhio">{{ anhio }}</option>
+            </select>
+          </label>
           <label v-if="esAdministrador || esDocente || esApoderado"
             >Período
             <select v-model="periodoId" required :disabled="cargando || descargandoBimestre !== null">
               <option value="">Elige un período</option>
-              <option v-for="item in periodos" :key="item.id" :value="item.id">{{ item.nombre }}</option>
+              <option v-for="item in periodosDisponibles" :key="item.id" :value="item.id">
+                {{ item.nombre }}
+              </option>
             </select>
           </label>
           <label v-else

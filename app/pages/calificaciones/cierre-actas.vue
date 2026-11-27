@@ -64,7 +64,7 @@ function elegirAnhioInicial(): void {
 }
 
 function elegirGradoInicial(): void {
-  grado.value = grados.value[0]?.numero ?? TODOS_LOS_GRADOS
+  grado.value = TODOS_LOS_GRADOS
 }
 
 async function cargarPeriodos(): Promise<void> {
