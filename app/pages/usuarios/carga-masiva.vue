@@ -56,13 +56,14 @@ const AYUDA_POR_ROL: Record<RolCargaMasiva, AyudaCarga> = {
     columnasOpcionales: ['telefono'],
   },
   ALUMNO: {
-    descripcion: 'Registra alumnos vinculándolos con un apoderado que ya exista en el sistema.',
+    descripcion: 'Registra alumnos y crea automáticamente la cuenta de su apoderado cuando aún no existe.',
     instrucciones: [
       'Completa una fila por alumno y conserva ALUMNO en la columna rol.',
       'Ingresa DNI, nombres, apellidos y correo. Para fecha_nacimiento usa AAAA-MM-DD; fecha y teléfono son opcionales.',
-      'Completa dni_apoderado con el DNI de un apoderado ya registrado y especifica parentesco: PADRE, MADRE, TUTOR_LEGAL u OTRO.',
+      'Completa dni_apoderado y parentesco: PADRE, MADRE, TUTOR_LEGAL u OTRO.',
+      'Si el apoderado no está registrado, completa también nombres_apoderado, apellido_paterno_apoderado, apellido_materno_apoderado y telefono_apoderado. El correo del apoderado es opcional.',
       'No completes username: el sistema genera el usuario del alumno automáticamente.',
-      'Al terminar, descarga las credenciales temporales; las contraseñas solo se muestran en ese resultado.',
+      'El sistema genera automáticamente las cuentas y contraseñas temporales del alumno y de los apoderados nuevos. Descarga las credenciales al terminar.',
     ],
     columnasObligatorias: [
       'rol',
@@ -74,7 +75,15 @@ const AYUDA_POR_ROL: Record<RolCargaMasiva, AyudaCarga> = {
       'dni_apoderado',
       'parentesco',
     ],
-    columnasOpcionales: ['fecha_nacimiento', 'telefono'],
+    columnasOpcionales: [
+      'fecha_nacimiento',
+      'telefono',
+      'nombres_apoderado',
+      'apellido_paterno_apoderado',
+      'apellido_materno_apoderado',
+      'correo_apoderado',
+      'telefono_apoderado',
+    ],
   },
   APODERADO: {
     descripcion: 'Registra apoderados y vincúlalos con alumnos que ya existan en el sistema.',
@@ -122,8 +131,8 @@ const procesando = ref(false)
 const descargandoPlantilla = ref(false)
 const arrastrando = ref(false)
 const credencialesDescargadas = ref(false)
-const contrasenasVisibles = ref(new Set<number>())
-const filaCopiada = ref<number | null>(null)
+const contrasenasVisibles = ref(new Set<string>())
+const filaCopiada = ref<string | null>(null)
 const selectorArchivo = ref<HTMLInputElement | null>(null)
 
 const indicePaso = computed(() => PASOS.findIndex((elemento) => elemento.clave === paso.value))
@@ -255,22 +264,26 @@ function descargarRechazadas(): void {
   descargarArchivo(`${base}-rechazadas.csv`, generarCsvRechazadas(resultado.value, revision.value.csv))
 }
 
-function alternarContrasena(fila: number): void {
+function claveCuenta(rol: string, dni: string): string {
+  return `${rol}:${dni}`
+}
+
+function alternarContrasena(clave: string): void {
   const visibles = new Set(contrasenasVisibles.value)
-  if (visibles.has(fila)) {
-    visibles.delete(fila)
+  if (visibles.has(clave)) {
+    visibles.delete(clave)
   } else {
-    visibles.add(fila)
+    visibles.add(clave)
   }
   contrasenasVisibles.value = visibles
 }
 
-async function copiarContrasena(fila: number, contrasena: string): Promise<void> {
+async function copiarContrasena(clave: string, contrasena: string): Promise<void> {
   try {
     await navigator.clipboard.writeText(contrasena)
-    filaCopiada.value = fila
+    filaCopiada.value = clave
     setTimeout(() => {
-      if (filaCopiada.value === fila) filaCopiada.value = null
+      if (filaCopiada.value === clave) filaCopiada.value = null
     }, 2000)
   } catch {
     errorGeneral.value = 'No se pudo copiar; usa "Mostrar" o descarga las credenciales.'
@@ -543,28 +556,32 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', avisarAntesDeCe
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="cuenta in resultado.cuentas" :key="cuenta.fila">
+                  <tr v-for="cuenta in resultado.cuentas" :key="claveCuenta(cuenta.rol, cuenta.dni)">
                     <td>{{ cuenta.fila }}</td>
                     <td>{{ cuenta.rol }}</td>
                     <td>{{ cuenta.dni }}</td>
                     <td>{{ cuenta.username }}</td>
                     <td class="celda-contrasena">
-                      <code>{{ contrasenasVisibles.has(cuenta.fila) ? cuenta.contrasenhaTemporal : '••••••••' }}</code>
+                      <code>{{
+                        contrasenasVisibles.has(claveCuenta(cuenta.rol, cuenta.dni))
+                          ? cuenta.contrasenhaTemporal
+                          : '••••••••'
+                      }}</code>
                       <button
                         type="button"
                         class="boton-mini"
-                        :aria-label="`${contrasenasVisibles.has(cuenta.fila) ? 'Ocultar' : 'Mostrar'} la contraseña de ${cuenta.username}`"
-                        @click="alternarContrasena(cuenta.fila)"
+                        :aria-label="`${contrasenasVisibles.has(claveCuenta(cuenta.rol, cuenta.dni)) ? 'Ocultar' : 'Mostrar'} la contraseña de ${cuenta.username}`"
+                        @click="alternarContrasena(claveCuenta(cuenta.rol, cuenta.dni))"
                       >
-                        {{ contrasenasVisibles.has(cuenta.fila) ? 'Ocultar' : 'Mostrar' }}
+                        {{ contrasenasVisibles.has(claveCuenta(cuenta.rol, cuenta.dni)) ? 'Ocultar' : 'Mostrar' }}
                       </button>
                       <button
                         type="button"
                         class="boton-mini"
                         :aria-label="`Copiar la contraseña de ${cuenta.username}`"
-                        @click="copiarContrasena(cuenta.fila, cuenta.contrasenhaTemporal)"
+                        @click="copiarContrasena(claveCuenta(cuenta.rol, cuenta.dni), cuenta.contrasenhaTemporal)"
                       >
-                        {{ filaCopiada === cuenta.fila ? 'Copiada' : 'Copiar' }}
+                        {{ filaCopiada === claveCuenta(cuenta.rol, cuenta.dni) ? 'Copiada' : 'Copiar' }}
                       </button>
                     </td>
                   </tr>
