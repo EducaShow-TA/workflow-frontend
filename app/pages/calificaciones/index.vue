@@ -46,6 +46,7 @@ const { listar: listarEstudiantes } = useEstudiantesMatriculables()
 const { listar, registrar, descargarEvidencia, cargaMasiva } = useCalificaciones()
 
 const periodos = ref<PeriodoAcademico[]>([])
+const anhioSeleccionado = ref(new Date().getFullYear())
 const estudiantes = ref<EstudianteMatriculable[]>([])
 const areas = ref<AreaCatalogo[]>([])
 const calificaciones = ref<Calificacion[]>([])
@@ -81,6 +82,14 @@ const competencias = computed(() => {
   }
   return [...unicas.values()].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
 })
+const anhosDisponibles = computed(() => {
+  const anhos = new Set(periodos.value.map((periodo) => Number(periodo.fechaInicio.slice(0, 4))))
+  anhos.add(new Date().getFullYear())
+  return [...anhos].sort((a, b) => b - a)
+})
+const periodosDelAnhio = computed(() =>
+  periodos.value.filter((periodo) => Number(periodo.fechaInicio.slice(0, 4)) === anhioSeleccionado.value),
+)
 
 function etiquetaCompetencia(competencia: CompetenciaCatalogo): string {
   const uuidDelCodigo = competencia.codigo.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)?.[0]
@@ -117,10 +126,7 @@ const competenciaSeleccionada = computed(() =>
 const totalCalificados = computed(() => calificaciones.value.length)
 
 function descripcionPeriodo(periodo: PeriodoAcademico): string {
-  return conAnhio(
-    formatearSeccionCompleta(periodo.numeroGrado, periodo.seccion, periodo.nivelEducativo),
-    periodo.fechaInicio.slice(0, 4),
-  )
+  return formatearSeccionCompleta(periodo.numeroGrado, periodo.seccion, periodo.nivelEducativo)
 }
 function formatearFecha(fecha: string): string {
   const valor = new Date(fecha)
@@ -181,7 +187,10 @@ async function cargarCatalogos(): Promise<void> {
     periodos.value = listaPeriodos
     estudiantes.value = listaEstudiantes
     areas.value = listaAreas
-    periodoId.value = listaPeriodos[0]?.periodoId ?? null
+    anhioSeleccionado.value = new Date().getFullYear()
+    periodoId.value =
+      listaPeriodos.find((periodo) => Number(periodo.fechaInicio.slice(0, 4)) === anhioSeleccionado.value)?.periodoId ??
+      null
     competenciaCodigo.value = competencias.value[0]?.codigo ?? ''
   } catch (fallo: unknown) {
     error.value = obtenerMensajeError(fallo, 'No fue posible consultar los datos académicos.')
@@ -208,6 +217,9 @@ async function cargarCalificaciones(): Promise<void> {
 watch(periodoId, () => {
   matriculaId.value = null
   limpiarFormulario()
+})
+watch(anhioSeleccionado, () => {
+  periodoId.value = periodosDelAnhio.value[0]?.periodoId ?? null
 })
 watch(matriculaId, () => {
   confirmacionRegistro.value = null
@@ -338,13 +350,19 @@ async function descargar(item: Calificacion): Promise<void> {
       <p v-if="cargando" role="status">Cargando datos académicos...</p>
       <div v-else class="campos">
         <div class="campo">
-          <label for="periodo-calificacion">Período académico</label>
-          <select id="periodo-calificacion" v-model.number="periodoId" :disabled="!periodos.length">
-            <option v-for="periodo in periodos" :key="periodo.periodoId" :value="periodo.periodoId">
+          <label for="anhio-calificacion">Año escolar</label>
+          <select id="anhio-calificacion" v-model.number="anhioSeleccionado">
+            <option v-for="anhio in anhosDisponibles" :key="anhio" :value="anhio">{{ anhio }}</option>
+          </select>
+        </div>
+        <div class="campo">
+          <label for="periodo-calificacion">Grado y sección</label>
+          <select id="periodo-calificacion" v-model.number="periodoId" :disabled="!periodosDelAnhio.length">
+            <option v-for="periodo in periodosDelAnhio" :key="periodo.periodoId" :value="periodo.periodoId">
               {{ descripcionPeriodo(periodo) }}
             </option>
           </select>
-          <small v-if="!periodos.length">Primero abre el año escolar desde Grados/Secciones.</small>
+          <small v-if="!periodosDelAnhio.length">No hay grados y secciones para el año {{ anhioSeleccionado }}.</small>
         </div>
 
         <div class="campo">

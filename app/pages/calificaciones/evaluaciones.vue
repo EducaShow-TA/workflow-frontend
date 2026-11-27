@@ -23,6 +23,7 @@ const { listar, crear, actualizar } = useEvaluacionesParciales()
 const { listar: listarBimestres } = useBimestres()
 
 const periodos = ref<PeriodoAcademico[]>([])
+const anhioSeleccionado = ref(new Date().getFullYear())
 const areas = ref<Area[]>([])
 const evaluaciones = ref<EvaluacionParcial[]>([])
 const calendario = ref<BimestreAcademico[]>([])
@@ -48,6 +49,14 @@ const competencias = computed<CompetenciaOpcion[]>(() =>
         .map((competencia) => ({ ...competencia, areaNombre: area.nombre })),
     )
     .sort((primera, segunda) => primera.nombre.localeCompare(segunda.nombre, 'es')),
+)
+const anhosDisponibles = computed(() => {
+  const anhos = new Set(periodos.value.map((periodo) => Number(periodo.fechaInicio.slice(0, 4))))
+  anhos.add(new Date().getFullYear())
+  return [...anhos].sort((a, b) => b - a)
+})
+const periodosDelAnhio = computed(() =>
+  periodos.value.filter((periodo) => Number(periodo.fechaInicio.slice(0, 4)) === anhioSeleccionado.value),
 )
 const nombreCompetencia = computed(
   () => competencias.value.find((item) => item.codigo === competenciaCodigo.value)?.nombre ?? '',
@@ -85,10 +94,7 @@ function describirBimestre(numero: number): string {
 }
 
 function descripcionPeriodo(periodo: PeriodoAcademico): string {
-  return conAnhio(
-    formatearSeccionCompleta(periodo.numeroGrado, periodo.seccion, periodo.nivelEducativo),
-    periodo.fechaInicio.slice(0, 4),
-  )
+  return formatearSeccionCompleta(periodo.numeroGrado, periodo.seccion, periodo.nivelEducativo)
 }
 
 function limpiarFormulario(): void {
@@ -147,7 +153,10 @@ async function cargarCatalogos(): Promise<void> {
     const [periodosCargados, areasCargadas] = await Promise.all([listarPeriodos(), listarAreas()])
     periodos.value = periodosCargados
     areas.value = areasCargadas
-    periodoId.value = periodosCargados[0]?.periodoId ?? null
+    anhioSeleccionado.value = new Date().getFullYear()
+    periodoId.value =
+      periodosCargados.find((periodo) => Number(periodo.fechaInicio.slice(0, 4)) === anhioSeleccionado.value)
+        ?.periodoId ?? null
     competenciaCodigo.value =
       areasCargadas.find((area) => area.activo)?.competencias.find((competencia) => competencia.activo)?.codigo ?? ''
   } catch (fallo: unknown) {
@@ -229,6 +238,10 @@ async function guardar(): Promise<void> {
 
 watch(anhioPeriodo, () => void cargarCalendario())
 
+watch(anhioSeleccionado, () => {
+  periodoId.value = periodosDelAnhio.value[0]?.periodoId ?? null
+})
+
 watch([periodoId, competenciaCodigo], () => {
   limpiarFormulario()
   void cargarEvaluaciones()
@@ -248,14 +261,21 @@ onMounted(cargarCatalogos)
 
     <AvisoMensaje v-if="errorCatalogos" :mensaje="errorCatalogos" tipo="error" />
 
-    <section class="panel filtros" aria-label="Grado, sección y competencia">
+    <section class="panel filtros" aria-label="Año, grado, sección y competencia">
+      <label>
+        Año escolar
+        <select v-model.number="anhioSeleccionado" :disabled="cargandoCatalogos">
+          <option v-for="anhio in anhosDisponibles" :key="anhio" :value="anhio">{{ anhio }}</option>
+        </select>
+      </label>
       <label>
         Grado y sección
-        <select v-model.number="periodoId" :disabled="cargandoCatalogos || !periodos.length">
-          <option v-for="periodo in periodos" :key="periodo.periodoId" :value="periodo.periodoId">
+        <select v-model.number="periodoId" :disabled="cargandoCatalogos || !periodosDelAnhio.length">
+          <option v-for="periodo in periodosDelAnhio" :key="periodo.periodoId" :value="periodo.periodoId">
             {{ descripcionPeriodo(periodo) }}
           </option>
         </select>
+        <small v-if="!periodosDelAnhio.length">No hay secciones disponibles para {{ anhioSeleccionado }}.</small>
       </label>
       <label>
         Competencia

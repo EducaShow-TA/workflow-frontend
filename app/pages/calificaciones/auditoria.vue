@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useApi } from '~/composables/useApi'
 import { useCompetencias } from '~/composables/useCompetencias'
 import { describirAccionAuditoria, describirCambioAuditoria } from '~/composables/useAuditoriaCalificaciones'
@@ -23,6 +23,7 @@ interface ResultadoPagina {
 }
 
 interface FiltrosAuditoria {
+  anhio: string
   periodoId: string
   matriculaId: string
   estudianteId: string
@@ -38,10 +39,19 @@ const { listar: listarEstudiantes } = useEstudiantesMatriculables()
 const { listarAreas } = useCompetencias()
 
 const periodos = ref<PeriodoAcademico[]>([])
+const anhosDisponibles = computed(() => {
+  const anhos = new Set(periodos.value.map((periodo) => Number(periodo.fechaInicio.slice(0, 4))))
+  anhos.add(new Date().getFullYear())
+  return [...anhos].sort((a, b) => b - a)
+})
+const periodosDelAnhio = computed(() =>
+  periodos.value.filter((periodo) => Number(periodo.fechaInicio.slice(0, 4)) === Number(filtros.anhio)),
+)
 const estudiantes = ref<EstudianteMatriculable[]>([])
 const areas = ref<Area[]>([])
 const registros = ref<RegistroAuditoriaCalificacion[]>([])
 const filtros = reactive<FiltrosAuditoria>({
+  anhio: String(new Date().getFullYear()),
   periodoId: '',
   matriculaId: '',
   estudianteId: '',
@@ -75,6 +85,7 @@ const competenciasPorCodigo = computed(() => {
 
 const hayFiltros = computed(() =>
   Boolean(
+    filtros.anhio !== String(new Date().getFullYear()) ||
     filtros.periodoId ||
     filtros.matriculaId ||
     filtros.estudianteId ||
@@ -102,7 +113,15 @@ function rutaConsulta(): string {
   parametros.append('sort', 'fechaHora,desc')
   parametros.append('sort', 'id,desc')
 
-  for (const campo of ['periodoId', 'matriculaId', 'estudianteId', 'competenciaCodigo', 'tipo', 'accion'] as const) {
+  for (const campo of [
+    'anhio',
+    'periodoId',
+    'matriculaId',
+    'estudianteId',
+    'competenciaCodigo',
+    'tipo',
+    'accion',
+  ] as const) {
     const valor = filtros[campo].trim()
     if (valor) {
       parametros.set(campo, valor)
@@ -175,6 +194,7 @@ async function cargarCatalogos(): Promise<void> {
 
 function limpiarFiltros(): void {
   Object.assign(filtros, {
+    anhio: String(new Date().getFullYear()),
     periodoId: '',
     matriculaId: '',
     estudianteId: '',
@@ -193,11 +213,15 @@ function fechaVisible(valor: string): string {
 }
 
 function periodoEtiqueta(periodo: PeriodoAcademico): string {
-  return conAnhio(
-    formatearSeccionCompleta(periodo.numeroGrado, periodo.seccion, periodo.nivelEducativo),
-    periodo.fechaInicio.slice(0, 4),
-  )
+  return formatearSeccionCompleta(periodo.numeroGrado, periodo.seccion, periodo.nivelEducativo)
 }
+
+watch(
+  () => filtros.anhio,
+  () => {
+    filtros.periodoId = ''
+  },
+)
 
 function periodoVisible(id: number | null): string {
   if (id === null) {
@@ -294,10 +318,17 @@ onMounted(() => {
 
     <form class="panel-filtros" aria-label="Filtros de auditoría" @submit.prevent="consultar(0)">
       <div class="campo-filtro">
-        <label for="filtro-periodo-auditoria">Período</label>
+        <label for="filtro-anhio-auditoria">Año escolar</label>
+        <select id="filtro-anhio-auditoria" v-model="filtros.anhio" :disabled="cargando">
+          <option v-for="anhio in anhosDisponibles" :key="anhio" :value="String(anhio)">{{ anhio }}</option>
+        </select>
+      </div>
+
+      <div class="campo-filtro">
+        <label for="filtro-periodo-auditoria">Grado y sección</label>
         <select id="filtro-periodo-auditoria" v-model="filtros.periodoId" :disabled="cargando">
-          <option value="">Todos los períodos</option>
-          <option v-for="item in periodos" :key="item.periodoId" :value="String(item.periodoId)">
+          <option value="">Todos los grados y secciones</option>
+          <option v-for="item in periodosDelAnhio" :key="item.periodoId" :value="String(item.periodoId)">
             {{ periodoEtiqueta(item) }}
           </option>
         </select>

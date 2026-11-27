@@ -61,6 +61,7 @@ export interface MiClase {
   areaCodigo: string
   areaNombre: string
   totalAlumnos: number
+  actasCerradas: boolean
   competencias: CompetenciaClase[]
 }
 
