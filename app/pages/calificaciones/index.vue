@@ -82,6 +82,15 @@ const competencias = computed(() => {
   return [...unicas.values()].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
 })
 
+function etiquetaCompetencia(competencia: CompetenciaCatalogo): string {
+  const uuidDelCodigo = competencia.codigo.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)?.[0]
+  if (!uuidDelCodigo || !competencia.nombre.toLowerCase().endsWith(uuidDelCodigo.toLowerCase())) {
+    return competencia.nombre
+  }
+
+  return competencia.nombre.slice(0, -uuidDelCodigo.length).trimEnd()
+}
+
 const matriculas = computed<MatriculaConfirmada[]>(() => {
   if (periodoId.value === null) return []
   return estudiantes.value
@@ -280,7 +289,9 @@ async function guardar(): Promise<void> {
     await registrar(solicitud, archivo.value)
     confirmacionRegistro.value = {
       estudiante: matriculaSeleccionada.value?.estudiante ?? 'Estudiante seleccionado',
-      competencia: competenciaSeleccionada.value?.nombre ?? 'competencia seleccionada',
+      competencia: competenciaSeleccionada.value
+        ? etiquetaCompetencia(competenciaSeleccionada.value)
+        : 'competencia seleccionada',
       nota: solicitud.nota,
       notaAnterior: existente?.nota ?? null,
     }
@@ -346,7 +357,7 @@ async function descargar(item: Calificacion): Promise<void> {
           <label for="competencia-calificacion">Competencia</label>
           <select id="competencia-calificacion" v-model="competenciaCodigo" :disabled="!competencias.length">
             <option v-for="competencia in competencias" :key="competencia.codigo" :value="competencia.codigo">
-              {{ competencia.nombre }}
+              {{ etiquetaCompetencia(competencia) }}
             </option>
           </select>
           <small v-if="!competencias.length">Primero registra competencias activas en el catálogo.</small>
