@@ -39,16 +39,27 @@ export function sugerirPrimerVencimiento(anhioEscolar: number, fechaHoy: string)
   return sugerido
 }
 
+/** Cuotas que caben desde el primer vencimiento hasta diciembre del año escolar (alumnos que entran a mitad de año). */
+export function cuotasHastaDiciembre(primerVencimiento: string, anhioEscolar: number): number {
+  const [anhio, mes] = primerVencimiento.split('-').map(Number) as [number, number]
+  return Math.max(0, (anhioEscolar - anhio) * 12 + (12 - mes) + 1)
+}
+
 export function crearFormularioCompromiso(anhioEscolar: number, fechaHoy: string): FormularioCompromisoPago {
+  const primerVencimiento = sugerirPrimerVencimiento(anhioEscolar, fechaHoy)
   return {
     concepto: `Pensión escolar ${anhioEscolar}`,
     montoTotal: null,
-    numeroCuotas: CUOTAS_SUGERIDAS,
-    primerVencimiento: sugerirPrimerVencimiento(anhioEscolar, fechaHoy),
+    numeroCuotas: Math.max(1, Math.min(CUOTAS_SUGERIDAS, cuotasHastaDiciembre(primerVencimiento, anhioEscolar))),
+    primerVencimiento,
   }
 }
 
-export function validarCompromiso(formulario: FormularioCompromisoPago, fechaHoy: string): ErroresCompromisoPago {
+export function validarCompromiso(
+  formulario: FormularioCompromisoPago,
+  fechaHoy: string,
+  anhioEscolar?: number,
+): ErroresCompromisoPago {
   const errores: ErroresCompromisoPago = {}
   const concepto = formulario.concepto.trim()
 
@@ -67,6 +78,11 @@ export function validarCompromiso(formulario: FormularioCompromisoPago, fechaHoy
   const cuotas = formulario.numeroCuotas
   if (cuotas === null || !Number.isInteger(cuotas) || cuotas < 1 || cuotas > CUOTAS_MAXIMAS) {
     errores.numeroCuotas = `Ingresa un número entero de 1 a ${CUOTAS_MAXIMAS}.`
+  } else if (anhioEscolar && esFechaIsoValida(formulario.primerVencimiento)) {
+    const caben = cuotasHastaDiciembre(formulario.primerVencimiento, anhioEscolar)
+    if (cuotas > caben) {
+      errores.numeroCuotas = `Las pensiones terminan en diciembre de ${anhioEscolar}: con este primer vencimiento caben ${caben} cuotas.`
+    }
   }
 
   if (!esFechaIsoValida(formulario.primerVencimiento)) {

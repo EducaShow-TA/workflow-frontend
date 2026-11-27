@@ -8,6 +8,7 @@ import {
   calcularCronograma,
   construirSolicitudCompromiso,
   crearFormularioCompromiso,
+  cuotasHastaDiciembre,
   describirMes,
   formatearSoles,
   validarCompromiso,
@@ -49,6 +50,14 @@ const montoCuota = ref<number | null>(propiedades.montoPension)
 const cronograma = computed(() => calcularCronograma(formulario))
 const primeraCuota = computed(() => cronograma.value[0])
 const ultimaCuota = computed(() => cronograma.value[cronograma.value.length - 1])
+const cuotasDisponibles = computed(() =>
+  Math.min(CUOTAS_MAXIMAS, cuotasHastaDiciembre(formulario.primerVencimiento, propiedades.anhioEscolar)),
+)
+const ayudaCuotas = computed(() =>
+  cuotasDisponibles.value < 10
+    ? `Ingresa a mitad del año: caben ${cuotasDisponibles.value} cuotas, hasta diciembre de ${propiedades.anhioEscolar}.`
+    : `De 1 a ${cuotasDisponibles.value} cuotas mensuales, hasta diciembre de ${propiedades.anhioEscolar}.`,
+)
 const textoEstudiantes = computed(() =>
   propiedades.cantidad === 1 ? '1 estudiante' : `${propiedades.cantidad} estudiantes`,
 )
@@ -101,7 +110,7 @@ function confirmar(): void {
     return
   }
   actualizarMontoTotal()
-  errores.value = validarCompromiso(formulario, obtenerFechaHoyIso())
+  errores.value = validarCompromiso(formulario, obtenerFechaHoyIso(), propiedades.anhioEscolar)
 
   if (Object.values(errores.value).some(Boolean)) {
     return
@@ -157,14 +166,14 @@ function confirmar(): void {
               type="number"
               inputmode="numeric"
               min="1"
-              :max="CUOTAS_MAXIMAS"
+              :max="cuotasDisponibles"
               step="1"
               :aria-invalid="Boolean(errores.numeroCuotas)"
               :aria-describedby="errores.numeroCuotas ? 'error-cuotas' : 'ayuda-cuotas'"
               @input="limpiarError('numeroCuotas')"
             />
             <small v-if="errores.numeroCuotas" id="error-cuotas" class="error">{{ errores.numeroCuotas }}</small>
-            <small v-else id="ayuda-cuotas" class="ayuda">De 1 a {{ CUOTAS_MAXIMAS }} cuotas mensuales.</small>
+            <small v-else id="ayuda-cuotas" class="ayuda">{{ ayudaCuotas }}</small>
           </div>
         </div>
 
