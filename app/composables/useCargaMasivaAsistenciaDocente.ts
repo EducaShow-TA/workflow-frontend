@@ -37,10 +37,11 @@ function esResultadoCarga(datos: unknown): datos is ResultadoCargaAsistenciaDoce
 
 /** Carga CSV administrativa (US-2.5), con validación previa y guardado transaccional en el servidor. */
 export function useCargaMasivaAsistenciaDocente() {
-  const { solicitar } = useApi()
+  const { solicitar, solicitarArchivo } = useApi()
 
-  async function descargarPlantilla(): Promise<string> {
-    return solicitar<string>(`${RUTA}/plantilla`)
+  async function descargarPlantilla(formato: 'csv' | 'xlsx'): Promise<Blob> {
+    const parametros = new URLSearchParams({ formato })
+    return solicitarArchivo(`${RUTA}/plantilla?${parametros.toString()}`)
   }
 
   async function cargar(archivo: File, soloValidar: boolean): Promise<ResultadoCargaAsistenciaDocente> {

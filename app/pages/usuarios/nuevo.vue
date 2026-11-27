@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import type { CuentaUsuario, ErroresCuenta, FormularioCuenta } from '~/types/cuentaUsuario'
+import type { CuentaUsuario, ErroresCuenta, FormularioCuenta, SolicitudCrearDocente } from '~/types/cuentaUsuario'
+import type { CredencialTemporal } from '~/types/credencial'
 import {
   LONGITUD_DNI,
   LONGITUD_MAXIMA_CORREO,
@@ -12,7 +13,7 @@ import {
   validarCuenta,
 } from '~/composables/useCuentasUsuario'
 import { ROLES, listarModulosPermitidos, obtenerDescripcionRol, obtenerNombreRol } from '~/composables/usePermisosRol'
-import { normalizarDocumento } from '~/composables/useMascarasFormulario'
+import { normalizarCorreo, normalizarDocumento, normalizarNombre } from '~/composables/useMascarasFormulario'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
 import { obtenerPrimerError, tieneErrores } from '~/composables/useValidacion'
 
@@ -20,7 +21,8 @@ definePageMeta({
   middleware: 'autenticacion',
 })
 
-const { listarCuentas, crearCuenta } = useCuentasUsuario()
+const { listarCuentas, crearCuenta, crearDocente } = useCuentasUsuario()
+const ruta = useRoute()
 
 const formulario = reactive<FormularioCuenta>(crearFormularioVacio())
 const errores = reactive<ErroresCuenta>({})
@@ -28,6 +30,12 @@ const cuentasExistentes = ref<CuentaUsuario[]>([])
 const guardando = ref(false)
 const errorGuardado = ref('')
 const mostrarPassword = ref(false)
+const credencialDocente = ref<CredencialTemporal | null>(null)
+
+const rolInicial = ROLES.find((rol) => rol === ruta.query.rol)
+if (rolInicial) {
+  formulario.rol = rolInicial
+}
 
 onMounted(async () => {
   try {
@@ -63,6 +71,23 @@ async function guardar(): Promise<void> {
   errorGuardado.value = ''
 
   try {
+    if (formulario.rol === 'DOCENTE') {
+      const solicitud: SolicitudCrearDocente = {
+        dni: normalizarDocumento(formulario.dni, 'DNI'),
+        nombre: normalizarNombre(formulario.nombre),
+        apellidoPaterno: normalizarNombre(formulario.apellidoPaterno),
+        apellidoMaterno: normalizarNombre(formulario.apellidoMaterno),
+        correo: normalizarCorreo(formulario.correo),
+      }
+      const cuenta = await crearDocente(solicitud)
+      credencialDocente.value = {
+        nombre: `${solicitud.nombre} ${solicitud.apellidoPaterno} ${solicitud.apellidoMaterno}`,
+        username: cuenta.username,
+        contrasenhaTemporal: cuenta.contrasenhaTemporal,
+      }
+      return
+    }
+
     const cuenta = await crearCuenta(construirSolicitud(formulario, formulario.rol))
     await navigateTo({ path: '/usuarios', query: { creado: cuenta.username } })
   } catch (error: unknown) {
@@ -73,27 +98,51 @@ async function guardar(): Promise<void> {
 }
 
 async function cancelar(): Promise<void> {
-  await navigateTo('/usuarios')
+  await navigateTo(formulario.rol === 'DOCENTE' ? '/docentes' : '/usuarios')
+}
+
+async function irADocentes(): Promise<void> {
+  credencialDocente.value = null
+  await navigateTo('/docentes')
 }
 </script>
 
 <template>
   <main class="pagina-nuevo-usuario">
     <EncabezadoPagina
+      v-if="credencialDocente"
+      titulo="Docente creado"
+      descripcion="Guarda las credenciales de acceso antes de continuar."
+    >
+      <template #acciones>
+        <BotonAccion @click="irADocentes">Ir a docentes</BotonAccion>
+      </template>
+    </EncabezadoPagina>
+
+    <EncabezadoPagina
+      v-else
       titulo="Crear nuevo usuario"
       descripcion="Registra a una persona y asígnale el rol con el que ingresará al sistema."
     >
       <template #acciones>
         <BotonAccion variante="secundario" :deshabilitado="guardando" @click="cancelar">Cancelar</BotonAccion>
         <BotonAccion tipo="submit" form="formulario-usuario" :deshabilitado="guardando">
-          {{ guardando ? 'Guardando...' : 'Guardar usuario' }}
+          {{ guardando ? 'Guardando...' : formulario.rol === 'DOCENTE' ? 'Crear docente' : 'Guardar usuario' }}
         </BotonAccion>
       </template>
     </EncabezadoPagina>
 
-    <AvisoMensaje v-if="errorGuardado" :mensaje="errorGuardado" tipo="error" />
+    <section v-if="credencialDocente" class="tarjeta resultado-credenciales" aria-live="polite">
+      <p class="nota-credenciales">
+        Esta contraseña temporal solo se muestra ahora. Anótala o cópiala y entrégala al docente.
+      </p>
+      <CredencialesTemporales :credenciales="[credencialDocente]" />
+      <BotonAccion @click="irADocentes">Finalizar</BotonAccion>
+    </section>
 
-    <form id="formulario-usuario" class="cuadricula" novalidate @submit.prevent="guardar">
+    <AvisoMensaje v-if="errorGuardado && !credencialDocente" :mensaje="errorGuardado" tipo="error" />
+
+    <form v-if="!credencialDocente" id="formulario-usuario" class="cuadricula" novalidate @submit.prevent="guardar">
       <div class="columna-principal">
         <section class="tarjeta" aria-labelledby="titulo-informacion">
           <h2 id="titulo-informacion">Información básica</h2>
@@ -165,7 +214,7 @@ async function cancelar(): Promise<void> {
               </small>
             </div>
 
-            <div class="campo ancho-completo">
+            <div v-if="formulario.rol !== 'DOCENTE'" class="campo ancho-completo">
               <label for="username">Usuario de acceso <span class="obligatorio">*</span></label>
               <input
                 id="username"
@@ -220,6 +269,10 @@ async function cancelar(): Promise<void> {
             <small v-if="errores.rol" id="error-rol" class="error">{{ errores.rol }}</small>
           </div>
 
+          <p v-if="formulario.rol === 'DOCENTE'" class="nota-credenciales">
+            El usuario de acceso y una contraseña temporal se generarán automáticamente al crear al docente.
+          </p>
+
           <div class="capacidades" aria-live="polite">
             <h3>Capacidades del rol</h3>
 
@@ -247,48 +300,54 @@ async function cancelar(): Promise<void> {
         <section class="tarjeta" aria-labelledby="titulo-seguridad">
           <h2 id="titulo-seguridad">Seguridad de la cuenta</h2>
 
-          <div class="campo">
-            <label for="password">Contraseña inicial <span class="obligatorio">*</span></label>
-            <input
-              id="password"
-              v-model="formulario.password"
-              :type="mostrarPassword ? 'text' : 'password'"
-              autocomplete="new-password"
-              :aria-invalid="Boolean(errores.password)"
-              aria-describedby="ayuda-password"
-              @input="limpiarError('password')"
-            />
-            <small v-if="errores.password" class="error">{{ errores.password }}</small>
-            <small id="ayuda-password" class="ayuda">
-              Mínimo {{ LONGITUD_MINIMA_PASSWORD }} caracteres, con minúscula, mayúscula, número y símbolo; máximo 72
-              bytes UTF-8.
-            </small>
-          </div>
+          <template v-if="formulario.rol !== 'DOCENTE'">
+            <div class="campo">
+              <label for="password">Contraseña inicial <span class="obligatorio">*</span></label>
+              <input
+                id="password"
+                v-model="formulario.password"
+                :type="mostrarPassword ? 'text' : 'password'"
+                autocomplete="new-password"
+                :aria-invalid="Boolean(errores.password)"
+                aria-describedby="ayuda-password"
+                @input="limpiarError('password')"
+              />
+              <small v-if="errores.password" class="error">{{ errores.password }}</small>
+              <small id="ayuda-password" class="ayuda">
+                Mínimo {{ LONGITUD_MINIMA_PASSWORD }} caracteres, con minúscula, mayúscula, número y símbolo; máximo 72
+                bytes UTF-8.
+              </small>
+            </div>
 
-          <div class="campo">
-            <label for="confirmacion-password">Confirmar contraseña <span class="obligatorio">*</span></label>
-            <input
-              id="confirmacion-password"
-              v-model="formulario.confirmacionPassword"
-              :type="mostrarPassword ? 'text' : 'password'"
-              autocomplete="new-password"
-              :aria-invalid="Boolean(errores.confirmacionPassword)"
-              :aria-describedby="errores.confirmacionPassword ? 'error-confirmacion' : undefined"
-              @input="limpiarError('confirmacionPassword')"
-            />
-            <small v-if="errores.confirmacionPassword" id="error-confirmacion" class="error">
-              {{ errores.confirmacionPassword }}
-            </small>
-          </div>
+            <div class="campo">
+              <label for="confirmacion-password">Confirmar contraseña <span class="obligatorio">*</span></label>
+              <input
+                id="confirmacion-password"
+                v-model="formulario.confirmacionPassword"
+                :type="mostrarPassword ? 'text' : 'password'"
+                autocomplete="new-password"
+                :aria-invalid="Boolean(errores.confirmacionPassword)"
+                :aria-describedby="errores.confirmacionPassword ? 'error-confirmacion' : undefined"
+                @input="limpiarError('confirmacionPassword')"
+              />
+              <small v-if="errores.confirmacionPassword" id="error-confirmacion" class="error">
+                {{ errores.confirmacionPassword }}
+              </small>
+            </div>
 
-          <label class="casilla">
-            <input v-model="mostrarPassword" type="checkbox" />
-            Mostrar contraseña
-          </label>
+            <label class="casilla">
+              <input v-model="mostrarPassword" type="checkbox" />
+              Mostrar contraseña
+            </label>
 
-          <p class="nota">
-            La cuenta se crea <strong>activa</strong>. Comparte la contraseña con el usuario por un medio seguro: el
-            sistema todavía no envía correos de bienvenida.
+            <p class="nota">
+              La cuenta se crea <strong>activa</strong>. Comparte la contraseña con el usuario por un medio seguro: el
+              sistema todavía no envía correos de bienvenida.
+            </p>
+          </template>
+
+          <p v-else class="nota-credenciales">
+            Se asignará una contraseña temporal aleatoria que se mostrará una sola vez al terminar.
           </p>
         </section>
       </aside>
@@ -328,6 +387,18 @@ async function cancelar(): Promise<void> {
   border: 1px solid #c3c6d7;
   border-radius: 12px;
   background: white;
+}
+
+.resultado-credenciales {
+  width: min(100%, 720px);
+  align-self: center;
+}
+
+.nota-credenciales {
+  margin: 0;
+  color: #434655;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .tarjeta h2 {

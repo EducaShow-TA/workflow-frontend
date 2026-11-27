@@ -1,7 +1,14 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import type { AreaOpcion, DocenteOpcion } from '~/types/sesionClase'
-import type { Aula, DiaSemana, SesionHorario, SolicitudSesionHorario, ValidacionSesion } from '~/types/horarioSeccion'
+import type {
+  Aula,
+  DisponibilidadDocenteHorario,
+  DiaSemana,
+  SesionHorario,
+  SolicitudSesionHorario,
+  ValidacionSesion,
+} from '~/types/horarioSeccion'
 import { etiquetaConflicto, nombreDia, useHorarioSeccion } from '~/composables/useHorarioSeccion'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
 
@@ -16,6 +23,7 @@ const propiedades = defineProps<{
   docentes: DocenteOpcion[]
   aulas: Aula[]
   alumnos: number
+  anio: number
 }>()
 
 const emitir = defineEmits<{
@@ -36,6 +44,8 @@ const validando = ref(false)
 const guardando = ref(false)
 const confirmarEliminar = ref(false)
 const error = ref('')
+const disponibilidad = ref<DisponibilidadDocenteHorario[]>([])
+const cargandoDisponibilidad = ref(false)
 let consulta = 0
 
 const solicitud = computed<SolicitudSesionHorario | null>(() =>
@@ -106,6 +116,19 @@ watch(solicitud, async (actual) => {
   }
 })
 
+watch(docenteId, async (id) => {
+  disponibilidad.value = []
+  if (!id) return
+  cargandoDisponibilidad.value = true
+  try {
+    disponibilidad.value = await api.listarDisponibilidadDocente(Number(id), propiedades.anio)
+  } catch (fallo: unknown) {
+    error.value = obtenerMensajeError(fallo, 'No se pudo consultar la disponibilidad del docente.')
+  } finally {
+    cargandoDisponibilidad.value = false
+  }
+})
+
 function textoAula(aula: Aula): string {
   const insuficiente = propiedades.alumnos > aula.capacidad ? ' · aforo insuficiente' : ''
   return `${aula.codigo} · ${aula.capacidad} personas${insuficiente}`
@@ -169,6 +192,17 @@ async function eliminar(): Promise<void> {
             {{ docente.nombreCompleto }}
           </option>
         </select>
+        <small v-if="cargandoDisponibilidad" class="ayuda">Consultando disponibilidad…</small>
+        <div v-else-if="disponibilidad.length" class="disponibilidad-docente" role="note">
+          <strong>Horas ya asignadas en {{ anio }}:</strong>
+          <ul>
+            <li v-for="(ocupada, indice) in disponibilidad" :key="indice">
+              {{ nombreDia(ocupada.dia) }} {{ ocupada.horaInicio }}–{{ ocupada.horaFin }} ·
+              {{ ocupada.seccion }} · {{ ocupada.area }}
+            </li>
+          </ul>
+        </div>
+        <small v-else-if="docenteId" class="ayuda">Sin clases asignadas en el año.</small>
       </div>
       <div class="campo">
         <label for="sesion-aula">Aula <span class="obligatorio">*</span></label>
@@ -241,6 +275,17 @@ async function eliminar(): Promise<void> {
 </template>
 
 <style scoped>
+.disponibilidad-docente {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #f1f5f9;
+  color: #334155;
+  font-size: 12px;
+}
+.disponibilidad-docente ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
 .formulario {
   display: flex;
   flex-direction: column;

@@ -102,6 +102,10 @@ onMounted(cargar)
           <dd>{{ formatearSeccion(boleta.grado, boleta.seccion) }}</dd>
         </div>
         <div>
+          <dt>Tipo de cargo</dt>
+          <dd>{{ boleta.tipoCargo === 'MATRICULA' ? 'Matrícula anual' : 'Pensión' }}</dd>
+        </div>
+        <div>
           <dt>Mes de cobro</dt>
           <dd>{{ boleta.mesCobro }}</dd>
         </div>
@@ -114,7 +118,7 @@ onMounted(cargar)
           <dd>{{ etiquetaEstadoBoleta(boleta.estadoPago) }}</dd>
         </div>
         <div>
-          <dt>Pensión</dt>
+          <dt>{{ boleta.tipoCargo === 'MATRICULA' ? 'Matrícula' : 'Pensión' }}</dt>
           <dd>{{ moneda.format(boleta.monto) }}</dd>
         </div>
         <div>

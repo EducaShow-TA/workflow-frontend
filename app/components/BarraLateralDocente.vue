@@ -1,15 +1,29 @@
 <script setup lang="ts">
 const ruta = useRoute()
 
-const enlaces = [
-  { nombre: 'Mi panel', destino: '/docente', icono: '/icons/menu-panel.svg' },
-  { nombre: 'Tareas', destino: '/docente/tareas', icono: '/icons/menu-tareas.svg' },
-  { nombre: 'Calificaciones', destino: '/docente/calificaciones', icono: '/icons/menu-competencias.svg' },
-  { nombre: 'Asistencia de alumnos', destino: '/docente/asistencia', icono: '/icons/menu-estudiantes.svg' },
-  { nombre: 'Reporte de asistencia', destino: '/docente/reporte-asistencia', icono: '/icons/menu-reportes.svg' },
-  { nombre: 'Libretas e informes', destino: '/docente/libretas', icono: '/icons/menu-calificaciones.svg' },
-  { nombre: 'Mi marcaje', destino: '/docente/marcaje', icono: '/icons/menu-docentes.svg' },
-  { nombre: 'Mi horario', destino: '/docente/horario', icono: '/icons/menu-horarios.svg' },
+const grupos = [
+  {
+    titulo: 'Inicio',
+    enlaces: [{ nombre: 'Mi panel', destino: '/docente', icono: '/icons/menu-panel.svg' }],
+  },
+  {
+    titulo: 'Gestión académica',
+    enlaces: [
+      { nombre: 'Calificaciones', destino: '/docente/calificaciones', icono: '/icons/menu-competencias.svg' },
+      { nombre: 'Tareas', destino: '/docente/tareas', icono: '/icons/menu-tareas.svg' },
+      { nombre: 'Asistencia de alumnos', destino: '/docente/asistencia', icono: '/icons/menu-estudiantes.svg' },
+      { nombre: 'Reporte de asistencia', destino: '/docente/reporte-asistencia', icono: '/icons/menu-reportes.svg' },
+      { nombre: 'Libretas e informes', destino: '/docente/libretas', icono: '/icons/menu-calificaciones.svg' },
+      { nombre: 'Reporte anual de notas', destino: '/docente/reporte-anual', icono: '/icons/menu-reportes.svg' },
+    ],
+  },
+  {
+    titulo: 'Mi jornada',
+    enlaces: [
+      { nombre: 'Mi horario', destino: '/docente/horario', icono: '/icons/menu-horarios.svg' },
+      { nombre: 'Mi marcaje', destino: '/docente/marcaje', icono: '/icons/menu-docentes.svg' },
+    ],
+  },
 ]
 
 function activo(destino: string): boolean {
@@ -28,17 +42,20 @@ function activo(destino: string): boolean {
     </NuxtLink>
 
     <nav class="docente-navegacion" aria-label="Navegación docente">
-      <NuxtLink
-        v-for="enlace in enlaces"
-        :key="enlace.destino"
-        :to="enlace.destino"
-        class="docente-navegacion__enlace"
-        :class="{ 'docente-navegacion__enlace--activo': activo(enlace.destino) }"
-        :aria-current="activo(enlace.destino) ? 'page' : undefined"
-      >
-        <img :src="enlace.icono" alt="" />
-        <span>{{ enlace.nombre }}</span>
-      </NuxtLink>
+      <section v-for="grupo in grupos" :key="grupo.titulo" class="docente-navegacion__grupo">
+        <h2 class="docente-navegacion__titulo">{{ grupo.titulo }}</h2>
+        <NuxtLink
+          v-for="enlace in grupo.enlaces"
+          :key="enlace.destino"
+          :to="enlace.destino"
+          class="docente-navegacion__enlace"
+          :class="{ 'docente-navegacion__enlace--activo': activo(enlace.destino) }"
+          :aria-current="activo(enlace.destino) ? 'page' : undefined"
+        >
+          <img :src="enlace.icono" alt="" />
+          <span>{{ enlace.nombre }}</span>
+        </NuxtLink>
+      </section>
     </nav>
 
     <div class="docente-lateral__pie">

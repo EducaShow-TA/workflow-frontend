@@ -9,6 +9,7 @@ const titulos: Record<string, string> = {
   '/estudiante': 'Panel',
   '/estudiante/horario': 'Mi horario',
   '/estudiante/asistencia': 'Asistencia',
+  '/estudiante/reporte-anual': 'Reporte anual de notas',
   '/estudiante/tareas': 'Tareas',
 }
 const titulo = computed(

@@ -62,6 +62,7 @@ export interface DiaAsistencia {
 export type AtajoRango = 'SEMANA' | 'MES' | 'MES_ANTERIOR' | 'ANIO'
 
 export type EstadoBoletaFamilia = 'PENDIENTE' | 'PAGADA' | 'EN_MORA'
+export type TipoCargoBoletaFamilia = 'MATRICULA' | 'PENSION'
 
 export type SituacionCompromisoFamilia = 'AL_DIA' | 'CON_PENDIENTES' | 'CON_MORA'
 
@@ -82,6 +83,7 @@ export interface BoletaFamilia {
   mora: number
   montoTotal: number
   estadoPago: EstadoBoletaFamilia
+  tipoCargo: TipoCargoBoletaFamilia
   comprobante: ComprobanteFamilia | null
 }
 

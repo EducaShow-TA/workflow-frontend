@@ -278,9 +278,10 @@ onMounted(async () => {
                   <th scope="col">Apoderado titular</th>
                   <th scope="col">Grado / Sección</th>
                   <th scope="col">Mes de cobro</th>
+                  <th scope="col">Tipo de cargo</th>
                   <th scope="col">Vencimiento</th>
                   <th scope="col">Estado</th>
-                  <th scope="col" class="importe">Pensión</th>
+                  <th scope="col" class="importe">Importe</th>
                   <th scope="col" class="importe">Mora</th>
                   <th scope="col" class="importe">Total</th>
                 </tr>
@@ -292,6 +293,7 @@ onMounted(async () => {
                   <td>{{ boleta.apoderado }}</td>
                   <td>{{ formatearSeccion(boleta.grado, boleta.seccion) }}</td>
                   <td>{{ boleta.mesCobro }}</td>
+                  <td>{{ boleta.tipoCargo === 'MATRICULA' ? 'Matrícula' : 'Pensión' }}</td>
                   <td>{{ formatearFecha(boleta.fechaVencimiento) }}</td>
                   <td>
                     <span class="estado" :class="{ mora: boleta.estadoPago === 'EN_MORA' }">{{

@@ -44,9 +44,12 @@ const total = computed(
 )
 const descripcion = computed(() => {
   const hijos = [...new Set(aPagar.value.map((deuda) => deuda.nombreHijo))]
-  const meses = aPagar.value.map((deuda) => nombrarMesBoleta(deuda.boleta.mesCobro, true))
+  const conceptos = aPagar.value.map(
+    (deuda) =>
+      `${deuda.boleta.tipoCargo === 'MATRICULA' ? 'Matrícula' : 'Pensión'} ${nombrarMesBoleta(deuda.boleta.mesCobro, true)}`,
+  )
   const cantidad = aPagar.value.length
-  return `${hijos.join(' y ')} · ${cantidad === 1 ? meses[0] : `${cantidad} boletas (${meses.join(', ')})`}`
+  return `${hijos.join(' y ')} · ${cantidad === 1 ? conceptos[0] : `${cantidad} boletas (${conceptos.join(', ')})`}`
 })
 
 watch(
@@ -137,7 +140,7 @@ async function descargarTodos(): Promise<void> {
 <template>
   <VentanaModal
     :abierta="abierta"
-    :titulo="aPagar.length === 1 ? 'Pagar pensión' : 'Pagar pensiones'"
+    :titulo="aPagar.length === 1 ? 'Pagar boleta' : 'Pagar boletas'"
     :descripcion="descripcion"
     :bloqueada="procesando"
     @cerrar="emitir('cerrar')"

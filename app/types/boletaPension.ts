@@ -1,5 +1,6 @@
 export type EstadoBoleta = 'PENDIENTE' | 'EN_MORA' | 'PAGADA'
 export type MedioPago = 'PRESENCIAL' | 'VIRTUAL'
+export type TipoCargoBoleta = 'MATRICULA' | 'PENSION'
 
 /** Contrato del backend BoletaPensionResponse. */
 export interface BoletaPension {
@@ -18,6 +19,7 @@ export interface BoletaPension {
   montoTotal: number
   fechaVencimiento: string
   estadoPago: EstadoBoleta
+  tipoCargo: TipoCargoBoleta
   mecanismoGeneracion: 'AUTOMATICO' | 'MANUAL'
   fechaGeneracion: string
 }
@@ -85,6 +87,7 @@ export interface BoletaHistorial {
   fechaVencimiento: string
   montoTotal: number
   estadoPago: EstadoBoleta
+  tipoCargo: TipoCargoBoleta
   mecanismoGeneracion: 'AUTOMATICO' | 'MANUAL'
   numeroComprobante: string | null
 }

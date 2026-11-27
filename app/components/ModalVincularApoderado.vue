@@ -167,7 +167,7 @@ watch(
     ancho="amplia"
     @cerrar="cerrar"
   >
-    <CredencialesApoderado v-if="paso === 'credenciales'" :credenciales="credenciales" />
+    <CredencialesTemporales v-if="paso === 'credenciales'" :credenciales="credenciales" />
 
     <form v-else class="contenido" novalidate @submit.prevent="puedeVincular ? confirmar() : buscar()">
       <div class="documento">

@@ -189,12 +189,12 @@ function seleccionarArchivoCsv(evento: Event): void {
   errorCargaCsv.value = ''
 }
 
-async function obtenerPlantillaCsv(): Promise<void> {
+async function obtenerPlantilla(formato: 'csv' | 'xlsx'): Promise<void> {
   descargandoPlantillaCsv.value = true
   errorCargaCsv.value = ''
   try {
-    const contenido = await descargarPlantilla()
-    guardarArchivo(new Blob([contenido], { type: 'text/csv;charset=utf-8' }), 'plantilla-asistencia-docentes.csv')
+    const archivo = await descargarPlantilla(formato)
+    guardarArchivo(archivo, `plantilla-asistencia-docentes.${formato}`)
   } catch (fallo: unknown) {
     errorCargaCsv.value = obtenerMensajeError(fallo, 'No se pudo descargar la plantilla CSV.')
   } finally {
@@ -261,27 +261,37 @@ onMounted(cargar)
     <section v-if="esAdministrador" class="tarjeta carga-csv" aria-labelledby="titulo-carga-csv">
       <header class="encabezado-carga-csv">
         <div>
-          <h2 id="titulo-carga-csv">Carga masiva por CSV</h2>
-          <p>Registra o actualiza marcajes de varios docentes y fechas en un solo lote.</p>
+          <h2 id="titulo-carga-csv">Carga masiva de asistencia</h2>
+          <p>Registra o actualiza marcajes de varios docentes y fechas en CSV o Excel.</p>
         </div>
-        <button
-          type="button"
-          class="boton-csv secundario"
-          :disabled="descargandoPlantillaCsv || validandoCsv || guardandoCsv"
-          @click="obtenerPlantillaCsv"
-        >
-          {{ descargandoPlantillaCsv ? 'Descargando…' : 'Descargar plantilla' }}
-        </button>
+        <div class="acciones-csv">
+          <button
+            type="button"
+            class="boton-csv secundario"
+            :disabled="descargandoPlantillaCsv || validandoCsv || guardandoCsv"
+            @click="obtenerPlantilla('csv')"
+          >
+            {{ descargandoPlantillaCsv ? 'Descargando…' : 'Plantilla CSV' }}
+          </button>
+          <button
+            type="button"
+            class="boton-csv secundario"
+            :disabled="descargandoPlantillaCsv || validandoCsv || guardandoCsv"
+            @click="obtenerPlantilla('xlsx')"
+          >
+            {{ descargandoPlantillaCsv ? 'Descargando…' : 'Plantilla Excel' }}
+          </button>
+        </div>
       </header>
 
       <div class="contenido-carga-csv">
         <div class="campo campo-archivo-csv">
-          <label for="archivo-asistencia-docentes">Archivo CSV</label>
+          <label for="archivo-asistencia-docentes">Archivo CSV o Excel</label>
           <input
             id="archivo-asistencia-docentes"
             ref="entradaArchivoCsv"
             type="file"
-            accept=".csv,text/csv"
+            accept=".csv,.xls,.xlsx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             :disabled="validandoCsv || guardandoCsv"
             @change="seleccionarArchivoCsv"
           />

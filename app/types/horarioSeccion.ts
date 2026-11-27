@@ -5,6 +5,14 @@ export type DiaSemana = 'MONDAY' | 'TUESDAY' | 'WEDNESDAY' | 'THURSDAY' | 'FRIDA
 
 export type TipoConflicto = 'CELDA' | 'DOCENTE' | 'AULA' | 'CAPACIDAD'
 
+export interface DisponibilidadDocenteHorario {
+  dia: DiaSemana
+  horaInicio: string
+  horaFin: string
+  seccion: string
+  area: string
+}
+
 export interface SesionHorario {
   id: number
   bloqueId: number

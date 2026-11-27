@@ -75,6 +75,11 @@ function moverEntrePestanas(evento: KeyboardEvent): void {
       </button>
     </div>
 
+    <p class="ayuda-consulta">
+      Vista informativa: selecciona un rol para consultar sus permisos. Esta pantalla no modifica las reglas del
+      sistema.
+    </p>
+
     <section id="panel-permisos" class="panel-permisos" role="tabpanel" :aria-labelledby="`pestana-${rolSeleccionado}`">
       <p class="resumen-rol">
         {{ obtenerDescripcionRol(rolSeleccionado) }}
@@ -167,6 +172,13 @@ function moverEntrePestanas(evento: KeyboardEvent): void {
   outline-offset: 2px;
 }
 
+.ayuda-consulta {
+  margin: -12px 0 0;
+  color: #434655;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
 .panel-permisos {
   display: flex;
   flex-direction: column;
@@ -249,6 +261,13 @@ function moverEntrePestanas(evento: KeyboardEvent): void {
   margin: 0;
   padding: 0 18px;
   list-style: none;
+}
+
+.lista-permisos li::marker,
+.fila-permiso::before,
+.fila-permiso::after {
+  content: none;
+  display: none;
 }
 
 .fila-permiso {

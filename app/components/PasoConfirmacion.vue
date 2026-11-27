@@ -80,10 +80,6 @@ function mostrarParentesco(valor: string): string {
 
       <dl class="cuadricula-datos">
         <div>
-          <dt>Usuario de acceso</dt>
-          <dd>{{ datos.username }}</dd>
-        </div>
-        <div>
           <dt>Nombres</dt>
           <dd>{{ datos.nombres }}</dd>
         </div>

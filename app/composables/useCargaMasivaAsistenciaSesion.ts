@@ -35,10 +35,13 @@ function esResultadoCarga(datos: unknown): datos is ResultadoCargaAsistenciaSesi
 
 /** Carga CSV de asistencia de alumnos para una sesión (US-2.2). */
 export function useCargaMasivaAsistenciaSesion() {
-  const { solicitar } = useApi()
+  const { solicitar, solicitarArchivo } = useApi()
 
-  async function descargarPlantilla(sesionId: number): Promise<string> {
-    return solicitar<string>(`/api/v1/sesiones-clase/${sesionId}/asistencias/carga-masiva/plantilla`)
+  async function descargarPlantilla(sesionId: number, formato: 'csv' | 'xlsx'): Promise<Blob> {
+    const parametros = new URLSearchParams({ formato })
+    return solicitarArchivo(
+      `/api/v1/sesiones-clase/${sesionId}/asistencias/carga-masiva/plantilla?${parametros.toString()}`,
+    )
   }
 
   async function cargar(

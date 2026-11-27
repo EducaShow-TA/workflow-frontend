@@ -15,14 +15,16 @@ const ruta = useRoute()
 const secciones = computed(() =>
   propiedades.docente
     ? [
-        { titulo: 'Registro de calificaciones', destino: '/docente/calificaciones' },
-        { titulo: 'Libretas e informes', destino: '/docente/libretas' },
+        { titulo: 'Notas', destino: '/docente/calificaciones' },
+        { titulo: 'Libretas', destino: '/docente/libretas' },
+        { titulo: 'Reporte anual', destino: '/docente/reporte-anual' },
       ]
     : [
-        { titulo: 'Registro de calificaciones', destino: '/calificaciones' },
-        { titulo: 'Evaluaciones parciales', destino: '/calificaciones/evaluaciones' },
-        { titulo: 'Libretas e informes', destino: '/calificaciones/libretas' },
-        { titulo: 'Auditoría de cambios', destino: '/calificaciones/auditoria' },
+        { titulo: 'Notas', destino: '/calificaciones' },
+        { titulo: 'Evaluaciones', destino: '/calificaciones/evaluaciones' },
+        { titulo: 'Libretas', destino: '/calificaciones/libretas' },
+        { titulo: 'Reporte anual', destino: '/calificaciones/reporte-anual' },
+        { titulo: 'Auditoría', destino: '/calificaciones/auditoria' },
         { titulo: 'Cierre de actas', destino: '/calificaciones/cierre-actas' },
       ],
 )

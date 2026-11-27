@@ -2,12 +2,14 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useListadoEstudiantes } from '~/composables/useListadoEstudiantes'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
+import { usePermisosRol } from '~/composables/usePermisosRol'
 
 definePageMeta({
   middleware: 'autenticacion',
 })
 
 const { listarEstudiantes } = useListadoEstudiantes()
+const { puede } = usePermisosRol()
 const estudiantes = ref<Awaited<ReturnType<typeof listarEstudiantes>>>([])
 const cargando = ref(true)
 const errorCarga = ref('')
@@ -79,6 +81,10 @@ function obtenerIniciales(nombres: string, apellidos: string): string {
 async function informarNuevoEstudiante(): Promise<void> {
   await navigateTo('/estudiantes/nuevo')
 }
+
+async function irACargaMasiva(): Promise<void> {
+  await navigateTo('/usuarios/carga-masiva?rol=ALUMNO')
+}
 </script>
 
 <template>
@@ -90,10 +96,20 @@ async function informarNuevoEstudiante(): Promise<void> {
         <p>Administra los registros, matrículas y estados de los estudiantes.</p>
       </div>
 
-      <button type="button" class="boton-nuevo" @click="informarNuevoEstudiante">
-        <span aria-hidden="true">+</span>
-        Nuevo Estudiante
-      </button>
+      <div class="acciones-estudiantes">
+        <button
+          v-if="puede('ESTUDIANTE_REGISTRAR')"
+          type="button"
+          class="boton-carga"
+          @click="irACargaMasiva"
+        >
+          Carga masiva CSV/Excel
+        </button>
+        <button type="button" class="boton-nuevo" @click="informarNuevoEstudiante">
+          <span aria-hidden="true">+</span>
+          Nuevo Estudiante
+        </button>
+      </div>
     </div>
 
     <p v-if="mensajeInformativo" class="aviso-informativo" role="status">
@@ -234,6 +250,25 @@ async function informarNuevoEstudiante(): Promise<void> {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+}
+
+.acciones-estudiantes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.boton-carga {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid #234486;
+  border-radius: 8px;
+  color: #234486;
+  background: white;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .encabezado-pagina h1 {

@@ -8,6 +8,8 @@ const perfilAbierto = ref(false)
 const titulos: Record<string, string> = {
   '/familia': 'Panel',
   '/familia/asistencia': 'Asistencia',
+  '/familia/matricula': 'Matrícula anual',
+  '/familia/reporte-anual': 'Reporte anual de notas',
   '/familia/pagos': 'Pagos',
   '/familia/horario': 'Horario de mi hijo',
   '/libretas': 'Progreso académico',

@@ -33,7 +33,7 @@ export function validarMotivoRectificacion(motivo: string): string {
 
 /** US-3.8: calificaciones con evidencia pedagógica y seguimiento por competencia. */
 export function useCalificaciones() {
-  const { solicitar } = useApi()
+  const { solicitar, solicitarArchivo } = useApi()
   const autenticacion = useAutenticacionStore()
   const configuracion = useRuntimeConfig()
 
@@ -55,6 +55,34 @@ export function useCalificaciones() {
 
   function historial(calificacionId: number): Promise<MovimientoCalificacion[]> {
     return solicitar<MovimientoCalificacion[]>(`${RUTA}/${calificacionId}/historial`)
+  }
+
+  function cargaMasiva(
+    periodoId: number,
+    competenciaCodigo: string,
+    bimestre: number,
+    archivo: File,
+  ): Promise<{ totalFilas: number; filasValidas: number; filasRechazadas: number; errores: string[] }> {
+    const cuerpo = new FormData()
+    cuerpo.append('archivo', archivo, archivo.name)
+    return solicitar(
+      `${RUTA}/carga-masiva?periodoId=${periodoId}&competenciaCodigo=${encodeURIComponent(competenciaCodigo)}&bimestre=${bimestre}`,
+      { metodo: 'POST', cuerpo },
+    )
+  }
+
+  function descargarPlantillaCargaMasiva(
+    periodoId: number,
+    competenciaCodigo: string,
+    bimestre: number,
+    formato: 'csv' | 'xlsx',
+  ): Promise<Blob> {
+    const parametros = new URLSearchParams({
+      competenciaCodigo,
+      bimestre: String(bimestre),
+      formato,
+    })
+    return solicitarArchivo(`/api/v1/docentes/mis-clases/${periodoId}/plantilla-notas?${parametros.toString()}`)
   }
 
   async function descargarEvidencia(calificacion: Calificacion): Promise<void> {
@@ -80,5 +108,5 @@ export function useCalificaciones() {
     window.setTimeout(() => URL.revokeObjectURL(objetoUrl), 1000)
   }
 
-  return { listar, registrar, historial, descargarEvidencia }
+  return { listar, registrar, historial, cargaMasiva, descargarPlantillaCargaMasiva, descargarEvidencia }
 }

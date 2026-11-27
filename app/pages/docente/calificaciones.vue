@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { AlumnoClase, Calificacion, MiClase, NotaCualitativa, RiesgoAcademico } from '~/types/calificacion'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
 import { formatearFecha } from '~/composables/useFechas'
+import { guardarArchivo } from '~/composables/useReporteAsistencia'
 import { useCalificaciones } from '~/composables/useCalificaciones'
 import { useEvaluacionesParciales } from '~/composables/useEvaluacionesParciales'
 import type { EvaluacionParcial, NotaEvaluacionParcial } from '~/types/evaluacionParcial'
@@ -19,7 +20,12 @@ type FiltroNota = NotaCualitativa | 'SIN_NOTA' | 'RIESGO' | ''
 
 const autenticacion = useAutenticacionStore()
 const { listar: listarClases, listarAlumnos, obtenerRiesgo } = useMisClases()
-const { listar: listarNotas, descargarEvidencia } = useCalificaciones()
+const {
+  listar: listarNotas,
+  descargarEvidencia,
+  cargaMasiva,
+  descargarPlantillaCargaMasiva,
+} = useCalificaciones()
 const { listar: listarEvaluaciones, listarNotas: listarNotasParciales } = useEvaluacionesParciales()
 const { listar: listarBimestres } = useBimestres()
 const ruta = useRoute()
@@ -53,6 +59,9 @@ const evaluacionesCompetencia = ref<EvaluacionParcial[]>([])
 const notasParciales = ref<Record<number, NotaEvaluacionParcial[]>>({})
 const cargandoParciales = ref(false)
 const ventanaParcial = ref<{ evaluacion: EvaluacionParcial; alumno: AlumnoClase } | null>(null)
+const cargandoCsv = ref(false)
+const descargandoPlantillaNotas = ref(false)
+const inputCsv = ref<HTMLInputElement | null>(null)
 let solicitudParciales = 0
 let temporizadorResaltado: ReturnType<typeof setTimeout> | undefined
 
@@ -382,6 +391,68 @@ function calificarPendientes(): void {
   if (primero) abrir(primero)
 }
 
+function abrirCsv(): void {
+  inputCsv.value?.click()
+}
+
+async function cargarCsv(evento: Event): Promise<void> {
+  const entrada = evento.target as HTMLInputElement
+  const archivo = entrada.files?.[0]
+  const actual = clase.value
+  if (!archivo || !actual || !competencia.value || bimestreCerrado.value) return
+  cargandoCsv.value = true
+  error.value = ''
+  try {
+    const resultado = await cargaMasiva(
+      actual.periodoId,
+      competenciaElegida.value,
+      bimestreVisto.value,
+      archivo,
+    )
+    const notasActualizadas = await listarNotas(
+      actual.periodoId,
+      competenciaElegida.value,
+      bimestreVisto.value,
+    )
+    notasPorCompetencia.value = {
+      ...notasPorCompetencia.value,
+      [competenciaElegida.value]: notasActualizadas,
+    }
+    aviso.value =
+      resultado.filasRechazadas === 0
+        ? `Se cargaron ${resultado.filasValidas} notas desde el CSV.`
+        : `Se cargaron ${resultado.filasValidas} notas; ${resultado.filasRechazadas} filas fueron rechazadas.`
+  } catch (fallo: unknown) {
+    error.value = obtenerMensajeError(fallo, 'No se pudo cargar el archivo de notas.')
+  } finally {
+    cargandoCsv.value = false
+    entrada.value = ''
+  }
+}
+
+async function descargarPlantillaNotas(formato: 'csv' | 'xlsx'): Promise<void> {
+  const actual = clase.value
+  if (!actual || !competencia.value || modoParcial.value || bimestreCerrado.value) return
+  descargandoPlantillaNotas.value = true
+  error.value = ''
+  try {
+    const archivo = await descargarPlantillaCargaMasiva(
+      actual.periodoId,
+      competenciaElegida.value,
+      bimestreVisto.value,
+      formato,
+    )
+    guardarArchivo(
+      archivo,
+      `plantilla-notas-${actual.gradoNumero}-${actual.seccionCodigo}-bimestre-${bimestreVisto.value}.${formato}`,
+    )
+  } catch (fallo: unknown) {
+    error.value = obtenerMensajeError(fallo, 'No se pudo descargar la plantilla de notas.')
+  } finally {
+    descargandoPlantillaNotas.value = false
+  }
+}
+
 function alGuardar(calificacion: Calificacion, siguiente: boolean): void {
   actualizarNota(calificacion)
   aviso.value = `Nota ${calificacion.nota} guardada para ${alumnoEnEdicion.value?.nombreCompleto ?? 'el alumno'}.`
@@ -501,15 +572,51 @@ onMounted(async () => {
             {{ clase.areaNombre }} · {{ formatearSeccionCompleta(clase.gradoNumero, clase.seccionCodigo) }} ·
             {{ clase.anhio }}
           </h2>
-          <button
-            v-if="!modoParcial"
-            type="button"
-            class="docente-boton"
-            :disabled="cargandoClase || !competencia || !pendientes.length || bimestreCerrado"
-            @click="calificarPendientes"
-          >
-            {{ pendientes.length ? `Calificar pendientes (${pendientes.length})` : 'Todos calificados' }}
-          </button>
+          <div class="acciones-notas">
+            <input
+              ref="inputCsv"
+              class="entrada-csv"
+              type="file"
+              accept=".csv,.xls,.xlsx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              @change="cargarCsv"
+            />
+            <button
+              v-if="!modoParcial"
+              type="button"
+              class="docente-boton secundario"
+              :disabled="cargandoCsv || descargandoPlantillaNotas || cargandoClase || !competencia || bimestreCerrado"
+              @click="abrirCsv"
+            >
+              {{ cargandoCsv ? 'Cargando…' : 'Subir notas CSV/Excel' }}
+            </button>
+            <button
+              v-if="!modoParcial"
+              type="button"
+              class="docente-boton secundario"
+              :disabled="cargandoCsv || descargandoPlantillaNotas || cargandoClase || !competencia || bimestreCerrado"
+              @click="descargarPlantillaNotas('csv')"
+            >
+              {{ descargandoPlantillaNotas ? 'Descargando…' : 'Plantilla CSV' }}
+            </button>
+            <button
+              v-if="!modoParcial"
+              type="button"
+              class="docente-boton secundario"
+              :disabled="cargandoCsv || descargandoPlantillaNotas || cargandoClase || !competencia || bimestreCerrado"
+              @click="descargarPlantillaNotas('xlsx')"
+            >
+              {{ descargandoPlantillaNotas ? 'Descargando…' : 'Plantilla Excel' }}
+            </button>
+            <button
+              v-if="!modoParcial"
+              type="button"
+              class="docente-boton"
+              :disabled="cargandoClase || !competencia || !pendientes.length || bimestreCerrado"
+              @click="calificarPendientes"
+            >
+              {{ pendientes.length ? `Calificar pendientes (${pendientes.length})` : 'Todos calificados' }}
+            </button>
+          </div>
         </div>
 
         <p v-if="!clase.competencias.length" class="docente-texto-secundario">
@@ -882,6 +989,14 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.acciones-notas {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.entrada-csv {
+  display: none;
+}
 .bimestres-clase {
   display: flex;
   flex-wrap: wrap;

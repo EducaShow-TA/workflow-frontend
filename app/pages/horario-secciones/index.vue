@@ -329,6 +329,7 @@ onMounted(cargarCatalogos)
       :docentes="docentes"
       :aulas="aulas"
       :alumnos="seccion?.cantidadMatriculados ?? 0"
+      :anio="anhio"
       @cerrar="modalAbierto = false"
       @guardada="alGuardar"
     />

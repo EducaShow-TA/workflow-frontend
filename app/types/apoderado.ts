@@ -1,3 +1,5 @@
+import type { CredencialTemporal } from '~/types/credencial'
+
 export type ParentescoApoderado = 'PADRE' | 'MADRE' | 'TUTOR_LEGAL' | 'OTRO'
 export type TipoDocumentoApoderado = 'DNI' | 'PASAPORTE'
 
@@ -50,9 +52,5 @@ export interface SolicitudEditarApoderado {
   esPrincipal: boolean
 }
 
-/** Cuenta creada para un apoderado: su contraseña temporal solo se muestra una vez. */
-export interface CredencialApoderado {
-  nombre: string
-  username: string
-  contrasenhaTemporal: string
-}
+/** Credenciales temporales de una cuenta de apoderado. */
+export type CredencialApoderado = CredencialTemporal

@@ -596,8 +596,10 @@ async function confirmarApertura(): Promise<void> {
         </template>
 
         <template v-else>
-          <p>Primero registra las secciones del colegio con «Agregar sección»; luego podrás abrir el año escolar.</p>
-          <BotonAccion @click="abrirRegistroSeccion">+ Agregar sección</BotonAccion>
+          <p>
+            Al abrir el año se crearán automáticamente los grados 1.º a 5.º de secundaria y la sección A de cada grado.
+          </p>
+          <BotonAccion @click="abrirApertura">Abrir año escolar {{ anhioActual }}</BotonAccion>
         </template>
       </section>
 
@@ -845,7 +847,7 @@ async function confirmarApertura(): Promise<void> {
       :descripcion="
         editandoAnhio
           ? 'Actualiza las fechas de clases de todas las secciones del año.'
-          : 'Crea el periodo de clases de cada sección para el año indicado.'
+          : 'Crea automáticamente los grados 1.º-5.º, la sección A y el periodo de clases de cada sección.'
       "
       :bloqueada="abriendo"
       @cerrar="aperturaAbierta = false"
@@ -1003,7 +1005,7 @@ async function confirmarApertura(): Promise<void> {
         <BotonAccion
           tipo="submit"
           form="formulario-apertura"
-          :deshabilitado="abriendo || (!editandoAnhio && seccionesPorCrear.length === 0)"
+          :deshabilitado="abriendo"
         >
           {{
             abriendo
