@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   describirRangoVigencia,
-  describirResponsable,
+  describirResponsableHorario,
   formatearFechaHora,
   nombreVigencia,
   rutaAuditoriaHorarios,
@@ -21,8 +21,8 @@ describe('auditoría de cambios de horario', () => {
   })
 
   it('no muestra "Cuenta #null" cuando el cambio no tiene una cuenta asociada', () => {
-    expect(describirResponsable({ usuarioCuentaId: 12 })).toBe('Cuenta #12')
-    expect(describirResponsable({ usuarioCuentaId: null })).toBe('Sin cuenta asociada')
+    expect(describirResponsableHorario({ usuarioCuentaId: 12 })).toBe('Cuenta #12')
+    expect(describirResponsableHorario({ usuarioCuentaId: null })).toBe('Sin cuenta asociada')
   })
 
   it('nombra el tipo de vigencia en lenguaje común', () => {

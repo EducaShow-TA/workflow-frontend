@@ -16,7 +16,7 @@ export function rutaAuditoriaHorarios(filtros: FiltrosAuditoriaHorario): string 
   return `${RUTA}?${parametros.toString()}`
 }
 
-export function describirResponsable(registro: Pick<RegistroAuditoriaHorario, 'usuarioCuentaId'>): string {
+export function describirResponsableHorario(registro: Pick<RegistroAuditoriaHorario, 'usuarioCuentaId'>): string {
   return registro.usuarioCuentaId === null ? 'Sin cuenta asociada' : `Cuenta #${registro.usuarioCuentaId}`
 }
 
