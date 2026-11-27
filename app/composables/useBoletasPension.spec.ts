@@ -22,6 +22,7 @@ const boleta: BoletaPension = {
   montoTotal: 525,
   fechaVencimiento: '2026-11-01',
   estadoPago: 'EN_MORA',
+  tipoCargo: 'PENSION',
   mecanismoGeneracion: 'MANUAL',
   fechaGeneracion: '2026-10-01T10:00:00',
 }

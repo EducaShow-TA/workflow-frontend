@@ -137,12 +137,7 @@ async function cargarArchivoMasivo(evento: Event): Promise<void> {
   avisoCargaMasiva.value = ''
   erroresCargaMasiva.value = []
   try {
-    const resultado = await cargaMasiva(
-      periodoId.value,
-      competenciaCodigo.value,
-      bimestre.value,
-      archivoSeleccionado,
-    )
+    const resultado = await cargaMasiva(periodoId.value, competenciaCodigo.value, bimestre.value, archivoSeleccionado)
     avisoCargaMasiva.value =
       resultado.filasRechazadas === 0
         ? `Se cargaron ${resultado.filasValidas} notas; se revisaron ${resultado.totalFilas} filas.`
@@ -500,8 +495,8 @@ async function descargar(item: Calificacion): Promise<void> {
         <div>
           <h2 id="titulo-carga-masiva">Carga masiva de notas</h2>
           <p class="ayuda">
-            Como administrador, puedes cargar notas para la competencia y el bimestre seleccionados. Se aceptan CSV,
-            XLS y XLSX.
+            Como administrador, puedes cargar notas para la competencia y el bimestre seleccionados. Se aceptan CSV, XLS
+            y XLSX.
           </p>
         </div>
         <input

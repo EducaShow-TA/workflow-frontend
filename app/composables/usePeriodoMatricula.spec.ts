@@ -9,6 +9,8 @@ const periodoExistente: PeriodoMatricula = {
   estado: 'VIGENTE',
   tieneMatriculas: false,
   anhioEscolar: 2027,
+  montoMatricula: 500,
+  montoPension: 800,
 }
 
 describe('lógica de períodos de matrícula', () => {

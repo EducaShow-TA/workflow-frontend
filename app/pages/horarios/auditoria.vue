@@ -3,7 +3,7 @@ import { onMounted, ref } from 'vue'
 import type { RegistroAuditoriaHorario } from '~/types/auditoriaHorario'
 import {
   describirRangoVigencia,
-  describirResponsable,
+  describirResponsableHorario,
   formatearFechaHora,
   nombreVigencia,
   useAuditoriaHorarios,
@@ -76,7 +76,7 @@ onMounted(cargar)
               {{ registro.seccion }}<small>Horario #{{ registro.horarioId }}</small>
             </td>
             <td>
-              {{ registro.usuarioNombre }}<small>{{ describirResponsable(registro) }}</small>
+              {{ registro.usuarioNombre }}<small>{{ describirResponsableHorario(registro) }}</small>
             </td>
             <td>
               <strong>{{ registro.accion }}</strong><small>{{ registro.detalle }}</small>

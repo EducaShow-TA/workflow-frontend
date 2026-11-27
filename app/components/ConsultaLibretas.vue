@@ -349,11 +349,7 @@ onMounted(cargarCatalogos)
           </label>
           <label v-if="esAdministrador || esDocente || esApoderado"
             >Estudiante con matrícula confirmada
-            <select
-              v-model="estudianteId"
-              required
-              :disabled="!periodoId || cargando || descargandoBimestre !== null"
-            >
+            <select v-model="estudianteId" required :disabled="!periodoId || cargando || descargandoBimestre !== null">
               <option value="">Elige un estudiante</option>
               <option v-for="item in estudiantesDisponibles" :key="item.id" :value="item.id">{{ item.nombre }}</option>
             </select>
@@ -445,7 +441,10 @@ onMounted(cargarCatalogos)
           <div class="resumen">
             <h3>
               {{
-                conAnhio(formatearSeccionCompleta(periodo.gradoNumero, periodo.seccion), periodo.fechaInicio.slice(0, 4))
+                conAnhio(
+                  formatearSeccionCompleta(periodo.gradoNumero, periodo.seccion),
+                  periodo.fechaInicio.slice(0, 4),
+                )
               }}
             </h3>
             <span class="estado" :class="periodo.actasCerradas ? 'oficial' : 'borrador'">

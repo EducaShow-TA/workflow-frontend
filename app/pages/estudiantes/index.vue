@@ -97,12 +97,7 @@ async function irACargaMasiva(): Promise<void> {
       </div>
 
       <div class="acciones-estudiantes">
-        <button
-          v-if="puede('ESTUDIANTE_REGISTRAR')"
-          type="button"
-          class="boton-carga"
-          @click="irACargaMasiva"
-        >
+        <button v-if="puede('ESTUDIANTE_REGISTRAR')" type="button" class="boton-carga" @click="irACargaMasiva">
           Carga masiva CSV/Excel
         </button>
         <button type="button" class="boton-nuevo" @click="informarNuevoEstudiante">

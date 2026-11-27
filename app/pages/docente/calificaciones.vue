@@ -20,12 +20,7 @@ type FiltroNota = NotaCualitativa | 'SIN_NOTA' | 'RIESGO' | ''
 
 const autenticacion = useAutenticacionStore()
 const { listar: listarClases, listarAlumnos, obtenerRiesgo } = useMisClases()
-const {
-  listar: listarNotas,
-  descargarEvidencia,
-  cargaMasiva,
-  descargarPlantillaCargaMasiva,
-} = useCalificaciones()
+const { listar: listarNotas, descargarEvidencia, cargaMasiva, descargarPlantillaCargaMasiva } = useCalificaciones()
 const { listar: listarEvaluaciones, listarNotas: listarNotasParciales } = useEvaluacionesParciales()
 const { listar: listarBimestres } = useBimestres()
 const ruta = useRoute()
@@ -403,17 +398,8 @@ async function cargarCsv(evento: Event): Promise<void> {
   cargandoCsv.value = true
   error.value = ''
   try {
-    const resultado = await cargaMasiva(
-      actual.periodoId,
-      competenciaElegida.value,
-      bimestreVisto.value,
-      archivo,
-    )
-    const notasActualizadas = await listarNotas(
-      actual.periodoId,
-      competenciaElegida.value,
-      bimestreVisto.value,
-    )
+    const resultado = await cargaMasiva(actual.periodoId, competenciaElegida.value, bimestreVisto.value, archivo)
+    const notasActualizadas = await listarNotas(actual.periodoId, competenciaElegida.value, bimestreVisto.value)
     notasPorCompetencia.value = {
       ...notasPorCompetencia.value,
       [competenciaElegida.value]: notasActualizadas,

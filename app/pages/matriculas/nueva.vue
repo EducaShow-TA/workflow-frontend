@@ -533,7 +533,11 @@ onMounted(cargarDatos)
           :disabled="descargandoConstanciaId !== null"
           @click="descargarConstancia(matricula.matriculaId)"
         >
-          {{ descargandoConstanciaId === matricula.matriculaId ? 'Descargando…' : `Descargar constancia #${matricula.matriculaId}` }}
+          {{
+            descargandoConstanciaId === matricula.matriculaId
+              ? 'Descargando…'
+              : `Descargar constancia #${matricula.matriculaId}`
+          }}
         </button>
       </div>
       <AvisoMensaje v-if="errorConstancia" :mensaje="errorConstancia" tipo="error" />
