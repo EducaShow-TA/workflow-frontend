@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import type {
   ErrorConfirmacionMatricula,
   EstudianteMatriculable,
@@ -48,6 +48,8 @@ const aviso = ref('')
 const avisoSeleccion = ref('')
 const confirmacionExitosa = ref(false)
 const constanciasGeneradas = ref<MatriculaApi[]>([])
+const seccionConfirmada = ref('')
+const busquedaConstancia = ref('')
 const descargandoConstanciaId = ref<number | null>(null)
 const errorConstancia = ref('')
 const modalCompromisoAbierto = ref(false)
@@ -157,6 +159,24 @@ const disponiblesSinAgregar = computed(() =>
     (estudiante) => !estudiantesSeleccionados.value.includes(estudiante.estudianteId),
   ),
 )
+const constancias = computed(() => {
+  const porId = new Map(estudiantes.value.map((estudiante) => [estudiante.estudianteId, estudiante]))
+  return constanciasGeneradas.value
+    .map((matricula) => {
+      const estudiante = porId.get(matricula.estudianteId)
+      return {
+        matriculaId: matricula.matriculaId,
+        nombre: estudiante ? nombreCompleto(estudiante) : `Estudiante ${matricula.estudianteId}`,
+        dni: estudiante?.dni ?? '',
+      }
+    })
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+})
+const constanciasFiltradas = computed(() => {
+  const termino = busquedaConstancia.value.trim().toLocaleLowerCase()
+  if (!termino) return constancias.value
+  return constancias.value.filter((item) => `${item.nombre} ${item.dni}`.toLocaleLowerCase().includes(termino))
+})
 const nombreSeccionDestino = computed(() =>
   periodoSeleccionado.value
     ? formatearSeccionCompleta(periodoSeleccionado.value.numeroGrado, periodoSeleccionado.value.seccion)
@@ -344,6 +364,8 @@ async function confirmarSeleccion(compromiso: SolicitudCompromisoPago): Promise<
       compromiso,
     )
     modalCompromisoAbierto.value = false
+    seccionConfirmada.value = nombreSeccionDestino.value
+    busquedaConstancia.value = ''
     constanciasGeneradas.value = resultados
     seleccionPendientes.value = []
     incidenciasCompromiso.value = []
@@ -354,6 +376,8 @@ async function confirmarSeleccion(compromiso: SolicitudCompromisoPago): Promise<
         ? `Se confirmó 1 matrícula. Se generó su constancia, el cargo de matrícula y el cronograma de pensiones.`
         : `Se confirmaron ${resultados.length} matrículas. Se generaron las constancias y cargos de matrícula, además de los cronogramas de pensiones.`
     confirmacionExitosa.value = true
+    await nextTick()
+    document.getElementById('titulo-resultado')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   } catch (fallo: unknown) {
     if (fallo instanceof ErrorSolicitudApi && fallo.datos && typeof fallo.datos === 'object') {
       const respuesta = fallo.datos as Partial<ErrorConfirmacionMatricula>
@@ -577,26 +601,55 @@ onMounted(cargarDatos)
     <PanelEstadoCarga v-if="cargando" :cargando="true" texto-carga="Cargando estudiantes y vacantes..." />
     <AvisoMensaje v-if="error" :mensaje="error" tipo="error" />
     <IncidenciasMatricula :incidencias="incidenciasCompromiso" />
-    <div v-if="aviso" class="aviso-exito">
-      <AvisoMensaje :mensaje="aviso" tipo="exito" />
-      <NuxtLink v-if="confirmacionExitosa" to="/finanzas" class="enlace-finanzas">Ver boletas en Finanzas →</NuxtLink>
-      <div v-if="confirmacionExitosa" class="lista-constancias">
-        <button
-          v-for="matricula in constanciasGeneradas"
-          :key="matricula.matriculaId"
-          type="button"
-          :disabled="descargandoConstanciaId !== null"
-          @click="descargarConstancia(matricula.matriculaId)"
-        >
-          {{
-            descargandoConstanciaId === matricula.matriculaId
-              ? 'Descargando…'
-              : `Descargar constancia #${matricula.matriculaId}`
-          }}
-        </button>
+    <section
+      v-if="aviso && confirmacionExitosa"
+      class="tarjeta resultado-confirmacion"
+      aria-labelledby="titulo-resultado"
+    >
+      <div class="resultado-cabecera">
+        <span class="resultado-icono" aria-hidden="true">✓</span>
+        <div>
+          <h2 id="titulo-resultado">
+            {{ constancias.length === 1 ? '1 matrícula confirmada' : `${constancias.length} matrículas confirmadas` }}
+            <template v-if="seccionConfirmada">en {{ seccionConfirmada }}</template>
+          </h2>
+          <p>Se emitieron la boleta de matrícula y el cronograma de pensiones de cada estudiante.</p>
+        </div>
+        <NuxtLink to="/finanzas" class="boton-finanzas">Ver boletas en Finanzas</NuxtLink>
       </div>
-      <AvisoMensaje v-if="errorConstancia" :mensaje="errorConstancia" tipo="error" />
-    </div>
+      <div class="resultado-constancias">
+        <div class="resultado-subtitulo">
+          <h3>Constancias de matrícula</h3>
+          <input
+            v-if="constancias.length > 8"
+            v-model="busquedaConstancia"
+            type="search"
+            placeholder="Buscar por nombre o DNI"
+            aria-label="Buscar constancia por nombre o DNI"
+          />
+        </div>
+        <ul class="lista-constancias">
+          <li v-for="item in constanciasFiltradas" :key="item.matriculaId">
+            <span class="constancia-nombre">{{ item.nombre }}</span>
+            <span class="constancia-dni">{{ item.dni ? `DNI ${item.dni}` : '' }}</span>
+            <button
+              type="button"
+              class="boton-pdf"
+              :disabled="descargandoConstanciaId !== null"
+              :aria-label="`Descargar constancia de ${item.nombre}`"
+              @click="descargarConstancia(item.matriculaId)"
+            >
+              {{ descargandoConstanciaId === item.matriculaId ? 'Descargando…' : '⬇ PDF' }}
+            </button>
+          </li>
+          <li v-if="!constanciasFiltradas.length" class="constancia-vacia">
+            Ningún estudiante coincide con la búsqueda.
+          </li>
+        </ul>
+        <AvisoMensaje v-if="errorConstancia" :mensaje="errorConstancia" tipo="error" />
+      </div>
+    </section>
+    <AvisoMensaje v-else-if="aviso" :mensaje="aviso" tipo="exito" />
     <AvisoMensaje
       v-if="avisoPendientes && pendientesDeConfirmacion.length"
       :mensaje="avisoPendientes"
@@ -756,20 +809,6 @@ onMounted(cargarDatos)
   border-color: #c3c6d7;
   color: #7a7d8a;
   cursor: not-allowed;
-}
-.aviso-exito {
-  display: grid;
-  gap: 8px;
-}
-.enlace-finanzas {
-  justify-self: start;
-  color: #004ac6;
-  font-size: 14px;
-  font-weight: 600;
-  text-decoration: none;
-}
-.enlace-finanzas:hover {
-  text-decoration: underline;
 }
 .ayuda-pendientes {
   margin: 0 0 8px;
@@ -1173,5 +1212,139 @@ onMounted(cargarDatos)
 
 .no-corresponde small {
   font-size: 12px;
+}
+.resultado-confirmacion {
+  border-color: #9fd8b4;
+}
+.resultado-cabecera {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 24px;
+  background: #effaf3;
+}
+.resultado-cabecera h2 {
+  margin: 0;
+  color: #14532d;
+  font-size: 17px;
+}
+.resultado-cabecera p {
+  margin: 2px 0 0;
+  color: #3f6150;
+  font-size: 14px;
+}
+.resultado-icono {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 50%;
+  background: #1f9254;
+  color: white;
+  font-weight: 700;
+}
+.boton-finanzas {
+  margin-left: auto;
+  padding: 9px 14px;
+  border: 1px solid #004ac6;
+  border-radius: 8px;
+  background: white;
+  color: #004ac6;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.boton-finanzas:hover {
+  background: #eef3ff;
+}
+.resultado-constancias {
+  display: grid;
+  gap: 10px;
+  padding: 16px 24px 20px;
+}
+.resultado-subtitulo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.resultado-subtitulo h3 {
+  margin: 0;
+  color: #191c1e;
+  font-size: 15px;
+}
+.resultado-subtitulo input {
+  width: min(280px, 100%);
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid #c3c6d7;
+  border-radius: 8px;
+  font-size: 14px;
+}
+.lista-constancias {
+  max-height: 300px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  border: 1px solid #e1e3ec;
+  border-radius: 8px;
+  list-style: none;
+}
+.lista-constancias li {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 14px;
+  border-bottom: 1px solid #eef0f5;
+  font-size: 14px;
+}
+.lista-constancias li:last-child {
+  border-bottom: 0;
+}
+.constancia-nombre {
+  color: #191c1e;
+  font-weight: 600;
+}
+.constancia-dni {
+  color: #5b5f6e;
+  font-variant-numeric: tabular-nums;
+}
+.constancia-vacia {
+  color: #5b5f6e;
+}
+.boton-pdf {
+  padding: 5px 10px;
+  border: 1px solid #c3c6d7;
+  border-radius: 6px;
+  background: white;
+  color: #004ac6;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.boton-pdf:hover:not(:disabled) {
+  border-color: #004ac6;
+}
+.boton-pdf:disabled {
+  color: #7a7d8a;
+  cursor: not-allowed;
+}
+@media (max-width: 640px) {
+  .resultado-cabecera {
+    flex-wrap: wrap;
+  }
+  .boton-finanzas {
+    margin-left: 0;
+  }
+  .lista-constancias li {
+    grid-template-columns: 1fr auto;
+  }
+  .constancia-dni {
+    display: none;
+  }
 }
 </style>
