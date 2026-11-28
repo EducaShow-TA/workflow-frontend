@@ -3,14 +3,17 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
 import {
   NOMBRES_ESTADO_BOLETA,
+  alternarEnOrden,
   NOMBRES_SITUACION_COMPROMISO,
   boletasPagadas,
   boletasPorPagar,
   fechaPago,
   formatearSolesFamilia,
   nombrarMesBoleta,
+  seleccionInicial,
   usePagosFamilia,
 } from '~/composables/usePagosFamilia'
+import { obtenerFechaHoyIso } from '~/composables/useFechas'
 import { useEstadoSistema } from '~/composables/useParametrosSistema'
 import { useAutenticacionStore } from '~/stores/autenticacion'
 import type { BoletaFamilia, DeudaFamilia, PagosHijo } from '~/types/familia'
@@ -95,8 +98,16 @@ function alternarTodas(): void {
   seleccion.value = todasMarcadas.value ? [] : porPagar.value.map((boleta) => boleta.boletaId)
 }
 
-function seleccionarTodas(): void {
-  seleccion.value = porPagar.value.map((boleta) => boleta.boletaId)
+function seleccionarPorDefecto(): void {
+  seleccion.value = seleccionInicial(porPagar.value, obtenerFechaHoyIso())
+}
+
+function alternar(boleta: BoletaFamilia): void {
+  seleccion.value = alternarEnOrden(porPagar.value, seleccion.value, boleta.boletaId)
+}
+
+function porVencer(boleta: BoletaFamilia): boolean {
+  return boleta.estadoPago === 'PENDIENTE' && boleta.fechaVencimiento > `${obtenerFechaHoyIso().slice(0, 7)}-31`
 }
 
 async function cargar(): Promise<void> {
@@ -110,7 +121,7 @@ async function cargar(): Promise<void> {
         ? pedido
         : (hijos.value[0]?.estudianteId ?? null)
     }
-    seleccionarTodas()
+    seleccionarPorDefecto()
   } catch (fallo: unknown) {
     error.value = obtenerMensajeError(fallo, 'No se pudieron cargar tus pagos.')
   } finally {
@@ -139,10 +150,10 @@ async function alPagar(cantidad: number): Promise<void> {
 watch(estudianteId, () => {
   compromisoId.value = null
   verTodoHistorial.value = false
-  seleccionarTodas()
+  seleccionarPorDefecto()
 })
 
-watch(compromisoId, seleccionarTodas)
+watch(compromisoId, seleccionarPorDefecto)
 
 onMounted(() => {
   void cargarEstado(true)
@@ -264,7 +275,7 @@ onMounted(() => {
             <AvisoMensaje
               v-if="enMora"
               tipo="error"
-              :mensaje="`Tienes ${enMora} ${enMora === 1 ? 'boleta en mora' : 'boletas en mora'}. Te recomendamos pagar primero las más antiguas.`"
+              :mensaje="`Tienes ${enMora} ${enMora === 1 ? 'boleta en mora' : 'boletas en mora'}. ${enMora === 1 ? 'Ya está marcada: se paga primero.' : 'Ya están marcadas: se pagan primero.'}`"
             />
             <div class="docente-tarjeta lista-pagar">
               <table class="tabla-pagar">
@@ -292,10 +303,10 @@ onMounted(() => {
                   >
                     <td class="marca">
                       <input
-                        v-model="seleccion"
                         type="checkbox"
-                        :value="boleta.boletaId"
+                        :checked="seleccion.includes(boleta.boletaId)"
                         :aria-label="`Seleccionar ${boleta.tipoCargo === 'MATRICULA' ? 'matrícula' : 'pensión'} ${nombrarMesBoleta(boleta.mesCobro)}`"
+                        @change="alternar(boleta)"
                       />
                     </td>
                     <td>
@@ -309,7 +320,8 @@ onMounted(() => {
                       {{ fechaPago(boleta.fechaVencimiento) }}
                     </td>
                     <td>
-                      <span class="estado" :class="boleta.estadoPago.toLowerCase()">{{
+                      <span v-if="porVencer(boleta)" class="estado por-vencer">Por vencer</span>
+                      <span v-else class="estado" :class="boleta.estadoPago.toLowerCase()">{{
                         NOMBRES_ESTADO_BOLETA[boleta.estadoPago]
                       }}</span>
                     </td>
@@ -329,13 +341,13 @@ onMounted(() => {
                   :disabled="!seleccionadas.length || pagoNoDisponible"
                   @click="modalAbierto = true"
                 >
-                  {{ seleccionadas.length === porPagar.length ? 'Pagar todas' : 'Pagar seleccionadas' }}
+                  Pagar {{ formatearSolesFamilia(totalSeleccionado) }}
                 </button>
               </footer>
             </div>
             <p class="nota">
-              De la más antigua a la más reciente. Se pagan juntas en una sola operación: si una falla, no se cobra
-              ninguna.
+              Se pagan en orden, de la más antigua a la más reciente: al marcar un mes se incluyen los anteriores. Se
+              pagan juntas en una sola operación: si una falla, no se cobra ninguna.
             </p>
           </template>
         </section>
@@ -835,5 +847,10 @@ tr.en-mora td {
   .boton-pagar {
     width: 100%;
   }
+}
+
+.estado.por-vencer {
+  background: #eef2f7;
+  color: #475569;
 }
 </style>
