@@ -56,10 +56,31 @@ export function fechaPago(fecha: string, conAnio = true): string {
 }
 
 /** En mora y pendientes, de la más antigua a la más reciente. */
+/** Por pagar en el orden en que deben pagarse: la matrícula primero y luego las pensiones, de la más antigua a la más reciente. */
 export function boletasPorPagar(compromiso: CompromisoFamilia): BoletaFamilia[] {
   return compromiso.boletas
     .filter((boleta) => boleta.estadoPago !== 'PAGADA')
-    .sort((primera, segunda) => primera.mesCobro.localeCompare(segunda.mesCobro))
+    .sort(
+      (primera, segunda) =>
+        Number(primera.tipoCargo === 'PENSION') - Number(segunda.tipoCargo === 'PENSION') ||
+        primera.mesCobro.localeCompare(segunda.mesCobro),
+    )
+}
+
+/** Marcadas al entrar: hasta la última vencida o que vence este mes; si no hay, solo la siguiente. */
+export function seleccionInicial(porPagar: BoletaFamilia[], fechaHoy: string): number[] {
+  const finDeMes = `${fechaHoy.slice(0, 7)}-31`
+  const ultima = porPagar
+    .map((boleta) => boleta.estadoPago === 'EN_MORA' || boleta.fechaVencimiento <= finDeMes)
+    .lastIndexOf(true)
+  return porPagar.slice(0, Math.max(ultima, 0) + 1).map((boleta) => boleta.boletaId)
+}
+
+/** Las boletas se pagan en orden: marcar una incluye las anteriores y desmarcarla quita las siguientes. */
+export function alternarEnOrden(porPagar: BoletaFamilia[], seleccion: number[], boletaId: number): number[] {
+  const indice = porPagar.findIndex((boleta) => boleta.boletaId === boletaId)
+  const hasta = seleccion.includes(boletaId) ? indice : indice + 1
+  return porPagar.slice(0, hasta).map((boleta) => boleta.boletaId)
 }
 
 /** Pagadas, de la más reciente a la más antigua. */
