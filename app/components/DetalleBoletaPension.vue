@@ -122,7 +122,7 @@ onMounted(cargar)
           <dd>{{ moneda.format(boleta.monto) }}</dd>
         </div>
         <div>
-          <dt>Mora</dt>
+          <dt>Recargo por mora</dt>
           <dd>{{ moneda.format(boleta.mora) }}</dd>
         </div>
         <div>
@@ -132,6 +132,10 @@ onMounted(cargar)
           </dd>
         </div>
       </dl>
+      <p class="ayuda-mora">
+        El estado «En mora» indica que la boleta venció sin pagarse. El recargo es un importe aparte y actualmente no
+        hay una penalidad configurada.
+      </p>
       <h3>Comprobantes registrados</h3>
       <p v-if="!recibos.length">No hay comprobantes registrados para esta boleta.</p>
       <ul v-else class="recibos">
@@ -227,6 +231,11 @@ dt {
 dd {
   margin: 6px 0;
   overflow-wrap: anywhere;
+}
+.ayuda-mora {
+  margin: 4px 0 20px;
+  color: #64748b;
+  font-size: 13px;
 }
 .campos {
   border: 0;
