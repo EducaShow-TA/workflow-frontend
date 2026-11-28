@@ -7,6 +7,7 @@ import type { Aula, BloqueGrilla, DiaSemana, HorarioSeccion, SesionHorario } fro
 import { ErrorSolicitudApi } from '~/types/api'
 import { nombreDia, useHorarioSeccion } from '~/composables/useHorarioSeccion'
 import { useSesionesClase } from '~/composables/useSesionesClase'
+import { usePeriodosAcademicos } from '~/composables/usePeriodosAcademicos'
 import { obtenerMensajeError } from '~/composables/useMensajesError'
 import { obtenerNombreTurno, recortarHora } from '~/composables/usePlantillasHorario'
 
@@ -15,6 +16,7 @@ definePageMeta({ middleware: 'autenticacion' })
 const ruta = useRoute()
 const api = useHorarioSeccion()
 const { listarAreas, listarDocentes } = useSesionesClase()
+const { listarPorAnhio } = usePeriodosAcademicos()
 const anhioActual = ahoraSistema().getFullYear()
 const ANHIOS = [anhioActual, anhioActual + 1]
 
@@ -28,6 +30,7 @@ const anhio = ref(anhioActual)
 const horario = ref<HorarioSeccion | null>(null)
 const sinHorario = ref(false)
 const plantillaId = ref<number | ''>('')
+const matriculadosDelAnhio = ref(new Map<number, number>())
 const cargando = ref(false)
 const creando = ref(false)
 const error = ref('')
@@ -55,6 +58,21 @@ const coloresArea = computed(() => {
   areas.value.forEach((area, indice) => mapa.set(area.codigo, indice % 6))
   return mapa
 })
+
+function alumnos(item: Seccion): number {
+  return matriculadosDelAnhio.value.get(item.id) ?? 0
+}
+
+async function cargarMatriculados(): Promise<void> {
+  const anhioPedido = anhio.value
+  try {
+    const periodos = await listarPorAnhio(anhioPedido)
+    if (anhioPedido !== anhio.value) return
+    matriculadosDelAnhio.value = new Map(periodos.map((periodo) => [periodo.seccionId, periodo.matriculasActivas]))
+  } catch {
+    matriculadosDelAnhio.value = new Map()
+  }
+}
 
 function nombreSeccion(item: Seccion): string {
   return formatearSeccionCompleta(item.gradoNumero, item.nombre)
@@ -177,6 +195,8 @@ watch([seccionId, anhio], () => {
   void cargarHorario()
 })
 
+watch(anhio, cargarMatriculados, { immediate: true })
+
 onMounted(cargarCatalogos)
 </script>
 
@@ -197,7 +217,7 @@ onMounted(cargarCatalogos)
         Sección
         <select v-model.number="seccionId">
           <option v-for="item in secciones" :key="item.id" :value="item.id">
-            {{ nombreSeccion(item) }} · {{ item.cantidadMatriculados }} alumnos
+            {{ nombreSeccion(item) }} · {{ alumnos(item) }} alumnos
           </option>
         </select>
       </label>
@@ -298,7 +318,7 @@ onMounted(cargarCatalogos)
           <strong>{{ aula.codigo }}</strong>
           <span>{{ aula.capacidad }} personas</span>
           <small v-if="aula.descripcion">{{ aula.descripcion }}</small>
-          <small v-if="seccion && seccion.cantidadMatriculados > aula.capacidad" class="insuficiente">
+          <small v-if="seccion && alumnos(seccion) > aula.capacidad" class="insuficiente">
             No alcanza para {{ nombreSeccion(seccion) }}
           </small>
         </li>
@@ -328,7 +348,7 @@ onMounted(cargarCatalogos)
       :areas="areas"
       :docentes="docentes"
       :aulas="aulas"
-      :alumnos="seccion?.cantidadMatriculados ?? 0"
+      :alumnos="seccion ? alumnos(seccion) : 0"
       :anio="anhio"
       @cerrar="modalAbierto = false"
       @guardada="alGuardar"
