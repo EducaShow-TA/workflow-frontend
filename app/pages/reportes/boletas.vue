@@ -251,6 +251,10 @@ onMounted(async () => {
         <h2 id="titulo-detalle">Detalle de cobranza</h2>
         <p class="filtros-aplicados">{{ resumenFiltros }}</p>
         <p class="actualizacion">
+          El estado «En mora» indica una boleta vencida sin pago. El recargo por mora es un importe independiente y no
+          está configurado actualmente.
+        </p>
+        <p class="actualizacion">
           Última consulta: {{ ultimaConsulta }}. Los totales incluyen todas las páginas del reporte.
         </p>
         <div v-if="!boletas.length" class="vacio" role="status">
@@ -282,7 +286,7 @@ onMounted(async () => {
                   <th scope="col">Vencimiento</th>
                   <th scope="col">Estado</th>
                   <th scope="col" class="importe">Importe</th>
-                  <th scope="col" class="importe">Mora</th>
+                  <th scope="col" class="importe">Recargo por mora</th>
                   <th scope="col" class="importe">Total</th>
                 </tr>
               </thead>

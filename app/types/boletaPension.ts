@@ -15,6 +15,7 @@ export interface BoletaPension {
   seccion: string
   mesCobro: string
   monto: number
+  /** Recargo monetario por mora; no indica que el estado de pago sea EN_MORA. */
   mora: number
   montoTotal: number
   fechaVencimiento: string
