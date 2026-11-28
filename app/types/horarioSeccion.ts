@@ -23,6 +23,8 @@ export interface SesionHorario {
   docenteNombre: string
   aulaId: number
   aulaCodigo: string
+  vigenteDesde?: string
+  vigenteHasta?: string | null
 }
 
 export interface BloqueGrilla {

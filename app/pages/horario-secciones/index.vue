@@ -157,10 +157,11 @@ function abrirCelda(bloque: BloqueGrilla, dia: DiaSemana): void {
   modalAbierto.value = true
 }
 
-async function alGuardar(mensaje: string): Promise<void> {
+async function alGuardar(mensaje: string, sesionQuitadaId?: number): Promise<void> {
   modalAbierto.value = false
-  aviso.value = mensaje
   await cargarHorario()
+  const sigue = horario.value?.bloques.some((bloque) => bloque.sesiones.some((sesion) => sesion.id === sesionQuitadaId))
+  aviso.value = sigue ? 'La clase de hoy ya empezó: se quitará del horario desde mañana.' : mensaje
 }
 
 async function agregarAula(): Promise<void> {

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { obtenerFechaHoyIso } from '~/composables/useFechas'
 import { computed, ref, watch } from 'vue'
 import type { AreaOpcion, DocenteOpcion } from '~/types/sesionClase'
 import type {
@@ -28,7 +29,7 @@ const propiedades = defineProps<{
 
 const emitir = defineEmits<{
   cerrar: []
-  guardada: [mensaje: string]
+  guardada: [mensaje: string, sesionQuitadaId?: number]
 }>()
 
 const api = useHorarioSeccion()
@@ -140,8 +141,13 @@ async function guardar(): Promise<void> {
   error.value = ''
   try {
     if (propiedades.sesion) {
-      await api.actualizar(propiedades.horarioId, propiedades.sesion.id, solicitud.value)
-      emitir('guardada', `Se actualizó la clase del ${nombreDia(propiedades.dia)} ${propiedades.franja}.`)
+      const actualizada = await api.actualizar(propiedades.horarioId, propiedades.sesion.id, solicitud.value)
+      const desdeManana = tipoVigencia.value === 'PERMANENTE' && (actualizada.vigenteDesde ?? '') > obtenerFechaHoyIso()
+      emitir(
+        'guardada',
+        `Se actualizó la clase del ${nombreDia(propiedades.dia)} ${propiedades.franja}.` +
+          (desdeManana ? ' La clase de hoy ya empezó: el cambio rige desde mañana.' : ''),
+      )
     } else {
       await api.agregar(propiedades.horarioId, solicitud.value)
       emitir('guardada', `Se asignó la clase del ${nombreDia(propiedades.dia)} ${propiedades.franja}.`)
@@ -159,7 +165,11 @@ async function eliminar(): Promise<void> {
   error.value = ''
   try {
     await api.eliminar(propiedades.horarioId, propiedades.sesion.id)
-    emitir('guardada', `Se quitó la clase del ${nombreDia(propiedades.dia)} ${propiedades.franja}.`)
+    emitir(
+      'guardada',
+      `Se quitó la clase del ${nombreDia(propiedades.dia)} ${propiedades.franja}.`,
+      propiedades.sesion.id,
+    )
   } catch (fallo: unknown) {
     error.value = obtenerMensajeError(fallo, 'No se pudo quitar la clase.')
   } finally {
@@ -216,9 +226,12 @@ async function eliminar(): Promise<void> {
       <div v-if="sesion" class="campo">
         <label for="sesion-vigencia">Vigencia del cambio</label>
         <select id="sesion-vigencia" v-model="tipoVigencia" :disabled="guardando">
-          <option value="PERMANENTE">Permanente desde el próximo día</option>
+          <option value="PERMANENTE">Permanente desde hoy</option>
           <option value="TEMPORAL">Temporal por rango de fechas</option>
         </select>
+        <small v-if="tipoVigencia === 'PERMANENTE'" class="ayuda"
+          >Si la clase de hoy ya empezó, el cambio rige desde mañana.</small
+        >
       </div>
       <div v-if="sesion && tipoVigencia === 'TEMPORAL'" class="fechas-vigencia">
         <label class="campo" for="vigente-desde"
